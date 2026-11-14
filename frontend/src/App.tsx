@@ -42,7 +42,7 @@ export default function App() {
       <div className="min-h-full">
         <header className="sticky top-0 z-30 border-b border-line bg-canvas/90 backdrop-blur">
           <div className="frame mx-auto flex h-16 max-w-[1280px] items-center px-6">
-            <button onClick={() => setPage('ingest')} className="flex items-baseline gap-0.5">
+            <button onClick={() => setPage("ingest")} className="flex items-baseline">
               <span className="font-serif text-[26px] leading-none text-fg">Alib</span>
               <span className="font-serif text-[26px] leading-none text-terra">.ai</span>
             </button>

@@ -83,6 +83,21 @@ Any source can be supported by writing an adapter that outputs this format.
 - **"Inconsistent", never "lied" or "guilty".** The report describes data, and the investigator draws the conclusions.
 - **Phone data is assumed genuine.** Spoofing detection is out of scope, and the report says so.
 
+## Trust and transparency
+
+Every finding can be checked by the person reading it. Each one opens with four tabs:
+
+| Tab | What it gives you |
+|---|---|
+| **Evidence** | The picture: a map, a money chain, a thread diff, a timeline |
+| **How we know** | The step-by-step derivation, marking which steps were plain code and which were the language model. It also shows where each number came from, which phones hold each fact, and the validator checks the sentence passed. |
+| **Verify** | Your browser recomputes the key numbers from the raw rows, without trusting the check's own output, and shows ✓ or ✗ for each. Here you can also record "I checked this" or "I dispute this". |
+| **Sources** | For each row: the bundle hash, file, line number and the original JSON line, so you can open the source file and find it |
+
+Alib.ai also **briefs you before you ask.** As soon as the phones are loaded, it sweeps every pair and presents what stands out, ranked, with a week timeline and a relations graph. It also lists what it checked and dismissed, and why. You can **ask questions at any time.** Every answer cites its rows or says "cannot tell".
+
+Engineers: see [DERIVATION.md](DERIVATION.md) for exactly how each statement is derived.
+
 ## Run the mock-up
 
 Prerequisites: Node 20 or newer.
@@ -96,56 +111,53 @@ npm run dev
 Open http://localhost:5173 in Chrome on a laptop-size screen.
 
 ### Demo click-path
-1. **Ingest data.** Click **Load sample bundle** and watch the six pipeline stages run. Check the per-phone counts and the ingest notes, which include warnings such as power-off gaps. Then click **Open case**.
-2. **Case analysis.** The left panel shows the four phones and the pre-filled brief. Click **Analyse**.
-3. **Watch the run.** The to-do list ticks off one item at a time, and the subagent lanes show which tool each agent is calling. A run takes about 17 seconds.
-4. **Read the report.** It has five parts: Confirmed, Inconsistent with what you believe, Answers to your open questions, What you didn't ask about, and Suggested next steps.
-5. **Click each finding.** The right panel switches to the matching evidence view:
-
-   | Finding | View |
-   |---|---|
-   | Paul's and Amy's phones 23 km apart | Map with both tracks and a per-slot distance bar |
-   | Paul's and Cara's phones at Dock Cafe 4 times, with zero contact | Occasions table and map |
-   | $5,000 Paul → Ken, then $4,500 Ken → Cara | Money chain |
-   | Three phones deleting threads and powering off after the audit notice | Timeline per phone |
-   | Texts on Paul's phone that are missing from Amy's | Side-by-side thread with gaps |
-
-6. **Relations graph tab.** Shows who is connected to whom, and on which channel. Click an edge to see its rows.
-7. **Try variations:**
-   - Add the line `Paul met Cara in March.` and re-run. You get a **cannot tell** finding, because the data only covers 13–19 April.
-   - Delete the line `Paul and Cara don't know each other.` and re-run. The Dock Cafe finding moves to **What you didn't ask about**, because the sweep still catches it.
-   - Open http://localhost:5173/?fail=1#case and click Analyse to see the error state and **Retry**.
+1. **Ingest.** Click **Load the sample case** and watch the six pipeline stages run. Check the per-phone counts and the ingest notes. Then click **Read the briefing**.
+2. **Briefing.** This is what Alib.ai found on its own:
+   - **Week timeline:** hover a finding to light up its events, or click any marker.
+   - **Five ranked patterns**, each with "why it matters" and follow-up questions.
+   - **Relations graph:** click an edge to see its rows.
+   - **Checked and dismissed:** the decoys, and the rule that rejected each one.
+3. **Open a finding** with **Evidence and how we know**. Go through the tabs: Evidence, How we know, Verify (it should show all ✓), and Sources (expand a row to see its raw JSON line).
+4. **Ask.** Click a follow-up chip, or **Ask Alib.ai** in the header. Watch the steps stream in, then open the cited evidence. Try `Did Paul meet Cara in March?` to get a **cannot tell** answer.
+5. **Investigate.** The brief is pre-filled. Click **Analyse**. The to-do list and the agents' tool calls run for about 17 seconds. The report then appears: the index is on the left and the selected finding, with the same four tabs, is on the right.
+6. **Try variations in the brief:**
+   - Add `Paul met Cara in March.` and you get **cannot tell**.
+   - Delete `Paul and Cara don't know each other.` and the sweep still surfaces the Dock Cafe pattern under **What you didn't ask about**.
+   - Open http://localhost:5173/?fail=1#investigate and click Analyse to see the error state and **Retry**.
 
 ## Status
 
 | Part | State |
 |---|---|
-| UI: ingest page, case page, all evidence views, relations graph | ✅ Built (mock data) |
+| UI: Ingest, Briefing, Investigate, Ask drawer, finding drawer, all evidence views | ✅ Built (mock data) |
+| Transparency: derivation chain, number tracing, validator, corroboration matrix | ✅ Built (mock data) |
+| Fact-check: in-browser recomputation from raw rows; row provenance | ✅ Built (works on any rows from `/api/evidence`) |
 | API contract (`frontend/src/api/types.ts`) | ✅ Defined |
 | Case Bundle v1 format and example | ✅ Defined |
 | Synthetic data generator and answer key | ⏳ Next |
 | Ingest pipeline, SQLite store, checks and tests | ⏳ Next |
-| deepagents orchestrator and subagents | ⏳ Next |
+| deepagents orchestrator, subagents, briefing and Ask | ⏳ Next |
 | FastAPI with SSE | ⏳ Next |
 
 **Open questions:**
 - Does Arlequin accept a fully synthetic case for Track 1?
 - Which model will the agents use: Anthropic API or Amazon Bedrock? It is configurable through the `MODEL` env var.
-- Is a free-form chat box needed for the demo, or does it wait for iteration 2?
 
 ## Repo layout
 
 ```
 README.md                  you are here
 ARCHITECTURE.md            full engineering design
+DERIVATION.md              how every statement is derived and traced to source
 schema/case-bundle-v1/     ingest format spec + example bundle
 frontend/
   src/api/types.ts         the API contract (shared shapes)
   src/api/index.ts         swap point: mock today, FastAPI later
-  src/api/mock.ts          mock API (simulated agent run)
-  src/mock/                synthetic case data, scripted report, ingest report
-  src/pages/               IngestPage, CasePage
-  src/components/          BriefPanel, AgentProgress, ReportPanel, EvidencePanel
+  src/api/mock.ts          mock API (simulated agent run, briefing, Ask)
+  src/mock/                synthetic case data, findings with derivations, briefing, Ask
+  src/lib/verify.ts        independent recomputation used by the Verify tab
+  src/pages/               IngestPage, BriefingPage, InvestigatePage
+  src/components/          FindingDetail (4 tabs), drawers, WeekTimeline, RunProgress
   src/components/evidence/ one view per check + relations graph
 ```
 
