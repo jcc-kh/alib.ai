@@ -2,6 +2,10 @@
 
 This document covers the target design for iteration 1 and later. For a link-by-link account of how every statement is derived and how to trace it back to its source, see [DERIVATION.md](DERIVATION.md). The front-end mock-up in `frontend/` already follows these interfaces. Each mock is meant to be replaced by the real component behind the same contract.
 
+![Alib.ai system architecture](docs/architecture.png)
+
+*Diagram source: [docs/architecture-diagram.html](docs/architecture-diagram.html). To update it, edit the HTML, open it in Chrome at 1920×1240, and capture a full-size screenshot to `docs/architecture.png`.*
+
 ## 1. Design principle: code finds facts, the model routes and phrases
 
 ```

@@ -16,6 +16,8 @@ Alib.ai does that comparison. The investigator writes a short **brief** in three
 
 ## How it works
 
+![Alib.ai system architecture](docs/architecture.png)
+
 ```
  Phone data           Ingest              Case store        Checks (code)           Agents (LLM)                 Report
  ───────────          ──────              ──────────        ─────────────           ────────────                 ──────
@@ -149,6 +151,7 @@ Open http://localhost:5173 in Chrome on a laptop-size screen.
 README.md                  you are here
 ARCHITECTURE.md            full engineering design
 DERIVATION.md              how every statement is derived and traced to source
+docs/architecture.png      system diagram (source: docs/architecture-diagram.html)
 schema/case-bundle-v1/     ingest format spec + example bundle
 frontend/
   src/api/types.ts         the API contract (shared shapes)

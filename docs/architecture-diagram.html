@@ -1,0 +1,208 @@
+<!doctype html>
+<!-- Source for docs/architecture.png. Edit this file, then re-render (see README "Architecture diagram"). -->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Alib.ai architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #101010; --panel: #171717; --line: #2e2b28; --fg: #f5f1ea; --muted: #a39d94; --faint: #6f6a63;
+    --code: #6b9bff; --model: #e8a33d; --store: #4fc493; --ui: #e07a5f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--fg); font-family: Inter, sans-serif; width: 1920px; height: 1240px; position: relative; overflow: hidden; }
+  .serif { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; }
+  .mono { font-family: "JetBrains Mono", monospace; }
+  .abs { position: absolute; }
+  h1 { font-family: "Instrument Serif", serif; font-weight: 400; font-size: 52px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 18px; margin-top: 6px; }
+  .eyebrow { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); margin-bottom: 10px; }
+  .col { position: absolute; top: 190px; }
+  .col-title { font-family: "Instrument Serif", serif; font-size: 27px; line-height: 1.1; margin-bottom: 4px; }
+  .col-note { font-size: 13px; color: var(--faint); margin-bottom: 16px; height: 34px; }
+  .box { border: 1.5px solid var(--line); border-radius: 12px; background: var(--panel); padding: 12px 14px; margin-bottom: 10px; }
+  .box.code { border-color: color-mix(in srgb, var(--code) 70%, transparent); }
+  .box.model { border-color: color-mix(in srgb, var(--model) 75%, transparent); }
+  .box.store { border-color: color-mix(in srgb, var(--store) 65%, transparent); }
+  .box.ui { border-color: color-mix(in srgb, var(--ui) 70%, transparent); }
+  .bt { font-size: 15px; font-weight: 600; color: var(--fg); }
+  .bd { font-size: 12.5px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+  .tag { display: inline-block; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; padding: 2px 7px; border-radius: 99px; margin-left: 6px; vertical-align: 2px; }
+  .tag.code { color: var(--code); border: 1px solid color-mix(in srgb, var(--code) 50%, transparent); }
+  .tag.model { color: var(--model); border: 1px solid color-mix(in srgb, var(--model) 50%, transparent); }
+  .stage { display: flex; align-items: center; gap: 10px; border: 1.5px solid color-mix(in srgb, var(--code) 55%, transparent); border-radius: 10px; background: var(--panel); padding: 9px 12px; margin-bottom: 8px; }
+  .num { width: 22px; height: 22px; border-radius: 99px; border: 1px solid var(--code); color: var(--code); font-size: 11px; display: grid; place-items: center; flex-shrink: 0; }
+  .list { font-size: 12.5px; color: var(--muted); line-height: 1.75; }
+  .list b { color: var(--fg); font-weight: 500; }
+  .ep { font-size: 12px; line-height: 1.5; margin-bottom: 9px; }
+  .ep .m { color: var(--code); }
+  .ep .d { color: var(--faint); display: block; }
+  .page { position: absolute; top: 0; border-radius: 12px; border: 1.5px solid color-mix(in srgb, var(--ui) 65%, transparent); background: var(--panel); padding: 14px 16px; height: 150px; }
+  .tabs { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .tabs span { font-size: 11.5px; border: 1px solid var(--line); border-radius: 99px; padding: 3px 9px; color: var(--muted); }
+  .legend { display: flex; gap: 26px; font-size: 13px; color: var(--muted); }
+  .legend i { display: inline-block; width: 22px; height: 12px; border-radius: 4px; border: 2px solid; margin-right: 8px; vertical-align: -1px; }
+  .principle { border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; font-size: 13.5px; color: var(--muted); line-height: 1.55; background: #131313; }
+  .principle b { color: var(--fg); font-weight: 500; }
+  svg.arrows { position: absolute; inset: 0; pointer-events: none; }
+  .lbl { font-family: Inter, sans-serif; font-size: 12.5px; fill: #a39d94; paint-order: stroke; stroke: #101010; stroke-width: 7px; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="abs" style="left:56px; top:44px;">
+  <div class="eyebrow">System architecture · iteration 1</div>
+  <h1><span>Alib</span><span style="color:#c8553a">.ai</span> · how a phone extraction becomes a cited finding</h1>
+  <div class="sub">Code finds the facts. The model routes and phrases. Every statement links back to a line in a source file.</div>
+</div>
+<div class="abs legend" style="right:56px; top:64px;">
+  <span><i style="border-color:var(--code)"></i>Deterministic code</span>
+  <span><i style="border-color:var(--model)"></i>Language model</span>
+  <span><i style="border-color:var(--store)"></i>Data at rest</span>
+  <span><i style="border-color:var(--ui)"></i>User interface</span>
+</div>
+
+<!-- 1 · Input -->
+<div class="col" style="left:56px; width:230px;">
+  <div class="eyebrow">1 · Input</div>
+  <div class="col-title">Phone data</div>
+  <div class="col-note">Any source, via an adapter</div>
+  <div class="box"><div class="bt">Phone extractions</div><div class="bd">Forensic exports, spreadsheets, or the seeded synthetic generator</div></div>
+  <div class="box code"><div class="bt">Adapter</div><div class="bd">One per source format; writes a Case Bundle</div></div>
+  <div class="box store" style="margin-top:28px"><div class="bt">Case Bundle v1</div>
+    <div class="bd mono" style="font-size:11.5px; line-height:1.6; margin-top:6px">manifest.json<br>persons.jsonl<br>devices/&lt;id&gt;/<br>&nbsp;&nbsp;messages · calls<br>&nbsp;&nbsp;locations · transactions<br>&nbsp;&nbsp;device_events<br>&nbsp;&nbsp;contacts · social_*</div>
+  </div>
+</div>
+
+<!-- 2 · Ingest -->
+<div class="col" style="left:340px; width:250px;">
+  <div class="eyebrow">2 · Ingest</div>
+  <div class="col-title">Ingest pipeline</div>
+  <div class="col-note">backend/ingest/ · pure functions</div>
+  <div class="stage"><span class="num">1</span><div><div class="bt" style="font-size:14px">Load</div><div class="bd">manifest + JSONL, file/line kept</div></div></div>
+  <div class="stage"><span class="num">2</span><div><div class="bt" style="font-size:14px">Validate</div><div class="bd">pydantic schema, errors with line</div></div></div>
+  <div class="stage"><span class="num">3</span><div><div class="bt" style="font-size:14px">Normalise</div><div class="bd">E.164 numbers, tz-aware times, places</div></div></div>
+  <div class="stage"><span class="num">4</span><div><div class="bt" style="font-size:14px">Resolve entities</div><div class="bd">numbers, emails, handles → people</div></div></div>
+  <div class="stage"><span class="num">5</span><div><div class="bt" style="font-size:14px">Store</div><div class="bd">global id + provenance per row</div></div></div>
+  <div class="stage"><span class="num">6</span><div><div class="bt" style="font-size:14px">Index</div><div class="bd">pair contacts, 10-min location slots</div></div></div>
+</div>
+
+<!-- 3 · Store -->
+<div class="col" style="left:644px; width:230px;">
+  <div class="eyebrow">3 · Store</div>
+  <div class="col-title">Case store</div>
+  <div class="col-note">SQLite · one row per phone</div>
+  <div class="box store">
+    <div class="list"><b>persons</b> · identifiers · devices<br><b>messages</b> · <b>calls</b><br><b>locations</b> · <b>transactions</b><br><b>device_events</b><br>contacts · social_accounts<br>social_interactions</div>
+  </div>
+  <div class="box store">
+    <div class="bt" style="font-size:14px">Every row carries</div>
+    <div class="bd mono" style="font-size:11.5px; line-height:1.6; margin-top:4px">id  paul:loc:1268<br>device_owner<br>provenance:<br>&nbsp;bundle sha256<br>&nbsp;file · line<br>&nbsp;raw JSON line</div>
+  </div>
+</div>
+
+<!-- 4 · Checks -->
+<div class="col" style="left:928px; width:290px;">
+  <div class="eyebrow">4 · Checks</div>
+  <div class="col-title">Deterministic checks</div>
+  <div class="col-note">backend/checks/ · no model, thresholds are named args</div>
+  <div class="box code"><div class="bt mono" style="font-size:13px">missing_messages</div><div class="bd">on one phone, gone from the other</div></div>
+  <div class="box code"><div class="bt mono" style="font-size:13px">distance_between</div><div class="bd">haversine per 10-min slot → together / apart</div></div>
+  <div class="box code"><div class="bt mono" style="font-size:13px">money_chains</div><div class="bd">A→B then B→C, ≤24 h, 80–100%</div></div>
+  <div class="box code"><div class="bt mono" style="font-size:13px">silent_meetings</div><div class="bd">≤100 m, ≥20 min, ≥2 times, zero contact</div></div>
+  <div class="box code"><div class="bt mono" style="font-size:13px">synchronised_behaviour</div><div class="bd">≥3 phones delete / power off in 60 min</div></div>
+  <div class="box code" style="padding:10px 14px"><div class="bd mono" style="font-size:11.5px; margin:0">contact_graph · get_coverage<br>get_events · search_messages<br><span style="color:var(--fg)">run_sweep()</span> = all checks × all pairs</div></div>
+</div>
+
+<!-- 5 · Agents -->
+<div class="col" style="left:1272px; width:330px;">
+  <div class="eyebrow">5 · Agents</div>
+  <div class="col-title">LangChain deepagents</div>
+  <div class="col-note">backend/agents/ · create_deep_agent</div>
+  <div class="box model"><div class="bt">orchestrator <span class="tag model">model</span></div><div class="bd">splits the brief · write_todos · routes items via <span class="mono">task</span> · calls run_sweep</div></div>
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:6px 0 10px 18px;">
+    <div class="box model" style="margin:0; padding:9px 11px"><div class="bt mono" style="font-size:12px">location-analyst</div></div>
+    <div class="box model" style="margin:0; padding:9px 11px"><div class="bt mono" style="font-size:12px">comms-analyst</div></div>
+    <div class="box model" style="margin:0; padding:9px 11px"><div class="bt mono" style="font-size:12px">relationship-mapper</div></div>
+    <div class="box model" style="margin:0; padding:9px 11px"><div class="bt mono" style="font-size:12px">financial-analyst</div></div>
+    <div class="box model" style="margin:0; padding:9px 11px; grid-column: span 2"><div class="bt mono" style="font-size:12px">device-forensics</div></div>
+  </div>
+  <div class="box model"><div class="bt">report-writer <span class="tag model">model</span></div><div class="bd">one sentence per finding, copied numbers + their source fields</div></div>
+  <div class="box code"><div class="bt">validate_report() <span class="tag code">code</span></div><div class="bd">cites evidence · phones not people · no "lied/guilty" · every number traced · one sentence → else repair once, then drop</div></div>
+</div>
+
+<!-- 6 · API -->
+<div class="col" style="left:1656px; width:208px;">
+  <div class="eyebrow">6 · API</div>
+  <div class="col-title">FastAPI</div>
+  <div class="col-note">backend/api.py · SSE for runs</div>
+  <div class="box code" style="padding:14px">
+    <div class="ep mono"><span class="m">POST</span> /api/ingest<span class="d">ingest report</span></div>
+    <div class="ep mono"><span class="m">GET</span> /api/case<span class="d">people, counts, places</span></div>
+    <div class="ep mono"><span class="m">GET</span> /api/briefing<span class="d">proactive, from sweep</span></div>
+    <div class="ep mono"><span class="m">POST</span> /api/analyse<span class="d">SSE: todos · subagent · report</span></div>
+    <div class="ep mono"><span class="m">POST</span> /api/ask<span class="d">SSE: step · answer</span></div>
+    <div class="ep mono"><span class="m">GET</span> /api/evidence<span class="d">rows + provenance by phone</span></div>
+    <div class="ep mono" style="margin:0"><span class="m">GET</span> /api/graph<span class="d">contact graph</span></div>
+  </div>
+</div>
+
+<!-- 7 · Front end -->
+<div class="abs" style="left:56px; top:905px; width:1808px;">
+  <div class="eyebrow">7 · Front end · React + Vite · contract: types.ts</div>
+  <div style="position:relative; height:160px; margin-top:4px;">
+    <div class="page" style="left:0; width:280px;"><div class="bt serif" style="font-size:24px; font-weight:400">Ingest</div><div class="bd">Drop a bundle · six stages · per-phone counts · ingest notes</div></div>
+    <div class="page" style="left:310px; width:400px;"><div class="bt serif" style="font-size:24px; font-weight:400">Briefing <span class="tag model" style="font-family:Inter">proactive</span></div><div class="bd">Written before anyone asks: ranked patterns with "why it matters", week timeline, relations graph, checked-and-dismissed decoys</div></div>
+    <div class="page" style="left:740px; width:360px;"><div class="bt serif" style="font-size:24px; font-weight:400">Investigate</div><div class="bd">Your brief (believe · confused · don't know) → live to-dos and agent lanes → report index + finding</div></div>
+    <div class="page" style="left:1130px; width:290px;"><div class="bt serif" style="font-size:24px; font-weight:400">Ask drawer</div><div class="bd">Any question, any time. Streams steps, answers with cited findings or "cannot tell"</div></div>
+    <div class="page" style="left:1450px; width:358px;"><div class="bt serif" style="font-size:24px; font-weight:400">Finding detail</div><div class="bd">Same four tabs everywhere a finding opens</div>
+      <div class="tabs"><span>Evidence</span><span>How we know</span><span style="color:var(--code); border-color:color-mix(in srgb,var(--code) 50%,transparent)">Verify · recompute in browser</span><span>Sources · file + line</span></div></div>
+  </div>
+</div>
+
+<!-- Principle footer -->
+<div class="abs principle" style="left:56px; top:1100px; width:1808px; display:grid; grid-template-columns: repeat(4, 1fr); gap:28px;">
+  <div><b>Facts come from code.</b> Checks are pure Python over the store; every number is computed there and returned with the rows used.</div>
+  <div><b>The model routes and phrases.</b> It splits briefs, picks checks, and writes one sentence; it never does arithmetic or reads raw data directly.</div>
+  <div><b>Every claim is traceable.</b> Statement → number trace → check output → evidence ids → row → file, line and raw JSON in the bundle.</div>
+  <div><b>Anyone can re-check.</b> The Verify tab recomputes from raw rows without trusting the check; a mismatch means don't rely on it.</div>
+</div>
+
+<!-- Arrows -->
+<svg class="arrows" viewBox="0 0 1920 1240">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8a847c"/></marker>
+    <marker id="am" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e8a33d"/></marker>
+    <marker id="ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b9bff"/></marker>
+  </defs>
+  <!-- bundle -> ingest -->
+  <path d="M288,560 C312,560 312,320 336,320" fill="none" stroke="#8a847c" stroke-width="1.5" marker-end="url(#a)"/>
+  <!-- ingest -> store -->
+  <path d="M592,540 C616,540 616,330 640,330" fill="none" stroke="#8a847c" stroke-width="1.5" marker-end="url(#a)"/>
+  <!-- store -> checks -->
+  <path d="M876,340 L924,340" stroke="#8a847c" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="878" y="330" class="lbl">SQL</text>
+  <!-- agents call checks (bidirectional) -->
+  <path d="M1268,330 L1222,330" stroke="#6b9bff" stroke-width="1.5" marker-end="url(#ac)"/>
+  <text x="1226" y="320" class="lbl">tool calls</text>
+  <path d="M1222,460 L1268,460" stroke="#6b9bff" stroke-width="1.5" marker-end="url(#ac)"/>
+  <text x="1222" y="482" class="lbl">JSON + ids</text>
+  <!-- agents -> api -->
+  <path d="M1604,560 C1628,560 1628,420 1652,420" fill="none" stroke="#8a847c" stroke-width="1.5" marker-end="url(#a)"/>
+  <!-- api -> front end -->
+  <path d="M1760,680 L1760,930" stroke="#8a847c" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="1770" y="800" class="lbl">JSON / SSE</text>
+  <!-- brief / question up to orchestrator -->
+  <path d="M1000,930 C1000,860 1420,880 1420,745" fill="none" stroke="#e8a33d" stroke-width="1.5" stroke-dasharray="5 5" marker-end="url(#am)"/>
+  <text x="1130" y="842" class="lbl" style="fill:#e8a33d">brief items, questions → agents</text>
+  <!-- sweep at ingest -> briefing -->
+  <path d="M1040,795 C1040,880 560,850 560,930" fill="none" stroke="#6b9bff" stroke-width="1.5" stroke-dasharray="5 5" marker-end="url(#ac)"/>
+  <text x="590" y="858" class="lbl" style="fill:#6b9bff">run_sweep() at ingest → ranked briefing</text>
+  <!-- provenance -> sources/verify -->
+  <path d="M760,662 C760,900 1640,860 1640,930" fill="none" stroke="#4fc493" stroke-width="1.2" stroke-dasharray="2 5" marker-end="url(#a)"/>
+  <text x="1240" y="905" class="lbl" style="fill:#4fc493">provenance + raw rows → Verify, Sources</text>
+</svg>
+</body>
+</html>
