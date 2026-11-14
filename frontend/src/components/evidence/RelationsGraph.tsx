@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react'
 import { getEvidence, getGraph, type Channel, type EvidenceByPhone, type Graph, type GraphEdge } from '../../api'
-import EvidenceRows from './EvidenceRows'
+import SourcesView from '../SourcesView'
 
 // Fixed layout for the four-person demo case; a force layout replaces this for larger cases.
-const POS: Record<string, [number, number]> = { paul: [140, 160], amy: [60, 40], ken: [360, 60], cara: [330, 270] }
+const POS: Record<string, [number, number]> = { paul: [170, 170], amy: [70, 50], ken: [400, 70], cara: [370, 290] }
 
 export const CHANNEL_STYLE: Record<Channel, { color: string; dash?: string; label: string }> = {
-  call: { color: '#0ea5e9', label: 'Calls' },
-  message: { color: '#6366f1', label: 'Messages' },
-  transfer: { color: '#16a34a', label: 'Money' },
-  deleted_thread: { color: '#dc2626', dash: '2 3', label: 'Deleted thread' },
-  social: { color: '#a855f7', dash: '6 3', label: 'Social' },
-  colocation: { color: '#f59e0b', dash: '8 4', label: 'Co-location only' },
+  call: { color: '#6b9bff', label: 'Calls' },
+  message: { color: '#a7b8ff', label: 'Messages' },
+  transfer: { color: '#4fc493', label: 'Money' },
+  deleted_thread: { color: '#e07a5f', dash: '2 4', label: 'Deleted thread' },
+  social: { color: '#c79bff', dash: '6 4', label: 'Social' },
+  colocation: { color: '#e8a33d', dash: '9 5', label: 'Co-location only' },
 }
 
 export default function RelationsGraph() {
@@ -27,9 +27,8 @@ export default function RelationsGraph() {
     if (sel) getEvidence(sel.evidence_ids).then(setRows)
   }, [sel])
 
-  if (!g) return <div className="pulse-dot text-sm text-slate-500">Building contact graph…</div>
+  if (!g) return <div className="pulse-dot text-sm text-faint">Building contact graph…</div>
 
-  // Group parallel edges per pair so they fan out instead of overlapping.
   const byPair = new Map<string, GraphEdge[]>()
   for (const e of g.edges) {
     const k = [e.source, e.target].sort().join('|')
@@ -37,39 +36,24 @@ export default function RelationsGraph() {
   }
 
   return (
-    <div className="space-y-3">
-      <div className="text-xs text-slate-500">
-        Built by <span className="font-mono">relationship-mapper</span> from messages, calls, transfers, deletion events, social interactions and
-        co-location across all four phones. Click an edge to see its rows.
-      </div>
-      <svg viewBox="0 0 440 320" className="w-full rounded-lg bg-slate-50">
+    <div className="space-y-4">
+      <svg viewBox="0 0 480 340" className="w-full">
         {[...byPair.values()].flatMap((edges) =>
           edges.map((e, i) => {
             const [a, b] = [e.source, e.target].sort()
             const [x1, y1] = POS[a]
             const [x2, y2] = POS[b]
-            const n = edges.length
-            const off = (i - (n - 1) / 2) * 26
-            const mx = (x1 + x2) / 2
-            const my = (y1 + y2) / 2
+            const off = (i - (edges.length - 1) / 2) * 52
             const len = Math.hypot(x2 - x1, y2 - y1)
-            const nx = -(y2 - y1) / len
-            const ny = (x2 - x1) / len
-            const cx = mx + nx * off * 2
-            const cy = my + ny * off * 2
+            const cx = (x1 + x2) / 2 + (-(y2 - y1) / len) * off
+            const cy = (y1 + y2) / 2 + ((x2 - x1) / len) * off
             const st = CHANNEL_STYLE[e.channel]
             const active = sel === e
+            const d = `M${x1},${y1} Q${cx},${cy} ${x2},${y2}`
             return (
               <g key={`${e.source}-${e.target}-${e.channel}`} onClick={() => setSel(e)} className="cursor-pointer">
-                <path d={`M${x1},${y1} Q${cx},${cy} ${x2},${y2}`} fill="none" stroke="transparent" strokeWidth={12} />
-                <path
-                  d={`M${x1},${y1} Q${cx},${cy} ${x2},${y2}`}
-                  fill="none"
-                  stroke={st.color}
-                  strokeWidth={active ? 4 : e.weak ? 1.2 : 2.2}
-                  strokeDasharray={st.dash}
-                  opacity={e.weak ? 0.5 : 1}
-                >
+                <path d={d} fill="none" stroke="transparent" strokeWidth={14} />
+                <path d={d} fill="none" stroke={st.color} strokeWidth={active ? 3.5 : e.weak ? 1 : 1.8} strokeDasharray={st.dash} opacity={e.weak ? 0.45 : active || !sel ? 1 : 0.35}>
                   <title>{e.label}</title>
                 </path>
               </g>
@@ -80,17 +64,17 @@ export default function RelationsGraph() {
           const [x, y] = POS[n.id]
           return (
             <g key={n.id}>
-              <circle cx={x} cy={y} r={22} fill={n.color} stroke="#fff" strokeWidth={3} />
-              <text x={x} y={y + 4} textAnchor="middle" fontSize={12} fontWeight={700} fill="#fff">
+              <circle cx={x} cy={y} r={26} fill="#101010" stroke={n.color} strokeWidth={1.5} />
+              <text x={x} y={y + 5} textAnchor="middle" fontSize={14} fill={n.color} style={{ fontFamily: 'Instrument Serif, serif' }}>
                 {n.label.split(' ')[0]}
               </text>
             </g>
           )
         })}
       </svg>
-      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+      <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-faint">
         {Object.entries(CHANNEL_STYLE).map(([k, s]) => (
-          <span key={k} className="inline-flex items-center gap-1">
+          <span key={k} className="inline-flex items-center gap-1.5">
             <svg width="18" height="6">
               <line x1="0" x2="18" y1="3" y2="3" stroke={s.color} strokeWidth="2" strokeDasharray={s.dash} />
             </svg>
@@ -98,22 +82,23 @@ export default function RelationsGraph() {
           </span>
         ))}
       </div>
-      <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 text-xs">
+      <div className="divide-y divide-line border-y border-line text-[13px]">
         {g.edges.map((e) => (
-          <li
+          <button
             key={`${e.source}-${e.target}-${e.channel}`}
-            onClick={() => setSel(e)}
-            className={`flex cursor-pointer items-center gap-2 px-2.5 py-1.5 hover:bg-slate-50 ${sel === e ? 'bg-blue-50' : ''}`}
+            onClick={() => setSel(sel === e ? null : e)}
+            className={`flex w-full items-center gap-3 px-1 py-2 text-left transition hover:bg-panel ${sel === e ? 'bg-panel' : ''}`}
           >
-            <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: CHANNEL_STYLE[e.channel].color }} />
-            <span className="w-24 shrink-0 font-medium capitalize">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: CHANNEL_STYLE[e.channel].color }} />
+            <span className="w-28 shrink-0 capitalize text-muted">
               {e.source} – {e.target}
             </span>
-            <span className={e.weak ? 'text-slate-400' : ''}>{e.label}</span>
-          </li>
+            <span className={e.weak ? 'text-faint' : 'text-fg/90'}>{e.label}</span>
+            <span className="ml-auto text-[11px] text-faint">{e.evidence_ids.length} rows</span>
+          </button>
         ))}
-      </ul>
-      {sel && rows && <EvidenceRows rows={rows} />}
+      </div>
+      {sel && rows && <SourcesView rows={rows} />}
     </div>
   )
 }

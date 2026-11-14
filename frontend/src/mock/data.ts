@@ -72,13 +72,13 @@ export const NUMBERS: Record<PersonId, string> = {
 export const COMPANY_NUMBER = '+1 555 010 0900'
 
 export const PEOPLE: Person[] = [
-  { person_id: 'paul', name: 'Paul Tan', role: 'Bookkeeper at Harbor Supply Co.', phone_number: NUMBERS.paul, device_id: 'paul-iphone', color: '#2563eb', counts: { messages: 912, calls: 64, locations: 992, transfers: 14, social: 41 } },
-  { person_id: 'amy', name: 'Amy Lim', role: "Paul's friend", phone_number: NUMBERS.amy, device_id: 'amy-pixel', color: '#db2777', counts: { messages: 801, calls: 51, locations: 1008, transfers: 9, social: 67 } },
-  { person_id: 'ken', name: 'Ken Ong', role: "Paul's friend", phone_number: NUMBERS.ken, device_id: 'ken-galaxy', color: '#d97706', counts: { messages: 655, calls: 47, locations: 944, transfers: 11, social: 22 } },
-  { person_id: 'cara', name: 'Cara Diaz', role: 'Supplier to Harbor Supply Co.', phone_number: NUMBERS.cara, device_id: 'cara-iphone', color: '#059669', counts: { messages: 702, calls: 39, locations: 991, transfers: 17, social: 35 } },
+  { person_id: 'paul', name: 'Paul Tan', role: 'Bookkeeper at Harbor Supply Co.', phone_number: NUMBERS.paul, device_id: 'paul-iphone', color: '#6b9bff', counts: { messages: 912, calls: 64, locations: 992, transfers: 14, social: 41 } },
+  { person_id: 'amy', name: 'Amy Lim', role: "Paul's friend", phone_number: NUMBERS.amy, device_id: 'amy-pixel', color: '#ec7fa9', counts: { messages: 801, calls: 51, locations: 1008, transfers: 9, social: 67 } },
+  { person_id: 'ken', name: 'Ken Ong', role: "Paul's friend", phone_number: NUMBERS.ken, device_id: 'ken-galaxy', color: '#e8a33d', counts: { messages: 655, calls: 47, locations: 944, transfers: 11, social: 22 } },
+  { person_id: 'cara', name: 'Cara Diaz', role: 'Supplier to Harbor Supply Co.', phone_number: NUMBERS.cara, device_id: 'cara-iphone', color: '#4fc493', counts: { messages: 702, calls: 39, locations: 991, transfers: 17, social: 35 } },
 ]
 export const personName = (id: PersonId) => PEOPLE.find((p) => p.person_id === id)?.name.split(' ')[0] ?? id
-export const personColor = (id: PersonId) => PEOPLE.find((p) => p.person_id === id)?.color ?? '#64748b'
+export const personColor = (id: PersonId) => PEOPLE.find((p) => p.person_id === id)?.color ?? '#8a857e'
 
 // ---------- row store ----------
 
@@ -102,9 +102,40 @@ function nextId(owner: PersonId, table: EvidenceTable) {
   counters.set(key, n)
   return `${owner}:${short}:${String(n).padStart(4, '0')}`
 }
+// Provenance: where each row lives in the ingested Case Bundle. Line numbers are derived from the
+// record number so they are stable; the bundle hash is a fixed placeholder in the mock.
+export const BUNDLE = { name: 'harbor-supply-case.zip', sha256: '9f2c4e1ab07d3c58e6f1d2a4b9c07e3315aa8d0c6b2e94f7a1d5c3b8e0f6a2d4', tool: 'synthetic-generator 0.1' }
+const EXTRACTED_AT: Record<PersonId, string> = {
+  paul: '2026-04-21T09:14:00-04:00',
+  amy: '2026-04-21T10:02:00-04:00',
+  ken: '2026-04-21T11:30:00-04:00',
+  cara: '2026-04-21T13:45:00-04:00',
+}
+const deviceOf = (owner: PersonId) => PEOPLE.find((p) => p.person_id === owner)!.device_id
+
 function addRow(owner: PersonId, table: EvidenceTable, timestamp: string, summary: string, fields: EvidenceRow['fields']) {
   const id = nextId(owner, table)
-  ROWS.set(id, { id, device_owner: owner, table, timestamp, summary, fields })
+  const recordNo = Number(id.split(':')[2])
+  const record_id = `${SHORT[table][0]}${recordNo}`
+  const raw = JSON.stringify({ record_id, timestamp, ...fields })
+  ROWS.set(id, {
+    id,
+    device_owner: owner,
+    table,
+    timestamp,
+    summary,
+    fields,
+    provenance: {
+      bundle: BUNDLE.name,
+      bundle_sha256: BUNDLE.sha256,
+      file: `devices/${deviceOf(owner)}/${table}.jsonl`,
+      line: recordNo - BASES[SHORT[table]] + 1,
+      record_id,
+      extraction_tool: BUNDLE.tool,
+      extracted_at: EXTRACTED_AT[owner],
+      raw,
+    },
+  })
   return id
 }
 

@@ -122,6 +122,46 @@ export interface Finding {
   agent: SubagentName
   evidence_ids: string[]
   check_output: CheckOutput
+  derivation: Derivation
+}
+
+// ---------- Transparency: how a finding was derived ----------
+
+export type DerivationStepKind = 'question' | 'route' | 'tool' | 'data' | 'compute' | 'rule' | 'statement'
+
+export interface DerivationStep {
+  kind: DerivationStepKind
+  title: string
+  detail: string
+  /** Exact call, query or formula, shown in monospace. */
+  code?: string
+  actor: 'code' | 'model'
+}
+
+/** Ties each number in the statement to the check-output field it came from. */
+export interface NumberTrace {
+  text: string
+  field: string
+  value: string
+}
+
+export interface ValidatorCheck {
+  rule: string
+  passed: boolean
+  detail: string
+}
+
+/** Which phones hold the data behind each fact in the finding. */
+export interface Corroboration {
+  fact: string
+  phones: Record<PersonId, 'present' | 'absent' | 'deleted' | 'n/a'>
+}
+
+export interface Derivation {
+  steps: DerivationStep[]
+  numbers: NumberTrace[]
+  validator: ValidatorCheck[]
+  corroboration: Corroboration[]
 }
 
 export interface Report {
@@ -215,6 +255,20 @@ export interface EvidenceRow {
   timestamp: string
   summary: string
   fields: Record<string, string | number | null>
+  provenance: Provenance
+}
+
+/** Where a row came from, so anyone can open the source file and find it. */
+export interface Provenance {
+  bundle: string
+  bundle_sha256: string
+  file: string
+  line: number
+  record_id: string
+  extraction_tool: string
+  extracted_at: string
+  /** The original JSONL line as ingested. */
+  raw: string
 }
 
 /** Rows grouped by the phone they were extracted from. */
@@ -236,4 +290,51 @@ export interface GraphEdge {
 export interface Graph {
   nodes: { id: PersonId; label: string; color: string }[]
   edges: GraphEdge[]
+}
+
+// ---------- Proactive briefing ----------
+
+export interface TimelineEvent {
+  id: string
+  owner: PersonId
+  t: string
+  end?: string
+  kind: 'location' | 'meeting' | 'message' | 'transfer' | 'deletion' | 'power_off' | 'trigger'
+  label: string
+  finding_id?: string
+  /** For transfers: draw a link to another phone's row. */
+  link_to?: PersonId
+}
+
+export interface BriefingItem {
+  finding: Finding
+  headline: string
+  why_it_matters: string
+  rank_reason: string
+  follow_ups: string[]
+}
+
+export interface Briefing {
+  generated_from: string
+  headline: string
+  stats: { label: string; value: string }[]
+  items: BriefingItem[]
+  timeline: TimelineEvent[]
+  /** Patterns the checks looked at and rejected, with the rule that rejected them. */
+  dismissed: { title: string; why: string }[]
+}
+
+// ---------- Ask (questions with cited answers) ----------
+
+export type AskEvent =
+  | { type: 'step'; text: string }
+  | { type: 'answer'; answer: Answer }
+
+export interface Answer {
+  question: string
+  text: string
+  verdict: Verdict | null
+  findings: Finding[]
+  steps: string[]
+  suggestions: string[]
 }

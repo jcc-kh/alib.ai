@@ -4,11 +4,15 @@
 //   POST /api/analyse (SSE) -> analyse (events delivered through onEvent)
 //   GET  /api/evidence?ids= -> getEvidence
 //   GET  /api/graph         -> getGraph
+//   GET  /api/briefing      -> getBriefing (proactive, generated at ingest)
+//   POST /api/ask (SSE)     -> ask
 
-import type { AgentEvent, Brief, CaseInfo, EvidenceByPhone, Graph, IngestReport, IngestStage, Report } from './types'
+import type { AgentEvent, Answer, AskEvent, Brief, Briefing, CaseInfo, EvidenceByPhone, Graph, IngestReport, IngestStage, Report } from './types'
 import { GRAPH, PEOPLE, PLACES, ROWS } from '../mock/data'
 import { INGEST_REPORT, INGEST_STAGES } from '../mock/ingest'
 import { planRun } from '../mock/report'
+import { buildBriefing } from '../mock/briefing'
+import { answerQuestion } from '../mock/ask'
 
 const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
@@ -84,4 +88,20 @@ export async function getEvidence(ids: string[]): Promise<EvidenceByPhone> {
 export async function getGraph(): Promise<Graph> {
   await sleep(100)
   return GRAPH
+}
+
+export async function getBriefing(): Promise<Briefing> {
+  await sleep(200)
+  return buildBriefing()
+}
+
+export async function ask(question: string, onEvent: (e: AskEvent) => void): Promise<Answer> {
+  const { steps, answer } = answerQuestion(question)
+  for (const text of steps) {
+    await sleep(450)
+    onEvent({ type: 'step', text })
+  }
+  await sleep(300)
+  onEvent({ type: 'answer', answer })
+  return answer
 }

@@ -1,14 +1,69 @@
 @import "tailwindcss";
 
-html, body, #root { height: 100%; }
-body { background: #f1f5f9; color: #0f172a; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+/* Alib.ai theme: dark editorial canvas, warm off-white serif headings, hairline frames.
+   Design cues taken from arlq.ai (Arlequin AI); the wordmark and palette details are our own. */
+@theme {
+  --color-canvas: #101010;
+  --color-panel: #161616;
+  --color-raised: #1d1d1d;
+  --color-line: #2a2826;
+  --color-line-strong: #3a3734;
+  --color-fg: #f5f1ea;
+  --color-muted: #a39d94;
+  --color-faint: #6f6a63;
+  --color-terra: #c8553a;
+  --color-terra-soft: #e07a5f;
+  --color-azure: #1652d6;
+  --color-azure-soft: #6b9bff;
+  --color-amber: #e8a33d;
+  --color-sage: #4fc493;
+  --color-rose: #ec7fa9;
+  --font-serif: "Instrument Serif", Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
 
-/* Leaflet without base tiles: the city is invented, so we draw places ourselves. */
-.leaflet-container { background: #e2e8f0; font: inherit; }
-.place-label { background: transparent; border: none; box-shadow: none; color: #334155; font-size: 11px; font-weight: 600; }
+html, body, #root { height: 100%; }
+body {
+  background: var(--color-canvas);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--color-terra); color: #fff; }
+
+/* Scrollbars that don't shout on a dark canvas */
+* { scrollbar-width: thin; scrollbar-color: #3a3734 transparent; }
+
+/* Hairline frame with corner dots, used for page sections */
+.frame { position: relative; border-left: 1px solid var(--color-line); border-right: 1px solid var(--color-line); }
+.dot-rule { position: relative; border-top: 1px solid var(--color-line); }
+.dot-rule::before, .dot-rule::after { content: ""; position: absolute; top: -3px; width: 5px; height: 5px; border-radius: 9999px; background: #d6d1c9; }
+.dot-rule::before { left: -3px; }
+.dot-rule::after { right: -3px; }
+
+/* Primary button: solid blue with a thin outer ring, as on the reference site */
+.btn-primary { background: var(--color-azure); color: #fff; border-radius: 8px; box-shadow: 0 0 0 3px var(--color-canvas), 0 0 0 4px #2b3a5a; transition: filter .15s; }
+.btn-primary:hover { filter: brightness(1.12); }
+.btn-primary:disabled { opacity: .5; }
+.btn-ghost { border: 1px solid var(--color-line-strong); border-radius: 8px; color: var(--color-fg); transition: background .15s; }
+.btn-ghost:hover { background: var(--color-raised); }
+
+/* Leaflet on a dark canvas without base tiles (the city is invented) */
+.leaflet-container { background: #141414; font: inherit; }
+.leaflet-bar a { background: #1d1d1d !important; color: #f5f1ea !important; border-color: #2a2826 !important; }
+.place-label { background: transparent; border: none; box-shadow: none; color: #a39d94; font-size: 11px; font-weight: 500; }
 .place-label::before { display: none; }
+.dist-label { background: #101010; border: 1px solid var(--color-terra); color: var(--color-terra-soft); font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 9999px; box-shadow: none; }
+.dist-label::before { display: none; }
+.leaflet-tooltip { background: #1d1d1d; color: #f5f1ea; border-color: #3a3734; }
 
 @keyframes pulse-dot { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
 .pulse-dot { animation: pulse-dot 1s ease-in-out infinite; }
-.dist-label { background: #fff; border: 1px solid #fca5a5; color: #b91c1c; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 9999px; box-shadow: none; }
-.dist-label::before { display: none; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+.rise { animation: rise .35s ease-out both; }
+@keyframes slide-in { from { transform: translateX(24px); opacity: 0 } to { transform: none; opacity: 1 } }
+.slide-in { animation: slide-in .25s ease-out both; }
+
+/* Soft glow behind hero headings, echoing the reference site's gradient circles */
+.glow { background: radial-gradient(closest-side, rgba(200,85,58,.18), transparent 70%), radial-gradient(closest-side, rgba(22,82,214,.14), transparent 70%); background-size: 520px 520px, 520px 520px; background-position: calc(50% - 130px) 50%, calc(50% + 130px) 50%; background-repeat: no-repeat; }

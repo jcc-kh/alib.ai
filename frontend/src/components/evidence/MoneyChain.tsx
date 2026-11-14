@@ -6,46 +6,42 @@ import { fmtDateTime, fmtMoney } from '../../lib/format'
 export default function MoneyChain({ out }: { out: ChainOutput }) {
   const people = [out.links[0].from, ...out.links.map((l) => l.to)]
   return (
-    <div className="space-y-3">
-      <div className="flex items-center rounded-lg bg-slate-50 p-3">
+    <div className="space-y-6">
+      <div className="flex items-center rounded-xl border border-line px-6 py-8">
         {people.map((p, i) => (
           <Fragment key={p + i}>
             <div className="flex flex-col items-center">
-              <div className="grid h-11 w-11 place-items-center rounded-full text-sm font-bold text-white" style={{ background: personColor(p) }}>
+              <div className="grid h-14 w-14 place-items-center rounded-full border-2 font-serif text-2xl" style={{ borderColor: personColor(p), color: personColor(p) }}>
                 {personName(p)[0]}
               </div>
-              <div className="mt-1 text-xs font-medium">{personName(p)}</div>
+              <div className="mt-2 text-sm text-fg">{personName(p)}</div>
             </div>
             {i < out.links.length && (
-              <div className="mx-1 flex flex-1 flex-col items-center">
-                <div className="text-sm font-semibold">{fmtMoney(out.links[i].amount, out.links[i].currency)}</div>
-                <div className="flex w-full items-center">
-                  <div className="h-0.5 flex-1 bg-slate-400" />
-                  <div className="h-0 w-0 border-y-4 border-l-8 border-y-transparent border-l-slate-400" />
+              <div className="mx-3 flex flex-1 flex-col items-center">
+                <div className="font-serif text-2xl text-sage">{fmtMoney(out.links[i].amount, out.links[i].currency)}</div>
+                <div className="my-1 flex w-full items-center">
+                  <div className="h-px flex-1 bg-sage/60" />
+                  <div className="h-0 w-0 border-y-[5px] border-l-[9px] border-y-transparent border-l-sage/80" />
                 </div>
-                <div className="text-[10px] text-slate-500">{fmtDateTime(out.links[i].t)}</div>
-                <div className="text-[10px] italic text-slate-500">{out.links[i].memo ? `“${out.links[i].memo}”` : 'no memo'}</div>
+                <div className="text-[11px] text-faint">{fmtDateTime(out.links[i].t)}</div>
+                <div className="text-[11px] italic text-faint">{out.links[i].memo ? `“${out.links[i].memo}”` : 'no memo'}</div>
               </div>
             )}
           </Fragment>
         ))}
       </div>
       {out.links.length > 1 && (
-        <div className="grid grid-cols-3 gap-2 text-center text-xs">
-          <div className="rounded-lg bg-slate-50 py-1.5">
-            <div className="text-slate-500">Gap</div>
-            <div className="font-semibold">{out.gap_label}</div>
-          </div>
-          <div className="rounded-lg bg-slate-50 py-1.5">
-            <div className="text-slate-500">Onward share</div>
-            <div className="font-semibold">{Math.round(out.ratio * 100)}%</div>
-          </div>
-          <div className="rounded-lg bg-slate-50 py-1.5">
-            <div className="text-slate-500">Rule</div>
-            <div className="font-semibold">
-              ≤{out.thresholds.window_h} h, {out.thresholds.ratio_min * 100}–{out.thresholds.ratio_max * 100}%
+        <div className="grid grid-cols-3 divide-x divide-line rounded-xl border border-line">
+          {[
+            ['Time between', out.gap_label],
+            ['Passed on', `${Math.round(out.ratio * 100)}%`],
+            ['Rule', `≤ ${out.thresholds.window_h} h · ${out.thresholds.ratio_min * 100}–${out.thresholds.ratio_max * 100}%`],
+          ].map(([k, v]) => (
+            <div key={k} className="px-4 py-3">
+              <div className="text-[11px] text-faint">{k}</div>
+              <div className="font-serif text-2xl text-fg">{v}</div>
             </div>
-          </div>
+          ))}
         </div>
       )}
     </div>
