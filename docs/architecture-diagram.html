@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- Source for docs/architecture.png (1920×1440 @2x). Edit, then re-render. -->
+<!-- Source for docs/architecture.png (1920×1440 @2x). Edit, then re-render (see ARCHITECTURE.md). -->
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -7,265 +7,249 @@
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --bg: #101010; --panel: #171717; --line: #2e2b28; --fg: #f5f1ea; --muted: #a39d94; --faint: #6f6a63;
-    --code: #6b9bff; --model: #e8a33d; --store: #4fc493; --ui: #e07a5f;
+    --bg: #101010; --panel: #171717; --panel2: #131313; --line: #2e2b28; --fg: #f5f1ea; --muted: #a39d94; --faint: #6f6a63;
+    --code: #6b9bff; --model: #e8a33d; --net: #4fc493; --ui: #e07a5f;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--fg); font-family: Inter, sans-serif; width: 1920px; height: 1440px; position: relative; overflow: hidden; }
-  .serif { font-family: "Instrument Serif", Georgia, serif; font-weight: 400; }
   .mono { font-family: "JetBrains Mono", monospace; }
   .abs { position: absolute; }
-  h1 { font-family: "Instrument Serif", serif; font-weight: 400; font-size: 50px; letter-spacing: -0.01em; }
-  .sub { color: var(--muted); font-size: 18px; margin-top: 6px; }
-  .eyebrow { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); margin-bottom: 8px; }
-  .col { position: absolute; top: 330px; }
-  .col-title { font-family: "Instrument Serif", serif; font-size: 26px; line-height: 1.1; margin-bottom: 3px; }
-  .col-note { font-size: 12.5px; color: var(--faint); margin-bottom: 14px; height: 32px; }
-  .box { border: 1.5px solid var(--line); border-radius: 12px; background: var(--panel); padding: 11px 13px; margin-bottom: 9px; }
+  h1 { font-family: "Instrument Serif", serif; font-weight: 400; font-size: 48px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 17px; margin-top: 4px; }
+  .eyebrow { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); }
+  .legend { display: flex; gap: 22px; font-size: 13px; color: var(--muted); }
+  .legend i { display: inline-block; width: 22px; height: 12px; border-radius: 4px; border: 2px solid; margin-right: 8px; vertical-align: -1px; }
+
+  .layer { position: absolute; left: 56px; width: 1760px; border-radius: 18px; background: var(--panel2); display: grid; grid-template-columns: 300px 1fr; }
+  .layer .side { padding: 20px 24px; border-right: 1px solid var(--line); }
+  .layer .t { font-family: "Instrument Serif", serif; font-size: 31px; line-height: 1.05; }
+  .layer .t .n { margin-right: 10px; }
+  .layer .s { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  .layer .never { font-size: 12.5px; color: var(--faint); margin-top: 10px; line-height: 1.5; }
+  .layer .never b { color: var(--muted); font-weight: 500; }
+  .layer .body { padding: 18px 26px; position: relative; }
+
+  .box { border: 1.5px solid var(--line); border-radius: 12px; background: var(--panel); padding: 11px 13px; }
   .box.code { border-color: color-mix(in srgb, var(--code) 70%, transparent); }
   .box.model { border-color: color-mix(in srgb, var(--model) 75%, transparent); }
-  .box.store { border-color: color-mix(in srgb, var(--store) 65%, transparent); }
-  .bt { font-size: 14.5px; font-weight: 600; color: var(--fg); }
-  .bd { font-size: 12.3px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
-  .tag { display: inline-block; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; padding: 2px 7px; border-radius: 99px; margin-left: 6px; vertical-align: 2px; font-family: Inter, sans-serif; font-weight: 500; }
+  .box.net { border-color: color-mix(in srgb, var(--net) 65%, transparent); }
+  .box.ui { border-color: color-mix(in srgb, var(--ui) 65%, transparent); }
+  .box.plain { border-style: dashed; border-color: #45403b; }
+  .bt { font-size: 15px; font-weight: 600; }
+  .bd { font-size: 12.5px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+  .k { font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--fg); }
+  .kl { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: var(--muted); line-height: 1.7; }
+  .tag { display: inline-block; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; padding: 2px 7px; border-radius: 99px; margin-left: 6px; vertical-align: 2px; font-weight: 500; }
   .tag.code { color: var(--code); border: 1px solid color-mix(in srgb, var(--code) 50%, transparent); }
   .tag.model { color: var(--model); border: 1px solid color-mix(in srgb, var(--model) 50%, transparent); }
-  .tag.new { color: #f5f1ea; background: #c8553a; }
-  .stage { display: flex; align-items: center; gap: 10px; border: 1.5px solid color-mix(in srgb, var(--code) 55%, transparent); border-radius: 10px; background: var(--panel); padding: 8px 12px; margin-bottom: 7px; }
-  .num { width: 22px; height: 22px; border-radius: 99px; border: 1px solid var(--code); color: var(--code); font-size: 11px; display: grid; place-items: center; flex-shrink: 0; }
-  .rows { font-size: 12px; line-height: 1.55; }
-  .rows div { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-bottom: 1px solid #222; }
-  .rows div:last-child { border-bottom: 0; }
-  .rows .k { font-family: "JetBrains Mono", monospace; color: var(--fg); font-size: 11.5px; white-space: nowrap; }
-  .rows .v { color: var(--faint); text-align: right; font-size: 11.5px; }
-  .ep { font-size: 11.6px; line-height: 1.45; margin-bottom: 7px; }
-  .ep .m { color: var(--code); }
-  .ep .d { color: var(--faint); display: block; }
-  .page { position: absolute; top: 0; border-radius: 12px; border: 1.5px solid color-mix(in srgb, var(--ui) 65%, transparent); background: var(--panel); padding: 13px 15px; height: 140px; }
-  .page .bt { font-family: "Instrument Serif", serif; font-weight: 400; font-size: 23px; }
-  .tabs { display: flex; gap: 5px; margin-top: 8px; flex-wrap: wrap; }
-  .tabs span { font-size: 11px; border: 1px solid var(--line); border-radius: 99px; padding: 2px 8px; color: var(--muted); }
-  .legend { display: flex; gap: 24px; font-size: 13px; color: var(--muted); }
-  .legend i { display: inline-block; width: 22px; height: 12px; border-radius: 4px; border: 2px solid; margin-right: 8px; vertical-align: -1px; }
-  .band { position: absolute; top: 196px; left: 56px; width: 1808px; height: 92px; display: grid; grid-template-columns: 1fr 52px 1.25fr 52px 1.15fr; align-items: stretch; }
-  .band .st { border-radius: 14px; padding: 12px 18px; background: #131313; }
-  .band .st .h { display: flex; align-items: baseline; gap: 10px; }
-  .band .st .n { font-family: "Instrument Serif", serif; font-size: 34px; line-height: 1; }
-  .band .st .t { font-family: "Instrument Serif", serif; font-size: 25px; }
-  .band .st .d { font-size: 12.5px; color: var(--muted); margin-top: 5px; line-height: 1.4; }
-  .band .arr { display: grid; place-items: center; color: var(--faint); font-size: 26px; }
-  .gaps { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 11.5px; margin-top: 6px; }
-  .gaps .g { font-family: "JetBrains Mono", monospace; }
-  .principle { border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; font-size: 13.2px; color: var(--muted); line-height: 1.5; background: #131313; }
-  .principle b { color: var(--fg); font-weight: 500; }
-  svg.arrows { position: absolute; inset: 0; pointer-events: none; }
-  .lbl { font-family: Inter, sans-serif; font-size: 12.5px; fill: #a39d94; paint-order: stroke; stroke: #101010; stroke-width: 7px; stroke-linejoin: round; }
+  .arr { display: grid; place-items: center; color: var(--faint); font-size: 22px; }
+  .flow { display: grid; align-items: center; }
+  .chip { border: 1.5px solid color-mix(in srgb, var(--model) 70%, transparent); border-radius: 9px; background: var(--panel); padding: 4px 10px; font-family: "JetBrains Mono", monospace; font-size: 12px; }
+  .grp .gt { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--code); margin-bottom: 5px; }
+
+  /* front-end page cards */
+  .page .pt { font-family: "Instrument Serif", serif; font-size: 21px; line-height: 1.1; }
+  .page .ep { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--faint); margin-top: 3px; }
+  .page .pd { font-size: 12px; color: var(--muted); margin-top: 5px; line-height: 1.45; }
+  .pills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .pill { font-size: 10.5px; border-radius: 99px; padding: 2px 8px; border: 1px solid; white-space: nowrap; }
+  .p1 { color: var(--code); border-color: color-mix(in srgb, var(--code) 55%, transparent); }
+  .p2 { color: var(--net); border-color: color-mix(in srgb, var(--net) 55%, transparent); }
+  .p3 { color: var(--model); border-color: color-mix(in srgb, var(--model) 55%, transparent); }
+
+  .conn { position: absolute; left: 356px; display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); }
+  .conn .ar { font-size: 20px; line-height: 1; }
+  .foot { position: absolute; left: 56px; top: 1378px; width: 1808px; font-size: 14px; color: var(--muted); display: flex; justify-content: space-between; }
+  .foot b { color: var(--fg); font-weight: 500; }
+  .lane { position: absolute; left: 1832px; width: 32px; }
+  .lane .lbl { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(90deg); white-space: nowrap; font-size: 13px; color: var(--code); background: var(--bg); padding: 0 10px; }
 </style>
 </head>
 <body>
 
 <!-- Header -->
-<div class="abs" style="left:56px; top:40px;">
-  <div class="eyebrow">System architecture · iteration 1 · revision 2</div>
-  <h1><span>Alib</span><span style="color:#c8553a">.ai</span> · how phone data becomes a cited finding</h1>
-  <div class="sub">Agents never compute. Checks never conclude. Every statement links back to a line in a source file.</div>
+<div class="abs" style="left:56px; top:34px;">
+  <div class="eyebrow">System architecture · revision 3</div>
+  <h1 style="margin-top:6px"><span>Alib</span><span style="color:#c8553a">.ai</span> · three layers and the screens they feed</h1>
+  <div class="sub">Code finds the facts, the network connects them, and the model routes and phrases. Every sentence cites the rows behind it.</div>
 </div>
-<div class="abs legend" style="right:56px; top:60px;">
+<div class="abs legend" style="right:56px; top:56px;">
   <span><i style="border-color:var(--code)"></i>Deterministic code</span>
+  <span><i style="border-color:var(--net)"></i>Network model (code)</span>
   <span><i style="border-color:var(--model)"></i>Language model</span>
-  <span><i style="border-color:var(--store)"></i>Data at rest</span>
-  <span><i style="border-color:var(--ui)"></i>User interface</span>
+  <span><i style="border-color:var(--ui)"></i>Front end</span>
 </div>
 
-<!-- Three-stage band -->
-<div class="band">
-  <div class="st" style="border:1.5px solid color-mix(in srgb, var(--code) 70%, transparent)">
-    <div class="h"><span class="n" style="color:var(--code)">①</span><span class="t">Sweep</span><span class="tag code">code only · on case load</span></div>
-    <div class="d">Every check × every pair × full date range → one <span class="mono" style="color:var(--fg)">signals</span> row per hit, with evidence ids and strength</div>
+<!-- ===== Front end ===== -->
+<div class="layer" style="top:180px; height:180px; border:1.5px solid color-mix(in srgb, var(--ui) 60%, transparent);">
+  <div class="side">
+    <div class="t" style="color:var(--fg)">Front end</div>
+    <div class="s">React on mocks; <span class="k" style="font-size:11.5px">api/index.ts</span> swaps to FastAPI <span class="k" style="font-size:11.5px">/api</span>.</div>
+    <div class="never">Pills: the layer that feeds each screen. The Ingest page is a mock of upstream ingest.</div>
   </div>
-  <div class="arr">→</div>
-  <div class="st" style="border:1.5px solid color-mix(in srgb, var(--model) 75%, transparent)">
-    <div class="h"><span class="n" style="color:var(--model)">②</span><span class="t">Triage</span><span class="tag model">agents + code helpers</span></div>
-    <div class="d">Group signals into incidents · rank by checks agreeing and phones involved · dismiss ordinary ones with a reason · flag anchor moments (≥3 phones) → <b style="color:var(--fg); font-weight:500">opening briefing, top 5</b></div>
-  </div>
-  <div class="arr">→</div>
-  <div class="st" style="border:1.5px solid color-mix(in srgb, var(--model) 75%, transparent)">
-    <div class="h"><span class="n" style="color:var(--model)">③</span><span class="t">Brief refines</span><span class="tag model">agents · on submit</span></div>
-    <div class="d">Match each brief item to existing signals first · targeted checks only for what the sweep missed · re-rank by relevance → report</div>
-  </div>
-</div>
-
-<!-- 1 · Input -->
-<div class="col" style="left:56px; width:222px;">
-  <div class="eyebrow">Input</div>
-  <div class="col-title">Phone data</div>
-  <div class="col-note">Any source, via an adapter</div>
-  <div class="box"><div class="bt">Phone extractions</div><div class="bd">Forensic exports, spreadsheets, or the seeded generator (plants + decoys + answer key)</div></div>
-  <div class="box code"><div class="bt">Adapter</div><div class="bd">One per source format</div></div>
-  <div class="box store"><div class="bt">Case Bundle v1</div>
-    <div class="bd mono" style="font-size:11px; line-height:1.6; margin-top:6px">manifest.json<br>persons.jsonl<br>devices/&lt;id&gt;/<br>&nbsp;messages · calls<br>&nbsp;locations · transactions<br>&nbsp;device_events<br>&nbsp;contacts · social_*</div>
-  </div>
-</div>
-
-<!-- 2 · Ingest -->
-<div class="col" style="left:318px; width:236px;">
-  <div class="eyebrow">Ingest</div>
-  <div class="col-title">Ingest pipeline</div>
-  <div class="col-note">backend/ingest/ · pure functions</div>
-  <div class="stage"><span class="num">1</span><div><div class="bt" style="font-size:13.5px">Load</div><div class="bd">JSONL, file + line kept</div></div></div>
-  <div class="stage"><span class="num">2</span><div><div class="bt" style="font-size:13.5px">Validate</div><div class="bd">schema, errors with line</div></div></div>
-  <div class="stage"><span class="num">3</span><div><div class="bt" style="font-size:13.5px">Normalise</div><div class="bd">E.164, tz-aware, places</div></div></div>
-  <div class="stage"><span class="num">4</span><div><div class="bt" style="font-size:13.5px">Resolve entities</div><div class="bd">identifiers → people</div></div></div>
-  <div class="stage"><span class="num">5</span><div><div class="bt" style="font-size:13.5px">Store</div><div class="bd">global id + provenance</div></div></div>
-  <div class="stage"><span class="num">6</span><div><div class="bt" style="font-size:13.5px">Index <span class="tag new">new</span></div><div class="bd">location_timeline → <span class="mono">stays</span></div></div></div>
-</div>
-
-<!-- 3 · Store -->
-<div class="col" style="left:594px; width:240px;">
-  <div class="eyebrow">Store</div>
-  <div class="col-title">Case store</div>
-  <div class="col-note">SQLite · one row per phone</div>
-  <div class="box store">
-    <div class="bt" style="font-size:13px; color:var(--muted); font-weight:500">Evidence tables</div>
-    <div class="bd" style="line-height:1.6">persons · devices · contacts<br><span style="color:var(--fg)">messages · calls · locations<br>transactions · device_events</span><br>social_accounts · interactions</div>
-    <div class="bd mono" style="font-size:10.8px; margin-top:6px; color:var(--faint)">each row: id · device_owner ·<br>provenance (sha256, file, line, raw)</div>
-  </div>
-  <div class="box store">
-    <div class="bt" style="font-size:13px; color:var(--muted); font-weight:500">Derived tables <span class="tag new">new</span></div>
-    <div class="rows" style="margin-top:4px">
-      <div><span class="k">stays</span><span class="v">stay · travel · gap</span></div>
-      <div><span class="k">signals</span><span class="v">① sweep hits</span></div>
-      <div><span class="k">incidents</span><span class="v">② grouped, ranked</span></div>
-      <div><span class="k">anchors</span><span class="v">≥3 phones cluster</span></div>
-      <div><span class="k">dismissals</span><span class="v">reason + rule</span></div>
+  <div class="body" style="display:grid; grid-template-columns: repeat(6, 1fr); gap:12px; align-items:stretch;">
+    <div class="box ui page">
+      <div class="pt">Briefing</div><div class="ep">GET /briefing</div>
+      <div class="pd">Opens on load: top incidents, anchor moments, timeline</div>
+      <div class="pills"><span class="pill p2">2 incidents</span><span class="pill p1">1 signals</span></div>
+    </div>
+    <div class="box ui page">
+      <div class="pt">Relations graph</div><div class="ep">GET /graph · on Briefing</div>
+      <div class="pd">People and unknown numbers, edges by channel</div>
+      <div class="pills"><span class="pill p2">2 people map · edges</span></div>
+    </div>
+    <div class="box ui page">
+      <div class="pt">Location timeline</div><div class="ep">GET /timeline</div>
+      <div class="pd">A lane per phone: stays, typed gaps, suspect windows</div>
+      <div class="pills"><span class="pill p1">1 stays · integrity</span></div>
+    </div>
+    <div class="box ui page">
+      <div class="pt">Investigate</div><div class="ep">POST /analyse</div>
+      <div class="pd">Brief + statements → confirm items → agent lanes → report</div>
+      <div class="pills"><span class="pill p3">3 run events · report</span></div>
+    </div>
+    <div class="box ui page">
+      <div class="pt">Ask</div><div class="ep">POST /ask</div>
+      <div class="pd">Any question; a cited answer or "cannot tell"</div>
+      <div class="pills"><span class="pill p3">3 orchestrator</span><span class="pill p1">1 checks</span></div>
+    </div>
+    <div class="box ui page">
+      <div class="pt">Finding detail</div><div class="ep">GET /evidence</div>
+      <div class="pd">Evidence, How we know, Verify, Sources; dispute a row</div>
+      <div class="pills"><span class="pill p3">3 derivation</span><span class="pill p1">1 rows</span></div>
     </div>
   </div>
 </div>
 
-<!-- 4 · Checks -->
-<div class="col" style="left:874px; width:330px;">
-  <div class="eyebrow">Checks</div>
-  <div class="col-title">Deterministic checks</div>
-  <div class="col-note">backend/checks/ · one fixed question each · every number</div>
-  <div class="box code">
-    <div class="rows">
-      <div><span class="k">location_timeline <span class="tag new">new</span></span><span class="v">stays, travel, gaps</span></div>
-      <div><span class="k">location_gaps <span class="tag new">new</span></span><span class="v">≥45 min, typed</span></div>
-      <div><span class="k">distance_between</span><span class="v">together / apart</span></div>
-      <div><span class="k">silent_meetings</span><span class="v">≤100 m, 0 contact</span></div>
-      <div><span class="k">missing_messages</span><span class="v">one phone only</span></div>
-      <div><span class="k">money_chains</span><span class="v">A→B→C ≤24 h</span></div>
-      <div><span class="k">deletions · power_events</span><span class="v">device events</span></div>
-      <div><span class="k">synchronised_behaviour</span><span class="v">≥3 phones / 60 min</span></div>
-      <div><span class="k">identity_match</span><span class="v">people map</span></div>
+<!-- connector agents -> front end -->
+<div class="conn" style="top:368px;"><span class="ar" style="color:var(--ui)">↑</span>FastAPI: JSON for briefing, graph, timeline and evidence; SSE for runs, items to confirm, reruns and Ask</div>
+
+<!-- ===== Layer 3 · LangGraph agents ===== -->
+<div class="layer" style="top:402px; height:240px; border:1.5px solid color-mix(in srgb, var(--model) 60%, transparent);">
+  <div class="side">
+    <div class="t"><span class="n" style="color:var(--model)">3</span>Agents</div>
+    <div class="s">deepagents on LangGraph: one orchestrator, five domain subagents, a checkpointer for the human pause.</div>
+    <div class="never"><b>Never</b> computes a number, counts rows or picks a verdict.</div>
+  </div>
+  <div class="body flow" style="grid-template-columns: 150px 1fr 236px 1fr 190px 1fr 250px 1fr 250px 1fr 220px;">
+    <div class="box plain"><div class="bt" style="font-size:14px">Brief +<br>statements</div><div class="bd">from the investigator</div></div>
+    <div class="arr">→</div>
+    <div class="box model"><div class="bt">orchestrator</div><div class="bd">stronger model<br>splits input into items, each with its claimant · triage · routes · follow-ups</div></div>
+    <div class="arr">→</div>
+    <div class="box model" style="border-style:dashed"><div class="bt">⏸ confirm_items</div><div class="bd">LangGraph interrupt · investigator approves or edits items · resumes on <span class="k" style="font-size:11px">thread_id</span></div></div>
+    <div class="arr">→</div>
+    <div>
+      <div style="display:grid; gap:5px">
+        <div class="chip">relationship-mapper</div>
+        <div class="chip">location-analyst</div>
+        <div class="chip">comms-analyst</div>
+        <div class="chip">financial-analyst</div>
+        <div class="chip">device-forensics</div>
+      </div>
+      <div class="bd" style="margin-top:6px; font-size:11.5px">faster model · ↺ <span class="k" style="font-size:11px">follow_up</span> between subagents</div>
     </div>
-    <div class="gaps">
-      <span class="g" style="color:#e07a5f">location_off</span><span style="color:var(--muted)">phone in use during gap · <b style="color:var(--fg);font-weight:500">raised</b></span>
-      <span class="g" style="color:var(--muted)">powered_off</span><span style="color:var(--faint)">power event covers it · raised only if overlapping</span>
-      <span class="g" style="color:var(--muted)">unexplained</span><span style="color:var(--faint)">no activity · raised only if overlapping</span>
+    <div class="arr">→</div>
+    <div class="box model"><div class="bt">Finding <span class="tag model">structured</span></div><div class="kl" style="margin-top:5px">item_id · check<br>verdict <span style="color:var(--faint)">(copied from rule)</span><br>sentence · evidence_ids<br>numbers[text, field]</div></div>
+    <div class="arr">→</div>
+    <div class="box code"><div class="bt">Report <span class="tag code">code</span></div><div class="bd"><span class="k" style="font-size:11.5px">assemble_report()</span><br><span class="k" style="font-size:11.5px">validate_report()</span><br>by item · by person · reliability notes</div></div>
+  </div>
+</div>
+
+<!-- connector 2 -> 3 -->
+<div class="conn" style="top:650px;"><span class="ar" style="color:var(--net)">↑</span>people map, incidents and anchor moments: what triage ranks and the orchestrator routes on</div>
+
+<!-- ===== Layer 2 · Network model ===== -->
+<div class="layer" style="top:684px; height:272px; border:1.5px solid color-mix(in srgb, var(--net) 55%, transparent);">
+  <div class="side">
+    <div class="t"><span class="n" style="color:var(--net)">2</span>Network model</div>
+    <div class="s">Who is connected to whom, by which channel, and when. Built in code from check output.</div>
+    <div class="never"><b>Never</b> concludes: the graph is descriptive and gives no verdicts. Every edge carries evidence ids.</div>
+  </div>
+  <div class="body" style="display:grid; grid-template-columns: 520px 1fr; gap:24px; align-items:center;">
+    <svg viewBox="-40 0 600 270" width="520" height="234">
+      <defs>
+        <style>
+          .nd { fill: #1d1d1d; stroke: #4fc493; stroke-width: 1.6; }
+          .nl { font: 600 14px Inter, sans-serif; fill: #f5f1ea; text-anchor: middle; }
+          .el { font: 12px Inter, sans-serif; fill: #a39d94; paint-order: stroke; stroke: #131313; stroke-width: 6px; stroke-linejoin: round; text-anchor: middle; }
+        </style>
+      </defs>
+      <line x1="90" y1="55" x2="90" y2="215" stroke="#f5f1ea" stroke-opacity=".55" stroke-width="1.6" stroke-dasharray="7 5"/>
+      <text class="el" x="80" y="132" style="text-anchor:end">3 texts,</text><text class="el" x="80" y="147" style="text-anchor:end">thread deleted</text><text class="el" x="80" y="162" style="text-anchor:end">on Amy's phone</text>
+      <line x1="90" y1="55" x2="470" y2="55" stroke="#4fc493" stroke-width="1.6" stroke-dasharray="2 5"/>
+      <text class="el" x="280" y="48">co-located 4 days · no contact</text>
+      <line x1="90" y1="55" x2="470" y2="215" stroke="#f5f1ea" stroke-opacity=".8" stroke-width="2.6"/>
+      <text class="el" x="245" y="128">$5,000</text>
+      <line x1="470" y1="215" x2="470" y2="55" stroke="#f5f1ea" stroke-opacity=".8" stroke-width="2.6"/>
+      <text class="el" x="470" y="140">$4,500</text>
+      <line x1="280" y1="235" x2="90" y2="215" stroke="#f5f1ea" stroke-opacity=".45" stroke-width="1.4"/>
+      <line x1="280" y1="235" x2="470" y2="215" stroke="#f5f1ea" stroke-opacity=".45" stroke-width="1.4"/>
+      <text class="el" x="200" y="252">calls</text><text class="el" x="370" y="252">calls</text>
+      <circle class="nd" cx="90" cy="55" r="26"/><text class="nl" x="90" y="60">Paul</text>
+      <circle class="nd" cx="470" cy="55" r="26"/><text class="nl" x="470" y="60">Cara</text>
+      <circle class="nd" cx="90" cy="215" r="26"/><text class="nl" x="90" y="220">Amy</text>
+      <circle class="nd" cx="470" cy="215" r="26"/><text class="nl" x="470" y="220">Ken</text>
+      <rect x="236" y="222" width="88" height="26" rx="13" fill="#1d1d1d" stroke="#c8553a" stroke-width="1.6" stroke-dasharray="4 3"/>
+      <text class="nl" x="280" y="240" style="font-size:11.5px; font-weight:500; fill:#e07a5f">no one</text>
+    </svg>
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+      <div class="box net"><div class="k">identity_match</div><div class="bd">Numbers, emails and handles on every phone → one person each: the <b style="color:var(--fg); font-weight:500">people map</b> the other layers use.</div></div>
+      <div class="box net"><div class="k">contact_graph</div><div class="bd">Edges by channel: message, call, transfer, social, deleted thread, co-location. Each edge cites its rows.</div></div>
+      <div class="box net"><div class="k">unresolved_identifiers</div><div class="bd">Numbers that resolve to no one in the case but reach ≥2 people (possible burners).</div></div>
+      <div class="box net"><div class="k">propose_incidents · anchor_moments</div><div class="bd">Signals that share people and overlap in time → incidents. ≥3 phones acting at once → anchor moments.</div></div>
     </div>
   </div>
-  <div class="box code" style="border-style:dashed">
-    <div class="bt" style="font-size:12.5px; color:var(--muted); font-weight:500">Optional, in order</div>
-    <div class="bd mono" style="font-size:11px; line-height:1.6">call_log_mismatch · shared_unknown_number<br>transfer_after_meeting · contact_went_quiet</div>
+</div>
+
+<!-- connector 1 -> 2 -->
+<div class="conn" style="top:964px;"><span class="ar" style="color:var(--code)">↑</span>signals: one row per hit, with the people involved, a time range, evidence ids and strength</div>
+
+<!-- ===== Layer 1 · Deterministic checks ===== -->
+<div class="layer" style="top:998px; height:244px; border:1.5px solid color-mix(in srgb, var(--code) 60%, transparent);">
+  <div class="side">
+    <div class="t"><span class="n" style="color:var(--code)">1</span>Deterministic<br><span style="margin-left:27px">checks</span></div>
+    <div class="s">Pure Python over SQLite. One fixed question each; every number in the report comes from here.</div>
   </div>
-  <div class="box code">
-    <div class="bt" style="font-size:12.5px; color:var(--muted); font-weight:500">Code helpers the agents call</div>
-    <div class="bd mono" style="font-size:11px; line-height:1.6"><span style="color:var(--fg)">run_sweep</span> · propose_incidents<br>anchor_moments · rank_incidents<br>match_brief_item · get_coverage</div>
+  <div class="body flow" style="grid-template-columns: 230px 34px 1fr 34px 230px;">
+    <div class="box code"><div class="bt">Integrity pass</div><div class="bd">runs first, every time</div><div class="kl" style="margin-top:4px">clock offset<br>impossible travel<br>GPS vs Wi-Fi/cell</div><div class="bd" style="margin-top:2px">→ corrected times, suspect windows</div></div>
+    <div class="arr">→</div>
+    <div class="box code" style="display:grid; grid-template-columns: repeat(5, 1fr); gap:14px; padding:14px 16px;">
+      <div class="grp"><div class="gt">Location</div><div class="kl" style="color:var(--fg)">location_timeline<br>location_gaps<br>distance_between<br>silent_meetings</div></div>
+      <div class="grp"><div class="gt">Comms</div><div class="kl" style="color:var(--fg)">missing_messages</div></div>
+      <div class="grp"><div class="gt">Money</div><div class="kl" style="color:var(--fg)">money_chains</div></div>
+      <div class="grp"><div class="gt">Device</div><div class="kl" style="color:var(--fg)">deletions<br>power_events<br>synchronised_<br>&nbsp;&nbsp;behaviour</div></div>
+      <div class="grp"><div class="gt" style="color:var(--net)">Relationships</div><div class="kl" style="color:var(--fg)">identity_match<br>contact_graph<br>unresolved_<br>&nbsp;&nbsp;identifiers</div></div>
+    </div>
+    <div class="arr">→</div>
+    <div class="box code"><div class="bt">Signals + verdicts</div><div class="bd">The sweep runs every check over every pair → <span class="k" style="font-size:11.5px">signals</span>.<br><span class="k" style="font-size:11.5px">verdicts.py</span>: one rule per check, run by <span class="k" style="font-size:11.5px">apply_verdict_rule</span>.</div></div>
   </div>
 </div>
 
-<!-- 5 · Agents -->
-<div class="col" style="left:1246px; width:380px;">
-  <div class="eyebrow">Agents</div>
-  <div class="col-title">LangChain deepagents</div>
-  <div class="col-note">backend/agents/ · create_deep_agent · findings/*.json<br><span style="color:#6b9bff">← tool calls · JSON + evidence ids →</span></div>
-  <div class="box model"><div class="bt">orchestrator <span class="tag model">model</span></div><div class="bd">runs ② triage and ③ refine · reads every findings file · dispatches <b style="color:var(--fg);font-weight:500">follow-ups</b> from one subagent to another</div></div>
-  <div style="display:grid; grid-template-columns:1fr 1fr; gap:7px; margin:4px 0 9px 0;">
-    <div class="box model" style="margin:0; padding:8px 10px"><div class="bt mono" style="font-size:11.5px">relationship-mapper</div><div class="bd mono" style="font-size:10.5px">people map · relationships.json</div></div>
-    <div class="box model" style="margin:0; padding:8px 10px"><div class="bt mono" style="font-size:11.5px">location-analyst</div><div class="bd mono" style="font-size:10.5px">timeline · gaps · location.json</div></div>
-    <div class="box model" style="margin:0; padding:8px 10px"><div class="bt mono" style="font-size:11.5px">comms-analyst</div><div class="bd mono" style="font-size:10.5px">comms.json</div></div>
-    <div class="box model" style="margin:0; padding:8px 10px"><div class="bt mono" style="font-size:11.5px">financial-analyst</div><div class="bd mono" style="font-size:10.5px">financial.json</div></div>
-    <div class="box model" style="margin:0; padding:8px 10px; grid-column: span 2"><div class="bt mono" style="font-size:11.5px">device-forensics <span style="font-weight:400; color:var(--muted)">· device.json</span></div></div>
+<!-- Case store strip -->
+<div class="abs" style="left:56px; top:1256px; width:1760px; height:92px; border-radius:14px; border:1.5px dashed #45403b; background:var(--panel2); display:grid; grid-template-columns: 300px 1fr; align-items:center;">
+  <div style="padding:0 24px; border-right:1px solid var(--line); height:100%; display:flex; flex-direction:column; justify-content:center;">
+    <div style="font-family:'Instrument Serif',serif; font-size:25px">Case store</div>
+    <div class="bd" style="margin-top:2px">SQLite, already loaded and resolved</div>
   </div>
-  <div class="box" style="border-style:dashed; border-color:#4a4642; padding:9px 12px">
-    <div class="bd mono" style="font-size:10.8px; margin:0; line-height:1.6"><span style="color:var(--model)">chain example</span> location-analyst: Ken gap 14:00–16:30<br>→ financial-analyst: $4,500 → Cara at 15:40<br>→ comms-analyst: message at 15:10 → one finding</div>
-  </div>
-  <div class="box model"><div class="bt">report-writer <span class="tag model">model</span></div><div class="bd">merges, ranks via rank_incidents, words one sentence per finding</div></div>
-  <div class="box code"><div class="bt">validate_report() <span class="tag code">code</span></div><div class="bd">cites evidence · phones not people · neutral words · numbers traced · gaps = "no location data"</div></div>
-</div>
-
-<!-- 6 · API -->
-<div class="col" style="left:1668px; width:196px;">
-  <div class="eyebrow">API</div>
-  <div class="col-title">FastAPI</div>
-  <div class="col-note">backend/api.py · SSE for runs</div>
-  <div class="box code" style="padding:12px">
-    <div class="ep mono"><span class="m">POST</span> /api/ingest<span class="d">starts ① + ②</span></div>
-    <div class="ep mono"><span class="m">GET</span> /api/briefing<span class="d">opening briefing</span></div>
-    <div class="ep mono"><span class="m">GET</span> /api/timeline <span class="tag new" style="font-size:8.5px">new</span><span class="d">stays per person</span></div>
-    <div class="ep mono"><span class="m">GET</span> /api/signals <span class="tag new" style="font-size:8.5px">new</span><span class="d">all sweep hits</span></div>
-    <div class="ep mono"><span class="m">POST</span> /api/analyse<span class="d">③ SSE: todos · follow_up · report</span></div>
-    <div class="ep mono"><span class="m">POST</span> /api/ask<span class="d">SSE: step · answer</span></div>
-    <div class="ep mono"><span class="m">GET</span> /api/evidence<span class="d">rows + provenance</span></div>
-    <div class="ep mono" style="margin:0"><span class="m">GET</span> /api/case · /graph</div>
+  <div class="bd" style="padding:0 26px; font-size:13px; margin:0; line-height:1.6">
+    Phone records (messages, calls, locations, transactions, device events), each with its source file, line and raw JSON. Checks read through views that apply each phone's clock offset and leave out rows the investigator disputed. A dispute reruns every check that cited the row.
   </div>
 </div>
 
-<!-- 7 · Front end -->
-<div class="abs" style="left:56px; top:1102px; width:1808px;">
-  <div class="eyebrow">Front end</div>
-  <div style="position:relative; height:146px; margin-top:4px;">
-    <div class="page" style="left:0; width:370px;"><div class="bt">Briefing <span class="tag model">opens here</span></div><div class="bd">Shown on load, no brief needed: anchor moments, top 5 incidents, week timeline, relations graph, dismissed. Brief panel sharpens it.</div></div>
-    <div class="page" style="left:390px; width:330px;"><div class="bt">Location timeline <span class="tag new">new</span></div><div class="bd">One lane per person on a shared axis: stays, travel, <b style="color:var(--fg);font-weight:500">hatched gaps</b> by type, map of the selected window</div></div>
-    <div class="page" style="left:740px; width:310px;"><div class="bt">Investigate</div><div class="bd">Brief → matched to signals → live to-dos, agent lanes, follow-up hops → report</div></div>
-    <div class="page" style="left:1070px; width:250px;"><div class="bt">Ask drawer</div><div class="bd">Any question; cited answer or "cannot tell"</div></div>
-    <div class="page" style="left:1340px; width:468px;"><div class="bt">Finding detail</div><div class="bd">Same four tabs everywhere; How we know shows signal → incident → follow-up hops</div>
-      <div class="tabs"><span>Evidence (+ gap view)</span><span>How we know</span><span style="color:var(--code); border-color:color-mix(in srgb,var(--code) 50%,transparent)">Verify · recompute</span><span>Sources · file + line</span></div></div>
-  </div>
+<!-- Tool-call lane: agents call down into checks -->
+<div class="lane" style="top:406px; height:832px;">
+  <svg width="32" height="832" viewBox="0 0 32 832" style="position:absolute; inset:0">
+    <defs><marker id="ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b9bff"/></marker></defs>
+    <path d="M16,6 L16,824" stroke="#6b9bff" stroke-width="1.6" stroke-dasharray="6 5" marker-end="url(#ac)" marker-start="url(#ac)"/>
+  </svg>
+  <div class="lbl">tool calls: targeted checks, apply_verdict_rule, get_reliability · JSON + evidence ids back</div>
 </div>
 
-<!-- Principles -->
-<div class="abs principle" style="left:56px; top:1300px; width:1808px; display:grid; grid-template-columns: repeat(4, 1fr); gap:28px;">
-  <div><b>Checks never conclude.</b> One fixed question each, JSON out with the row ids used. Every number in the report is computed here.</div>
-  <div><b>Agents never compute.</b> They choose checks and parameters, follow up, read message content, merge, dismiss with a reason, and word.</div>
-  <div><b>Gaps are not guilt.</b> Missing location is "no location data". Only <span class="mono">location_off</span> (phone in use during the gap) is raised by default.</div>
-  <div><b>Everything is traceable.</b> Statement → number trace → signal → evidence ids → row → file, line, raw JSON. Verify recomputes it in the browser.</div>
+<div class="foot">
+  <span><b>Checks never conclude.</b> They return rows and numbers.</span>
+  <span><b>The network never judges.</b> It connects people and events.</span>
+  <span><b>Agents never compute.</b> They route, follow up and write one sentence per finding.</span>
 </div>
 
-<!-- Arrows -->
-<svg class="arrows" viewBox="0 0 1920 1440">
-  <defs>
-    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8a847c"/></marker>
-    <marker id="am" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#e8a33d"/></marker>
-    <marker id="ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b9bff"/></marker>
-    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4fc493"/></marker>
-  </defs>
-  <path d="M280,640 C300,640 298,460 314,460" fill="none" stroke="#8a847c" stroke-width="1.5" marker-end="url(#a)"/>
-  <path d="M556,760 C574,760 572,480 590,480" fill="none" stroke="#8a847c" stroke-width="1.5" marker-end="url(#a)"/>
-  <path d="M836,470 L870,470" stroke="#8a847c" stroke-width="1.5" marker-end="url(#a)"/>
-  <text x="838" y="460" class="lbl">read</text>
-  <!-- sweep writes signals back to the store -->
-  <path d="M870,683 L840,683" stroke="#6b9bff" stroke-width="1.6" marker-end="url(#ac)"/>
-  <text x="594" y="808" class="lbl" style="fill:#6b9bff">① sweep writes signals</text>
-  <!-- agents <-> checks (tool calls out, JSON + ids back) -->
-  <path d="M1242,462 L1208,462" stroke="#6b9bff" stroke-width="1.6" marker-end="url(#ac)"/>
-  <path d="M1208,492 L1242,492" stroke="#6b9bff" stroke-width="1.6" marker-end="url(#ac)"/>
-  <path d="M1628,700 C1646,700 1646,520 1664,520" fill="none" stroke="#8a847c" stroke-width="1.5" marker-end="url(#a)"/>
-  <path d="M1766,850 L1766,1128" stroke="#8a847c" stroke-width="1.5" marker-end="url(#a)"/>
-  <text x="1776" y="990" class="lbl">JSON / SSE</text>
-  <!-- triage -> opening briefing -->
-  <path d="M1330,952 C1330,1050 300,1010 300,1126" fill="none" stroke="#e8a33d" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#am)"/>
-  <text x="330" y="1060" class="lbl" style="fill:#e8a33d">② triage → opening briefing on page load</text>
-  <!-- brief -> refine -->
-  <path d="M960,1126 C960,1060 1500,1060 1500,952" fill="none" stroke="#e8a33d" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#am)"/>
-  <text x="1100" y="1090" class="lbl" style="fill:#e8a33d">③ brief → match signals, refine</text>
-  <!-- stays -> location timeline lanes -->
-  <path d="M660,786 C660,980 600,1020 600,1126" fill="none" stroke="#4fc493" stroke-width="1.3" stroke-dasharray="2 5" marker-end="url(#ag)"/>
-  <text x="672" y="900" class="lbl" style="fill:#4fc493">stays → lanes</text>
-  <!-- provenance -> finding detail -->
-  <path d="M780,786 C780,1060 1600,1040 1600,1126" fill="none" stroke="#4fc493" stroke-width="1.3" stroke-dasharray="2 5" marker-end="url(#ag)"/>
-  <text x="1430" y="1108" class="lbl" style="fill:#4fc493">provenance → Verify, Sources</text>
-</svg>
 </body>
 </html>

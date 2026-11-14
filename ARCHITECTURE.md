@@ -1,239 +1,354 @@
 # Alib.ai architecture
 
-This document covers the target design for iteration 1. For a link-by-link account of how every statement is derived and traced back to its source, see [DERIVATION.md](DERIVATION.md). The front-end mock-up in `frontend/` follows these interfaces. Each mock is meant to be replaced by the real component behind the same contract.
+This document covers the target design for the backend build. For a link-by-link account of how every statement is derived and traced back to its source, see [DERIVATION.md](DERIVATION.md). The front-end mock-up in `frontend/` is a placeholder: backend decisions are not made to fit it, but [`frontend/src/api/types.ts`](frontend/src/api/types.ts) is kept in step with the contract below.
 
 ![Alib.ai system architecture](docs/architecture.png)
 
-*Diagram source: [docs/architecture-diagram.html](docs/architecture-diagram.html). To update it, edit the HTML, open it in Chrome at 1920×1440, and capture a full-size screenshot to `docs/architecture.png`.*
+*Diagram source: [docs/architecture-diagram.html](docs/architecture-diagram.html). To update it, edit the HTML, and render it at 1920×1440 with a device scale factor of 2 to `docs/architecture.png`, for example with headless Chrome or Edge: `msedge --headless=new --hide-scrollbars --force-device-scale-factor=2 --window-size=1920,1440 --virtual-time-budget=8000 --screenshot=docs/architecture.png file:///<repo>/docs/architecture-diagram.html`.*
 
-> **Changes in this revision.** The pipeline is now **sweep → triage → brief refines**. It replaced "brief first". The page opens on a briefing, and the investigator's brief sharpens it. The revision also adds:
-> - a `signals` table, a `stays` table and an `incidents` table
-> - two location checks: `location_timeline` and `location_gaps`
-> - four optional checks
-> - per-subagent findings files, with follow-up chaining between subagents
-> - generator plants for gaps
->
-> The acceptance criteria have new entries (§11).
+> **Changes in revision 3** (from the planning handoff):
+> - **Agents:** orchestrator plus five domain subagents. The `report-writer` subagent is removed; the report is assembled in code and the orchestrator writes only the next-steps paragraph (§7, §8).
+> - **Structured output:** every domain subagent returns a Pydantic `Finding`. Verdicts come from code rules and are copied, never chosen (§7.2).
+> - **Integrity pass (new, stage ⓪):** clock offset, impossible travel and location-source disagreement, run in code before anything else. Writes per-phone reliability; every subagent gets `get_reliability` (§5).
+> - **Statements:** claims attributed to a person are accepted alongside the brief; the report shows, per person, which claims the phones support or contradict (§7.5, §8).
+> - **Human check:** a `confirm_items` interrupt lets the investigator approve or edit parsed items before any check runs (§7.4).
+> - **Disputes change results:** a disputed row is excluded, the checks that cited it rerun, and changed findings are marked (§9).
+> - **Names stand for phones:** the "phones, not people" wording rule is dropped. A sentence may use a case person's name for their phone ("Amy was at Northgate Mall"); the report says so once, in its assumptions (§8.1). The neutral-wording list is extended (§8.2).
+> - **New check:** `unresolved_identifiers` (possible burners); stretch: group meetings (§6).
+> - **Evaluation across seeds:** precision and recall per check over 10–20 generated cases, one seed held out (§12).
+> - **Ingestion is out of scope for this build.** The case store is assumed loaded, normalised and resolved (§3).
 
 ---
 
 ## 1. Operating rule
 
-**Agents never compute, and checks never conclude.**
+**Code finds facts; the model routes and phrases.** Agents never compute, and checks never conclude.
 
-| | Checks (code) | Agents (model) |
+| | Checks and rules (code) | Agents (model) |
 |---|---|---|
-| What they are | Plain Python functions over SQLite. Each answers **one fixed question**. | LangChain deepagents subagents |
-| What they do | Return JSON containing the evidence row ids they used. They compute **every number** the report will contain. | Choose which checks to run and with what parameters. Follow up on results. Read message content. Merge findings. Write the report. |
-| What they never do | Draw a conclusion, rank or word anything | Do arithmetic, count rows or invent a row |
+| What they are | Plain Python functions over SQLite. Each check answers **one fixed question**; each verdict rule maps a check output to a verdict. | LangChain deepagents: one orchestrator, five domain subagents |
+| What they do | Return JSON with the `evidence_ids` they used and **every number** the report will contain. Compute verdicts, strengths, reliability and rankings. | Parse the brief and statements into items. Choose which checks to run with what parameters. Follow up on results. Read message content. Phrase one sentence per finding. Write the next-steps paragraph. |
+| What they never do | Draw a conclusion in words, rank by judgement, or phrase anything | Do arithmetic, count rows, choose a verdict, or invent a row |
 
-Anything that looks like arithmetic in an agent's job is a **code helper the agent calls**. This includes grouping signals by time overlap, counting agreeing checks, or finding clusters of three or more phones. The agent decides what to do with the result: merge, dismiss with a reason, or follow up.
+Anything that looks like arithmetic in an agent's job is a **code helper the agent calls**: grouping signals by time overlap, counting agreeing checks, finding clusters of three or more phones, applying a verdict rule. The agent decides what to do with the result: merge, dismiss with a reason, or follow up.
 
-`validate_report()` (code) enforces the rule on output. It drops any statement that:
-- has no evidence ids, or ids that don't resolve
-- places a *person* somewhere instead of a phone
-- uses "lied", "guilty" or similar
-- contains a number not copied from a check output
-- is longer than one sentence
-
-It allows one repair attempt, then drops whatever still fails.
+`validate_report()` (code, §8.2) enforces the rule on output. It is the evidence auditor: there is no auditing agent.
 
 ---
 
 ## 2. Pipeline overview
 
 ```
- Case Bundle ─► Ingest ─► Case store ─► ① SWEEP (code) ─► signals ─► ② TRIAGE (agents) ─► incidents ─► Opening briefing
-                                         every check ×                group · rank · dismiss              (shown on page load)
-                                         every pair ×                 · anchor moments                          │
-                                         full range                                                             ▼
-                                                                       ③ BRIEF REFINES (agents) ◄── investigator's brief
-                                                                         match items → signals
-                                                                         targeted checks only for gaps
-                                                                         re-rank by relevance ─► Report
+ Case store ─► ⓪ INTEGRITY (code) ─► ① SWEEP (code) ─► signals ─► ② TRIAGE (agents) ─► incidents ─► Opening briefing
+ (loaded,       clock offsets          every check ×                group · rank · dismiss           (shown on page load)
+  resolved)     reliability            every pair ×                 · anchor moments                       │
+                stays                  full range                                                          ▼
+                                                    brief + statements ─► ③ PARSE (orchestrator) ─► items
+                                                                                         │
+                                                                     ④ CONFIRM (interrupt: investigator approves / edits)
+                                                                                         │
+                                                                     ⑤ REFINE (agents) match → targeted checks → Findings
+                                                                                         │
+                                                                     ⑥ ASSEMBLE (code) report + validate_report()
+                                                                                         │
+                                                                     ⑦ REVIEW (investigator) checked / disputed ─► rerun affected checks
 ```
 
 | Stage | Trigger | Actor | Reads | Writes |
 |---|---|---|---|---|
-| Ingest | Bundle uploaded | code | Case Bundle | case store tables, `stays` |
-| ① Sweep | Ingest finished | code only | case store, `stays` | `signals` |
-| ② Triage | Sweep finished | agents + code helpers | `signals` | `incidents`, `dismissals`, `anchors`, opening `Briefing` |
-| ③ Brief refines | Investigator submits a brief | agents + code helpers | `signals`, `incidents`; new targeted checks | `Report` (brief items matched to incidents, re-ranked) |
+| ⓪ Integrity | Case store ready | code only | evidence tables | `clock_offsets`, `reliability`, `stays` |
+| ① Sweep | Integrity finished | code only | case store (corrected timestamps), `stays` | `signals` |
+| ② Triage | Sweep finished | agents + code helpers | `signals`, `reliability` | `incidents`, `dismissals`, `anchors`, opening `Briefing` |
+| ③ Parse | Investigator submits brief and/or statements | orchestrator | brief, `statements` | proposed `items` |
+| ④ Confirm | Items proposed | investigator (interrupt) | proposed `items` | confirmed `items` |
+| ⑤ Refine | Items confirmed | orchestrator + domain subagents | `signals`, `incidents`, targeted checks | `findings` |
+| ⑥ Assemble | All tasks done | code (+ orchestrator for next steps) | `findings`, `items`, `incidents` | `Report` |
+| ⑦ Review | Investigator marks a row | code, then affected subagents | `reviews` | rerun checks, updated `findings` marked `changed` |
+
+Stages ⓪ and ① are invoked by the same entry point (`prepare_case()`), so no agent run and no direct `run_sweep()` call can skip the integrity pass.
 
 ---
 
-## 3. Ingest pipeline (`backend/ingest/`)
+## 3. Ingest (upstream, out of scope for this build)
 
-Input is a Case Bundle v1 (spec: [`schema/case-bundle-v1/README.md`](schema/case-bundle-v1/README.md)). Each stage is a pure function:
+The case store is assumed to be already loaded, normalised and resolved: every row has its global id `<device>:<type>:<record_id>`, `device_owner`, a tz-aware timestamp and `provenance`, and identifiers are resolved to `person_id` where possible. The intended ingest pipeline (load → validate → normalise → resolve → store, from a Case Bundle v1; spec in [`schema/case-bundle-v1/README.md`](schema/case-bundle-v1/README.md)) is unchanged, but `backend/ingest/` is **not** built or changed here.
 
-| Stage | Does | Output |
-|---|---|---|
-| `load` | Read the manifest and JSONL files | raw dicts + file/line provenance |
-| `validate` | Pydantic models in `schema.py` | errors (fatal), warnings |
-| `normalise` | E.164 numbers, tz-aware timestamps, lowercase handles, geofence locations to places | clean rows |
-| `resolve` | Identifiers → `person_id` (persons, contacts, social accounts) | `from_person`, `to_person` |
-| `store` | Write to SQLite with a global id `<device>:<type>:<record_id>` and `provenance` | case.db |
-| `index` | Per-pair contact index; run `location_timeline` for every person → `stays` | ingest report |
-
-New sources only need an **adapter** that writes a Case Bundle.
+Tests and the demo load the synthetic case straight into the case-store tables with the thinnest possible loader (`backend/store/load_synthetic.py`). Building `stays` moved from ingest to the integrity stage, so it uses clock-corrected timestamps.
 
 ---
 
 ## 4. Case store (SQLite)
 
-**Evidence tables** (one row per phone, each with `id`, `device_id`, `device_owner`, timestamp and `provenance`):
+**Evidence tables** (one row per phone record, each with `id`, `device_id`, `device_owner`, `ts` and `provenance`):
 - `persons` (plus `identifiers`, and `orgs` for known businesses)
-- `devices`, `contacts`, `messages`, `calls`, `locations`, `transactions`, `device_events`
+- `devices`, `contacts`, `messages`, `calls`, `transactions`, `device_events`
+- `locations`, which also carries `source` (`gps` | `wifi` | `cell`) and `accuracy_m`
 - `social_accounts`, `social_interactions`
+
+Raw `ts` is never overwritten. Checks read timestamps through the view `v_<table>` which adds `ts_adj = ts − clock_offsets.offset_s` for that device and excludes disputed rows (§9).
 
 **Derived tables**, written by code and read by checks and agents:
 
 | Table | Columns | Written by |
 |---|---|---|
-| `stays` | `segment_id, person, kind (stay\|travel\|gap), place, start, end, gap_type, evidence_ids` | `location_timeline` at ingest |
-| `signals` | `signal_id, check, people, start, end, evidence_ids, strength, output_json` | ① Sweep |
+| `clock_offsets` | `device_id, offset_s, n_pairs, spread_s, method, evidence_ids` | ⓪ Integrity |
+| `reliability` | `device_id, person, start, end, status (ok\|suspect), reasons[] (clock_skew\|impossible_travel\|source_disagreement), metrics_json, evidence_ids` | ⓪ Integrity |
+| `stays` | `segment_id, person, kind (stay\|travel\|gap), place, start, end, gap_type, evidence_ids` | ⓪ Integrity (via `location_timeline`) |
+| `signals` | `signal_id, check, people, start, end, evidence_ids, strength, output_json, reliability_flags` | ① Sweep |
 | `incidents` | `incident_id, signal_ids, people, start, end, n_checks, n_phones, rank, headline, anchor_id?` | ② Triage |
 | `dismissals` | `signal_id, reason, rule` | ② Triage |
 | `anchors` | `anchor_id, start, end, phones, signal_ids` | ② Triage (via code helper) |
+| `statements` | `statement_id, person_id, text, received_at` | API (§10) |
+| `items` | `item_id, source (brief\|statement), source_ref, claimant (person_id\|investigator), kind (belief\|question\|claim), text, people, start, end, status (proposed\|confirmed\|edited\|removed)` | ③ Parse, ④ Confirm |
+| `check_calls` | `call_id, check, params_json, output_json, evidence_ids, excluded_ids, run_at` | every check invocation |
+| `findings` | `finding_id, item_id, call_id, verdict, sentence, evidence_ids, numbers_json, reliability_note, agent, status (current\|changed\|withdrawn), supersedes?` | ⑤ Refine, ⑦ Review |
+| `reviews` | `review_id, target (finding_id\|evidence_id), kind (checked\|disputed), note, by, at` | ⑦ Review |
 
-`strength` is computed by the check in code, as a number in 0–1 from a documented per-check rule (see DERIVATION.md §3). Agents never set it.
+`strength` and verdicts are computed in code, from documented per-check rules (see DERIVATION.md §3). Agents never set them. `reliability_flags` on a signal lists the suspect windows its evidence falls in.
 
 ---
 
-## 5. Checks (`backend/checks/`)
+## 5. Integrity pass (`backend/integrity/`, stage ⓪)
 
-Every check is a pure function. Thresholds are named keyword arguments with the defaults below. Each returns `{check, params, results[], evidence_ids[]}`, and each result can be written as one `signals` row.
+All code, no model. Runs once per case (and again after a dispute that touches its inputs), before any sweep or agent run.
 
-### 5.1 Core checks (iteration 1)
+| Step | Logic | Output | Defaults |
+|---|---|---|---|
+| **Clock offset** | For each pair of phones, match calls present on both (same counterpart numbers, same direction, duration within 2 s). The offset estimate per phone is the median of `ts_b − ts_a` across matches, solved jointly against a reference phone (the one with the most matches). Runs **before** `missing_messages`, whose 2 s tolerance assumes synced clocks: without correction, every message in a skewed pair looks deleted. | `clock_offsets`; a phone with `|offset| > 5 s` gets a `clock_skew` reliability row covering its whole coverage | ≥3 matched calls; candidate window ±15 min; spread must be ≤ 2 s, otherwise status `suspect` with "offset not estimable" |
+| **Impossible travel** | Consecutive location fixes on one phone (corrected time) whose implied speed exceeds a ceiling, after allowing for both fixes' `accuracy_m` | `reliability` rows `impossible_travel` over the window between the fixes | 250 km/h; ignore pairs < 60 s apart |
+| **Location-source disagreement** | A GPS fix farther than allowed from the same phone's Wi-Fi or cell fix within the same time slot | `reliability` rows `source_disagreement` | slot 5 min; distance > max(1 km, 3 × combined accuracy) |
+| **Stays** | `location_timeline` for every person, on corrected timestamps | `stays` | see §6 |
+
+A reliability window is `ok` unless one of the rules above marks it `suspect`. The tool `get_reliability(person?, start, end)` returns the windows overlapping a range. It is given to every domain subagent, and §8.2 enforces that a finding whose evidence falls in a suspect window says so.
+
+Innocent noise the pass must **not** flag: indoor GPS loss (gap, not disagreement), normal drift within accuracy, an overnight power-off, a single fix with large `accuracy_m`.
+
+---
+
+## 6. Checks (`backend/checks/`)
+
+Every check is a pure function over the views in §4. Thresholds are named keyword arguments with the defaults below. Each returns `{check, params, results[], evidence_ids[]}`; each result can be written as one `signals` row. Each check has a matching **verdict rule** in `backend/checks/verdicts.py` that maps (item, check output) to `confirmed | inconsistent | cannot_tell`.
+
+### 6.1 Core checks
 
 | Check | Owner | Logic | Defaults |
 |---|---|---|---|
-| `location_timeline(person, start, end)` **new** | location | Turns location rows into ordered segments: **stay** (within 150 m for ≥10 min: place, start, end), **travel** (from, to, start, end), **gap** (start, end, gap_type). Stored in `stays`; other location checks read from it. | stay radius 150 m, min stay 10 min |
-| `location_gaps(person, start, end)` **new** | location | Periods with no location rows for ≥45 min (normal interval 10 min), each classified (below) | min gap 45 min |
+| `location_timeline(person, start, end)` | location | Location rows → ordered segments: **stay** (within 150 m for ≥10 min), **travel**, **gap** (with `gap_type`). Stored in `stays`. | stay radius 150 m, min stay 10 min |
+| `location_gaps(person, start, end)` | location | Periods with no location rows for ≥45 min, classified (below) | min gap 45 min |
 | `distance_between(a, b, start, end)` | location | Haversine per shared slot; min, median, max; label | together ≤150 m for ≥80% of slots; apart if never <1 km |
-| `silent_meetings(start, end)` | location | Shared stays within range on repeated occasions with no message or call on any phone | ≤100 m, ≥20 min, ≥2 occasions |
-| `missing_messages(a, b, start, end)` | comms | Message on one phone and absent from the other, plus `thread_deleted` on the phone that lacks it | tolerance 2 s |
+| `silent_meetings(start, end)` | location | Shared stays on repeated occasions with no message or call on any phone | ≤100 m, ≥20 min, ≥2 occasions |
+| `missing_messages(a, b, start, end)` | comms | Message on one phone and absent from the other (on `ts_adj`), plus `thread_deleted` on the phone that lacks it | tolerance 2 s |
 | `money_chains(start, end)` | financial | A→B then B→C | ≤24 h; 80–100%; first ≥ $500 |
-| `synchronised_behaviour(start, end)` | device | ≥N phones with `thread_deleted` or `power_off` in one window; also returns inbound messages before it as trigger candidates | 60 min, 3 phones |
-| `deletions(person?, start, end)` | device | All `thread_deleted` events, with counterpart resolved | none |
+| `synchronised_behaviour(start, end)` | device | ≥N phones with `thread_deleted` or `power_off` in one window; returns inbound messages before it as trigger candidates | 60 min, 3 phones |
+| `deletions(person?, start, end)` | device | All `thread_deleted` events, counterpart resolved | none |
 | `power_events(person?, start, end)` | device | `power_off`/`power_on` pairs with durations | none |
-| `identity_match()` | relationship | Links numbers, emails and handles to people across all phones; builds the **people map** the others use | none |
+| `identity_match()` | relationship | Links numbers, emails and handles to people across all phones; builds the **people map** | none |
+| `unresolved_identifiers(start, end)` **new** | relationship | Numbers or handles that contact ≥2 case people and resolve to no person and no known org (possible burners). Returns per identifier: which phones, counts by channel, first/last contact. Supersedes the optional `shared_unknown_number`. | ≥2 case people |
 
 **Gap classification** (`location_gaps`):
 
-| `gap_type` | Condition | Reading | Raised by default? |
-|---|---|---|---|
-| `powered_off` | A `power_off` event covers the gap | The phone was switched off | Only if it overlaps another signal |
-| `location_off` | The phone sent messages, made calls or made transfers **during** the gap | Location was disabled while the phone was in use. Strongest signal. | **Yes** |
-| `unexplained` | No activity of any kind | Could be a flat battery or no signal | Only if it overlaps another signal |
+| `gap_type` | Condition | Raised by default? |
+|---|---|---|
+| `powered_off` | A `power_off` event covers the gap | Only if it overlaps another signal |
+| `location_off` | The phone sent messages, made calls or made transfers **during** the gap | **Yes** |
+| `unexplained` | No activity of any kind | Only if it overlaps another signal |
 
-Wording rule: a gap is always reported as "**no location data**" and never as proof of intent.
+Wording rule: a gap is always "**no location data**", never proof of intent.
 
-### 5.2 Optional checks (build in this order if time allows)
+### 6.2 Optional checks (in this order if time allows)
 
 | Check | Owner | Logic | Defaults |
 |---|---|---|---|
-| `call_log_mismatch(a, b, start, end)` | comms | A call on one phone that is absent from the other | tolerance 2 s |
-| `shared_unknown_number(start, end)` | relationship | A number contacted by ≥2 case people that resolves to no person and no known org | ≥2 people |
+| `call_log_mismatch(a, b, start, end)` | comms | A call on one phone absent from the other (on `ts_adj`) | tolerance 2 s |
 | `transfer_after_meeting(start, end)` | financial | A transfer between two people within N hours after their phones were together | ≤6 h; ≥ $500 |
-| `contact_went_quiet(start, end)` | comms | A pair with daily contact that stops on a given date | ≥3 consecutive contact days, then ≥2 silent days |
+| `contact_went_quiet(start, end)` | comms | A pair with daily contact that stops | ≥3 contact days, then ≥2 silent days |
+| `group_meetings(start, end)` *stretch* | location | ≥3 phones co-located at once. Framed as a multi-way pattern like `synchronised_behaviour`, not as pairwise meetings. | ≤150 m, ≥20 min, ≥3 phones |
 
-### 5.3 Helpers (code, called by agents)
+### 6.3 Helpers (code, called by agents)
 
 | Helper | Purpose |
 |---|---|
-| `run_sweep()` | ① Every check × every pair × full range → `signals` |
-| `propose_incidents(signal_ids?)` | Groups signals that share people and overlap in time; returns candidate incidents with `n_checks` and `n_phones` |
+| `prepare_case()` | ⓪ integrity pass then ① `run_sweep()`. The only way to start a sweep. |
+| `run_sweep()` | Every check × every pair × full range → `signals`. Refuses to run if the integrity pass has not completed for the current case version. |
+| `propose_incidents(signal_ids?)` | Groups signals sharing people and overlapping in time; returns candidates with `n_checks`, `n_phones` |
 | `anchor_moments(window_min=60, min_phones=3)` | Times where signals from ≥3 phones cluster |
-| `rank_incidents(incident_ids, relevance?)` | Sorts by (relevance to the brief, if given) → `n_checks` → `n_phones`. Relevance labels come from the agent; the sort is code. |
-| `match_brief_item(item)` | Finds signals and incidents that share people and dates with a brief item |
-| `contact_graph(people?)` | Edges by channel, for the relations view |
+| `rank_incidents(incident_ids, relevance?)` | Sorts by relevance (agent label, if a brief exists) → `n_checks` → `n_phones` → strength |
+| `match_brief_item(item_id)` | Signals and incidents sharing people and dates with an item |
+| `apply_verdict_rule(item_id, call_id)` | Runs the check's verdict rule; returns the verdict the subagent must copy |
+| `get_reliability(person?, start, end)` | Suspect windows overlapping the range (§5) |
+| `contact_graph(people?)` | Edges by channel |
 | `get_events`, `search_messages`, `get_coverage` | Raw lookups |
 
-Every check has a unit test against `answer_key.json`: it must return the planted case and must not return any decoy.
+Every check has a unit test against `answer_key.json`: it must return the planted case and no decoy.
 
 ---
 
-## 6. Agents (`backend/agents/`, LangChain deepagents)
+## 7. Agents (`backend/agents/`, LangChain deepagents)
 
 ```python
+checkpointer = SqliteSaver(...)            # required by interrupt_on
+
 agent = create_deep_agent(
-    model=init_chat_model(os.environ["MODEL"]),          # Anthropic or Bedrock
-    tools=[run_sweep, propose_incidents, anchor_moments, rank_incidents, match_brief_item, get_coverage],
+    model=init_chat_model(os.environ["ORCHESTRATOR_MODEL"]),   # stronger model
+    tools=[confirm_items, match_brief_item, propose_incidents, anchor_moments,
+           rank_incidents, get_coverage, get_reliability],
     subagents=[relationship_mapper, location_analyst, comms_analyst,
-               financial_analyst, device_forensics, report_writer],
+               financial_analyst, device_forensics],
     system_prompt=ORCHESTRATOR_PROMPT,
+    interrupt_on={"confirm_items": True},
+    checkpointer=checkpointer,
 )
+agent.invoke(inputs, config={"configurable": {"thread_id": run_id}})
 ```
 
-### 6.1 Subagents and what each owns
+There is **no `report-writer`** (it had no tools, so no context to isolate; assembly is code, §8) and **no evidence-auditor** (`validate_report()` does that). Dynamic, interpreter-based subagents are not used: the sweep is already code.
 
-| Subagent | Checks it may run | Writes |
-|---|---|---|
-| `relationship-mapper` | `identity_match`, `shared_unknown_number`, `contact_graph` | `findings/relationships.json` + the **people map** the others read first |
-| `location-analyst` | `location_timeline`, `location_gaps`, `distance_between`, `silent_meetings` | `findings/location.json` |
-| `comms-analyst` | `missing_messages`, `call_log_mismatch`, `contact_went_quiet`, `search_messages` | `findings/comms.json` |
-| `financial-analyst` | `money_chains`, `transfer_after_meeting` | `findings/financial.json` |
-| `device-forensics` | `deletions`, `power_events`, `synchronised_behaviour` | `findings/device.json` |
-| `report-writer` | none | Merges, ranks (via `rank_incidents`) and words; output passes `validate_report()` |
+### 7.1 Subagents
 
-The findings files live in the deepagents virtual filesystem. Each entry is `{finding_id, signal_ids, check_calls[], statement_draft, evidence_ids, follow_up?}`.
+Each is a dict with `name`, `description`, `system_prompt`, `tools`, `model` (a faster model, `SUBAGENT_MODEL`) and `response_format=FindingSet`. Every subagent also gets `get_reliability`, `apply_verdict_rule`, `get_events` and `get_coverage`.
 
-### 6.2 Chaining
+| Subagent | Checks it may run |
+|---|---|
+| `relationship-mapper` | `identity_match`, `unresolved_identifiers`, `contact_graph` (its people map is read first by the others) |
+| `location-analyst` | `location_timeline`, `location_gaps`, `distance_between`, `silent_meetings`, `group_meetings`* |
+| `comms-analyst` | `missing_messages`, `call_log_mismatch`*, `contact_went_quiet`*, `search_messages` |
+| `financial-analyst` | `money_chains`, `transfer_after_meeting`* |
+| `device-forensics` | `deletions`, `power_events`, `synchronised_behaviour` |
 
-The orchestrator reads every findings file after each round. If an entry has a `follow_up` (or the orchestrator spots one), it dispatches a **new task to a different subagent** with the parameters filled in. Every follow-up is logged in the finding's derivation, so the chain is visible in "How we know".
+\* optional or stretch.
 
-Example (required by acceptance):
-1. `location-analyst` finds Ken's `location_off` gap, 15 Apr 14:00–16:30. It suggests a follow-up: "activity during gap".
-2. The orchestrator sends that to `financial-analyst`, which runs `get_events(ken, transactions, 14:00–16:30)`.
-3. The $4,500 transfer from Ken to Cara at 15:40 falls inside the gap. It is the second link of the S4 money chain, so the two signals join one incident.
-4. The orchestrator sends it to `comms-analyst`, which reads Ken's 15:10 message.
-5. The merged finding cites all three.
+### 7.2 Structured output
 
-### 6.3 Stage ② Triage (runs on case load, no brief)
+```python
+class NumberTrace(BaseModel):
+    text: str    # number as written in the sentence
+    field: str   # check-output field it was copied from
 
-1. Read `signals`. Call `propose_incidents()` to get candidate groupings.
-2. The agents review the candidates: merge or split them, and **dismiss** signals with an ordinary explanation. Each dismissal records the reason and the rule (for example: "$50 with memo 'lunch', below the $500 money-chain minimum").
-3. Call `anchor_moments()`. A cluster from three or more phones becomes an anchor. On the demo case, **17 April around 10:00 is flagged without the system being told about the audit.**
-4. Call `rank_incidents()`. Take the top 5. The `report-writer` writes a headline and a "why it matters" for each, using numbers only from the cited signals.
-5. Save the `Briefing`.
+class FollowUp(BaseModel):
+    to: Literal["relationship-mapper", "location-analyst", "comms-analyst",
+                "financial-analyst", "device-forensics"]
+    check: str
+    params: dict
+    reason: str
 
-### 6.4 Stage ③ Brief refines (runs when the investigator submits a brief)
+class Finding(BaseModel):
+    item_id: str
+    check: str
+    verdict: Literal["confirmed", "inconsistent", "cannot_tell"]  # copied from apply_verdict_rule
+    sentence: str
+    evidence_ids: list[str]
+    numbers: list[NumberTrace]
+    follow_up: FollowUp | None = None   # addition to the handoff model; keeps §7.3 chaining
 
-1. Split the brief into items and resolve people and dates. This step is done by the model and logged.
-2. For each item, call `match_brief_item()` **first**. If existing signals cover the item, reuse them.
-3. Run new targeted checks **only** for items the sweep did not cover. Example: "Paul met Cara in March" → `get_coverage()` → `cannot_tell`.
-4. The agent labels each incident's relevance to the brief. `rank_incidents(relevance=…)` then re-sorts.
-5. The report-writer assembles the report sections, and `validate_report()` runs.
+class FindingSet(BaseModel):
+    findings: list[Finding]
+```
 
-**Verdicts:**
-- `confirmed`: data on at least 2 phones agrees.
+Code persists each returned `Finding` to `findings`, linking it to the `check_calls` row that produced it. The validator rejects a finding whose `verdict` differs from the recorded `apply_verdict_rule` result for that item and call.
+
+### 7.3 Chaining
+
+After each round the orchestrator reads the new findings. A finding with `follow_up` (or one the orchestrator spots) becomes a **new task to a different subagent** with the parameters filled in, logged as a `follow_up` step in the finding's derivation. Required example: `location-analyst` finds Ken's `location_off` gap (15 Apr 14:00–16:30) → `financial-analyst` finds the $4,500 transfer to Cara at 15:40 (link 2 of S4) → `comms-analyst` reads Ken's 15:10 message → one merged incident citing all three.
+
+### 7.4 Parse and confirm (stages ③–④)
+
+1. The orchestrator splits the brief and each statement into **atomic items**, each attributed to whoever made the claim (`investigator` for the brief, the statement's `person_id` otherwise), with people and dates resolved.
+2. It calls `confirm_items(items)`. Because of `interrupt_on`, the run pauses there and the API streams the proposed items to the investigator (§10).
+3. The investigator approves, edits or removes items. The run resumes on the same `thread_id` with the confirmed list. **No targeted check runs before this point.** The sweep and triage ran earlier and are not tied to any item.
+
+### 7.5 Refine (stage ⑤)
+
+1. For each confirmed item, call `match_brief_item()` **first**; reuse existing signals where they settle it.
+2. Route uncovered items to the owning subagent for targeted checks. Dates outside coverage → `get_coverage()` → `cannot_tell`.
+3. Each subagent calls `apply_verdict_rule` and `get_reliability` for the windows it cites, then returns its `FindingSet`.
+4. The orchestrator labels each incident's relevance to the items; `rank_incidents(relevance=…)` re-sorts in code.
+
+### 7.6 Triage (stage ②, no brief)
+
+1. `propose_incidents()` → candidates. 2. Agents merge or split (logged), and dismiss signals with an ordinary explanation (reason + rule). 3. `anchor_moments()`: on the demo case **17 April around 10:00** is flagged without the system being told about the audit. 4. `rank_incidents()` → top 5. 5. Each incident's `headline` is the sentence of its strongest validated finding (picked in code); `why_it_matters` is the code-generated rank reason (for example "3 checks agree across 3 phones").
+
+**Verdicts** (rules in code):
+- `confirmed`: data on at least 2 phones agrees with the item.
 - `inconsistent`: the data contradicts the item.
-- `cannot_tell`: no data settles the item. The finding cites coverage rows; the agent never guesses.
+- `cannot_tell`: no data settles it. The finding cites coverage rows.
 
 ---
 
-## 7. API (FastAPI, `backend/api.py`)
+## 8. Report assembly and validation (`backend/report/`)
+
+### 8.1 Assembly (code)
+
+`assemble_report(run_id)` builds the `Report` from validated `findings`, `items` and `incidents`:
+- **By item:** Confirmed / Inconsistent (beliefs), Answers (questions).
+- **By person (new):** for each person who made statements, their claims with the verdict per claim: supported (`confirmed`), contradicted (`inconsistent`) or `cannot_tell`.
+- **Unprompted:** incidents matched to no item.
+- **Reliability notes:** findings resting on a suspect window are listed with the reason.
+- **Next steps:** the only free text the orchestrator writes. It is one short paragraph, given the assembled report as input, and passes the same validator.
+- **Assumptions:** fixed text from code. It always includes: "Names stand for each person's phone. 'Amy was at Northgate Mall' means Amy's phone was there; a phone's location is not proof of where its owner was."
+
+### 8.2 `validate_report()` (hardened)
+
+Drops any statement that fails a rule below, after one repair attempt:
+
+| Rule | Check |
+|---|---|
+| Cites evidence | `evidence_ids` non-empty and all resolve; none is disputed |
+| Neutral wording | No word from the banned list: `lied`, `lying`, `liar`, `guilty`, `innocent`, `criminal`, `confessed`, `admitted`, `caught`, `covered up`, `cover-up`, `fraud`, `stole`, `suspicious`, `obviously`, `clearly`, `proves`, `proof` |
+| Numbers traced | Every number token appears in `numbers[].text`; each `field` exists in the cited check output with an equal value |
+| Verdict copied | `verdict` equals the stored `apply_verdict_rule` result |
+| Reliability disclosed | If any cited evidence falls in a `suspect` window, the sentence contains the reliability phrase ("…, though this phone's clock/location data in that window is flagged as unreliable") |
+| One sentence | Exactly one terminal punctuation mark |
+
+There is no "phones, not people" rule: a case person's name may stand for their phone, and the report's assumptions say so (§8.1). The old `<Name> (was|were) (at|in|near)` regex is removed.
+
+---
+
+## 9. Investigator review and disputes (stage ⑦)
+
+The Verify tab's "I checked this" / "I dispute this" are stored as `reviews` (`note`, `by`, `at`).
+
+- **Checked** is recorded and shown; it changes nothing.
+- **Disputed** (on an evidence row, or on a finding meaning all its rows):
+  1. The row is excluded from the `v_*` views.
+  2. Code finds every `check_calls` row whose `evidence_ids` include it and reruns those calls with the same params. If the row fed the integrity pass (a matched call, a location fix), the affected integrity steps rerun first.
+  3. Signals and findings from rerun calls are recomputed. A finding whose verdict, evidence or numbers changed is superseded: the new one is `current` with `supersedes` set, the old one `changed`. A finding that no longer has evidence becomes `withdrawn`. Rephrasing goes back to the owning subagent only when the numbers changed.
+  4. The report is reassembled; changed findings are marked in the UI.
+
+---
+
+## 10. API (FastAPI, `backend/api.py`)
 
 | Endpoint | Returns |
 |---|---|
-| `POST /api/ingest` (zip) | `IngestReport`. Ingest kicks off ① sweep and ② triage in the background. |
-| `GET /api/case` | `CaseInfo`: people, per-phone counts, places |
-| `GET /api/briefing` | `Briefing`: top 5 incidents, anchors, timeline events, dismissed signals. Available as soon as triage finishes; this is what the page shows on load. |
-| `GET /api/signals?people=&check=&start=&end=` | Raw `signals` rows, for the "everything the sweep found" view |
+| `POST /api/case/prepare` | Runs `prepare_case()` (⓪ + ①) and triage ② in the background |
+| `GET /api/case` | `CaseInfo` |
+| `GET /api/reliability?person=&start=&end=` | `ReliabilityWindow[]` and `ClockOffset[]` |
+| `GET /api/briefing` | `Briefing` |
+| `GET /api/signals?people=&check=&start=&end=` | `signals` rows |
+| `GET /api/timeline?people=&start=&end=` | `stays` segments |
 | `GET /api/run/stream` | SSE of the case-load run (sweep + triage): `phase`, `agent`, `tool` (check, args, rows, ms), `follow_up`, `log`, `envelope` (an agent's `findings/*.json`) |
 | `GET /api/stats/{activity,heatmap,contacts,money,distance,places,volume}` | Chart aggregates computed from rows (see `frontend/src/lib/aggregates.ts`) |
-| `GET /api/timeline?people=&start=&end=` | `stays` segments per person (stay, travel, gap with `gap_type`) for the location timeline |
-| `POST /api/analyse` (Brief) | SSE stream: `todos`, `subagent` (start, tool, done, `follow_up`) and `report`, with `error` on failure. Uses ③. The last report is cached by brief hash. |
-| `POST /api/ask` (question) | SSE stream: `step`, then `answer` with cited findings or `cannot_tell` |
+| `POST /api/analyse` (`{brief, statements[]}`) | SSE: `todos`, `items_proposed` (then pauses), `subagent` (start, tool, done, `follow_up`), `report`, `error`. Returns `run_id`. |
+| `POST /api/analyse/{run_id}/confirm` (`{items[]}`) | Resumes the interrupted run with confirmed or edited items; the SSE stream continues |
+| `POST /api/reviews` (`Review`) | Records it; a dispute triggers §9 and streams `rerun` then an updated `report` |
+| `GET /api/reviews?target=` | `Review[]` |
+| `POST /api/ask` | SSE: `step`, then `answer` |
 | `GET /api/evidence?ids=` | Rows + provenance grouped by phone; 404 lists unknown ids |
 | `GET /api/graph` | Contact graph |
 
-Every `Finding` carries `derivation` (steps including follow-up hops, number traces, validator results, corroboration). Every `EvidenceRow` carries `provenance`. The contract is [`frontend/src/api/types.ts`](frontend/src/api/types.ts), and `backend/schemas.py` mirrors it. New shapes for this revision: `Signal`, `Incident`, `Anchor`, `Dismissal` and `Segment` (stay | travel | gap).
+`backend/schemas.py` mirrors [`frontend/src/api/types.ts`](frontend/src/api/types.ts). Contract changes in this revision:
+- `SubagentName` loses `report-writer`.
+- New: `Statement {statement_id, person_id, text}`, `Item {item_id, source, claimant, kind, text, people, start, end, status}`, `ReliabilityWindow`, `ClockOffset`, `Review {review_id, target, kind: 'checked' | 'disputed', note, by, at}`.
+- `AgentEvent` gains `items_proposed` and `rerun`.
+- `Finding` gains `item_id`, `claimant`, `reliability_note?`, `status: 'current' | 'changed' | 'withdrawn'`, `supersedes?`.
+- `Report` gains `by_person: {person_id, claims: {item_id, text, verdict, finding_ids}[]}[]` and `reliability_notes`.
+- `CheckName` gains `unresolved_identifiers` (and `group_meetings` if built).
 
 ---
 
-## 8. Front end (`frontend/`)
+## 11. Front end (`frontend/`)
+
+The front end is built on mocks (React, Vite, TypeScript, Tailwind v4, react-leaflet). It is not a constraint on backend design.
 
 There are two UIs over one case store (`src/state/caseStore.tsx`), with one guided flow: **Ingest → Analyse → Review → Refine → Ask**. Each step unlocks the next, and earlier steps stay viewable.
 
@@ -269,93 +384,90 @@ Every count and chart is computed from these rows. No activity falls inside powe
 
 The swap point between the mock and the real backend is [`frontend/src/api/index.ts`](frontend/src/api/index.ts).
 
----
-
-## 9. Synthetic data generator (`data/generate.py`)
-
-The generator is seeded, and writes a Case Bundle plus `answer_key.json`.
-
-**Existing scenarios:**
-
-| ID | Scenario |
-|---|---|
-| S1 | Deleted messages |
-| S2 | Shared alibi |
-| S4 | Money chain |
-| S5 | Silent meetings |
-| S7 | Synchronised behaviour |
-
-**Existing decoys:**
-- Amy and Ken once at FreshMart
-- $50 "lunch"
-- Ken's phone off overnight on 15 April
-
-**New plants:**
-
-| ID | Plant | Expected |
-|---|---|---|
-| G1 | Ken's phone has **no location rows on 15 Apr 14:00–16:30**, but sends a message at **15:10** and makes the $4,500 transfer to Cara at **15:40** | `location_off`, raised; chains with S4 |
-| G1-decoy | Amy's phone has **no location rows and no activity for 50 minutes on 16 Apr, 09:10–10:00** | `unexplained`, **not** raised |
-| (existing) | S7 power-offs on 17 Apr | `powered_off`, raised because they overlap S7 |
-| (existing) | Ken overnight 15→16 Apr | `powered_off`, not raised |
-
-**Optional-check plants:** for each optional check that gets built, plant one positive and one decoy.
-
-| Check | Positive | Decoy |
-|---|---|---|
-| `call_log_mismatch` | A Ken→Cara call on 14 Apr 21:05 is on Cara's phone and absent from Ken's | A Paul→Amy call whose copies differ by 1 s (within tolerance) |
-| `shared_unknown_number` | Paul and Cara both call +1 555 010 0777, which matches no person or org | Paul and Cara both call Harbor Supply's main line (a known org) |
-| `transfer_after_meeting` | Cara→Paul $1,200, memo "refund", at 12:10 on 18 Apr, after the Dock Cafe meeting ends at 09:50 | Paul→Amy $50 "lunch" after their phones were together, below $500 |
-| `contact_went_quiet` | Daily Paul↔Ken calls on 13–17 Apr, none on 18–19 Apr | Amy and a non-case friend who are in contact every other day (never daily) |
-
-All plants and decoys are listed in `answer_key.json` with their evidence row ids.
+New UI the contract implies: an item-confirmation step before analysis, a statements input, a per-person claims section in the report, reliability badges on findings and timeline windows, and "changed" markers after a dispute.
 
 ---
 
-## 10. Repository layout (target)
+## 12. Synthetic data, answer key and evaluation
+
+**Decision: synthetic for now.** This build, its tests and its evaluation run on the seeded generator below. [`data/README.md`](data/README.md) surveys public multi-phone training cases and recommends **MSAB 2026** (two phones, published answer key) as a later real case, with fetch and schema-dump scripts in `data/scripts/`. Running on it needs an adapter from phone databases to Case Bundle v1, which is ingest and out of scope here (§3). If it is added later, it is scored against its published answers, which are never shown to the agents.
+
+### 12.1 Generator (`data/generate.py`)
+
+Seeded; writes the case straight into the case-store tables (via the thin loader) plus `answer_key.json`. Scenarios S1, S2, S4, S5, S7, gap plant G1 and its decoy, and the optional-check plants are unchanged from revision 2. New plants and noise, each listed in the answer key with row ids:
+
+| Kind | Plant | Expected |
+|---|---|---|
+| Tampering | Clock skew: one phone's clock offset by a configurable amount (default +90 s) | `clock_offsets` recovers it within 2 s; no false `missing_messages` after correction |
+| Tampering | Spoofed GPS: GPS fixes far from the same phone's Wi-Fi/cell fixes, and a jump implying impossible speed | `source_disagreement` and `impossible_travel` windows; findings citing them carry the reliability note |
+| Plant | A burner number contacting ≥2 case people, resolving to no one | `unresolved_identifiers` returns it |
+| Innocent noise | Indoor GPS loss, normal drift within accuracy, deleted spam threads, overnight power-off | Not flagged by integrity; not raised as signals (or dismissed with a rule) |
+| Statements | Per-person statements for the demo case, some supported, some contradicted, one unknowable | Correct per-person verdicts |
+
+A `noise` parameter (0–3) scales the amount of innocent noise and the tampering magnitudes.
+
+### 12.2 Evaluation (`eval/run_eval.py`)
+
+- Generate 10–20 cases across seeds and noise levels; one seed (`HELD_OUT_SEED`) is never used while tuning thresholds.
+- Run `prepare_case()` and every check; compare with each answer key.
+- Report **precision and recall per check** and per integrity rule, plus clock-offset error, as a table and JSON.
+- An optional `--agents` mode runs the full pipeline on the demo brief and scores verdicts per item.
+
+---
+
+## 13. Repository layout (target)
 
 ```
-data/generate.py              seeded Case Bundle + answer_key.json
-schema/case-bundle-v1/        format spec + example bundle
-backend/ingest/               load, validate, normalise, resolve, store, index (→ stays)
-backend/checks/               location.py (timeline, gaps, distance, meetings), comms.py,
-                              money.py, relations.py, device.py, optional.py, helpers.py (sweep, incidents, anchors, rank)
-backend/agents/               orchestrator, subagents, triage, refine, writer, validator
-backend/api.py                FastAPI
-backend/tests/                checks vs answer key, ingest, validator, triage, e2e (slow)
-frontend/                     the UI (currently running on mocks)
-docs/architecture.png         system diagram
-DERIVATION.md                 how every statement is derived and traced to source
+data/generate.py              seeded case + answer_key.json (tampering, noise, statements)  [planned]
+data/datasets/, data/scripts/ real-dataset inventory, schema dumps, fetch scripts  [exists]
+schema/case-bundle-v1/        format spec + example bundle (ingest is upstream)
+backend/store/                schema.sql, views (ts_adj, dispute exclusion), load_synthetic.py
+backend/integrity/            clock.py, travel.py, sources.py, run.py (→ clock_offsets, reliability, stays)
+backend/checks/               location.py, comms.py, money.py, relations.py, device.py, optional.py,
+                              verdicts.py, helpers.py (prepare_case, sweep, incidents, anchors, rank)
+backend/agents/               orchestrator.py, subagents.py, models.py (Finding), prompts/
+backend/report/               assemble.py, validate.py
+backend/reviews.py            disputes → rerun
+backend/api.py                FastAPI + SSE
+backend/tests/                integrity, checks vs answer key, validator, reviews, triage, e2e (slow)
+eval/run_eval.py              multi-seed precision/recall
+frontend/                     placeholder UI on mocks
 ```
 
 ---
 
-## 11. Acceptance criteria
+## 14. Acceptance criteria
 
-These are from the PRD, carried forward:
+Carried forward:
 - [ ] `generate.py` is deterministic. Every non-deleted message is on both phones.
 - [ ] pytest passes: each check returns its plant and no decoy.
-- [ ] The demo brief yields the six expected findings. Every id resolves, and every statement refers to phones, not people.
+- [ ] The demo brief yields the expected findings. Every id resolves and every statement passes the hardened validator.
 - [ ] "Paul met Cara in March" returns `cannot_tell`.
+- [ ] The opening briefing exists with no brief entered and flags **17 April around 10:00** as an anchor.
+- [ ] Ken's gap is raised as `location_off`; Amy's gap is not.
+- [ ] At least one finding comes from a follow-up chain across two subagents (G1 → S4).
 
-New in this revision:
-- [ ] The opening briefing appears on page load with no brief entered.
-- [ ] The briefing flags **17 April around 10:00** as an anchor moment without being told about the audit.
-- [ ] The location timeline shows all four people with stays, travel and gaps.
-- [ ] Ken's gap is raised as `location_off`, and Amy's gap is **not** raised.
-- [ ] At least one finding in the report comes from a **follow-up chain across two subagents**. On the demo case this is G1 → S4.
+New in revision 3:
+- [ ] `run_sweep()` refuses to run before the integrity pass.
+- [ ] With planted clock skew, the offset is recovered within 2 s and `missing_messages` returns no false positives on that pair.
+- [ ] Spoofed GPS produces suspect windows; innocent noise produces none.
+- [ ] Any finding citing a suspect window says so (validator-enforced).
+- [ ] No targeted check runs before the investigator confirms items; edited items are what get checked.
+- [ ] The report shows, per person who made statements, which claims the phones support or contradict.
+- [ ] Disputing a row reruns exactly the checks that cited it and marks changed findings.
+- [ ] Every report's assumptions state that names stand for phones.
+- [ ] `unresolved_identifiers` returns the planted burner and not the known org's line.
+- [ ] `eval/run_eval.py` reports precision and recall per check over ≥10 seeds, with the held-out seed reported separately.
 
 ---
 
-## 12. Build order
+## 15. Build order
 
-1. Generator and answer key, including G1 and the G1 decoy
-2. Ingest, then `location_timeline` → `stays`, then core checks with tests (no model)
-3. `run_sweep` → `signals`; code helpers (`propose_incidents`, `anchor_moments`, `rank_incidents`, `match_brief_item`)
-4. `/api/case`, `/api/evidence`, `/api/timeline`, `/api/signals`
-5. Agents: triage → `/api/briefing`, then brief refines → `/api/analyse` (SSE), with findings files and chaining
-6. Front end: briefing as home, location timeline page, gap evidence view, follow-up hops in progress
-7. Optional checks, each with a plant and a decoy
-8. Cached demo run
+1. Generator and answer key, including planted tampering and innocent noise, loaded straight into the case store
+2. Integrity pass; checks and verdict rules; tests against the answer key
+3. Agents on the CLI: orchestrator, five subagents with structured output, `confirm_items` interrupt
+4. Report assembly and hardened `validate_report()`; reviews and reruns
+5. FastAPI endpoints and SSE
+6. Multi-seed evaluation script
 
-Steps 1–4 need no model and can run in parallel with front-end work against the contract in `types.ts`.
+Steps 1–2 and 6 need no model.

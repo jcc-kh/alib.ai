@@ -27,7 +27,7 @@ export function planRun(brief: Brief): Plan {
   const coveredScenarios = new Set<ScenarioId>()
   const todos: Todo[] = items.map((it, i) => ({ id: `t${i + 1}`, label: it.text, status: 'pending' }))
   todos.push({ id: 'rank', label: 'Re-rank incidents by relevance to the brief', status: 'pending' })
-  todos.push({ id: 'write', label: 'Write and validate the report', status: 'pending' })
+  todos.push({ id: 'write', label: 'Assemble and validate the report', status: 'pending' })
 
   const events: Plan['events'] = []
   const push = (delay: number, event: AgentEvent) => events.push({ delay, event })
@@ -97,13 +97,14 @@ export function planRun(brief: Brief): Plan {
   setStatus('rank', 'done')
 
   setStatus('write', 'in_progress')
-  push(300, { type: 'subagent', agent: 'report-writer', status: 'start', todo_id: 'write', note: `${findings.length} findings` })
-  push(900, { type: 'subagent', agent: 'report-writer', status: 'tool', todo_id: 'write', tool: `validate_report(${findings.length} statements)` })
-  push(400, { type: 'subagent', agent: 'report-writer', status: 'done', todo_id: 'write', note: `${findings.length} passed, 0 dropped` })
+  // The report is assembled in code (no report-writer agent); the orchestrator writes only next steps.
+  push(300, { type: 'subagent', agent: 'orchestrator', status: 'tool', todo_id: 'write', tool: `assemble_report(${findings.length} findings)` })
+  push(900, { type: 'subagent', agent: 'orchestrator', status: 'tool', todo_id: 'write', tool: `validate_report(${findings.length} statements + next steps) → ${findings.length} passed, 0 dropped` })
   setStatus('write', 'done')
   push(200, { type: 'subagent', agent: 'orchestrator', status: 'done', note: 'Report ready' })
 
-  return { events, report: { assumptions: ASSUMPTIONS, findings, next_steps: NEXT_STEPS } }
+  // The mock takes no statements yet, so there are no per-person claims, and no planted suspect windows.
+  return { events, report: { assumptions: ASSUMPTIONS, findings, next_steps: NEXT_STEPS, by_person: [], reliability_notes: [] } }
 }
 
 function fileOf(agent: SubagentName) {

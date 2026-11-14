@@ -44,6 +44,74 @@ export interface Brief {
   unknown: string[]
 }
 
+/** A statement attributed to a person in the case, submitted alongside the brief. */
+export interface Statement {
+  statement_id: string
+  person_id: PersonId
+  text: string
+}
+
+export type ItemStatus = 'proposed' | 'confirmed' | 'edited' | 'removed'
+
+/** Who made a claim: the investigator (brief) or a person in the case (statement). */
+export type Claimant = PersonId | 'investigator'
+
+/** One atomic claim or question parsed from the brief or a statement (stage ③), confirmed by the investigator (stage ④). */
+export interface Item {
+  item_id: string
+  source: 'brief' | 'statement'
+  /** The statement_id, or the brief box ('believe' | 'confused' | 'unknown'). */
+  source_ref: string
+  claimant: Claimant
+  kind: 'belief' | 'question' | 'claim'
+  text: string
+  people: PersonId[]
+  start: string | null
+  end: string | null
+  status: ItemStatus
+}
+
+export interface AnalyseRequest {
+  brief: Brief
+  statements: Statement[]
+}
+
+// ---------- Integrity pass (stage ⓪) ----------
+
+export type ReliabilityReason = 'clock_skew' | 'impossible_travel' | 'source_disagreement'
+
+export interface ReliabilityWindow {
+  device_id: string
+  person: PersonId
+  start: string
+  end: string
+  status: 'ok' | 'suspect'
+  reasons: ReliabilityReason[]
+  /** Numbers behind the flag, e.g. { speed_kmh: 640 } or { distance_m: 4200 }. */
+  metrics: Record<string, number>
+  evidence_ids: string[]
+}
+
+export interface ClockOffset {
+  device_id: string
+  offset_s: number
+  n_pairs: number
+  spread_s: number
+  evidence_ids: string[]
+}
+
+// ---------- Investigator review (stage ⑦) ----------
+
+export interface Review {
+  review_id: string
+  /** A finding id or an evidence row id. */
+  target: string
+  kind: 'checked' | 'disputed'
+  note: string
+  by: string
+  at: string
+}
+
 // ---------- Ingest ----------
 
 export type StageStatus = 'pending' | 'running' | 'done'
@@ -85,7 +153,6 @@ export type SubagentName =
   | 'relationship-mapper'
   | 'financial-analyst'
   | 'device-forensics'
-  | 'report-writer'
 
 export interface Todo {
   id: string
@@ -95,7 +162,11 @@ export interface Todo {
 
 export type AgentEvent =
   | { type: 'todos'; todos: Todo[] }
+  /** The run pauses at confirm_items; resume with POST /api/analyse/{run_id}/confirm. */
+  | { type: 'items_proposed'; run_id: string; items: Item[] }
   | { type: 'subagent'; agent: SubagentName; status: 'start' | 'tool' | 'done' | 'follow_up'; todo_id?: string; tool?: string; note?: string; to?: SubagentName }
+  /** After a dispute: the check calls being rerun. An updated `report` event follows. */
+  | { type: 'rerun'; review_id: string; call_ids: string[]; checks: string[] }
   | { type: 'report'; report: Report }
   | { type: 'error'; message: string }
 
@@ -110,12 +181,21 @@ export type CheckName =
   | 'silent_meetings'
   | 'synchronised_behaviour'
   | 'location_gaps'
+  | 'unresolved_identifiers'
+  | 'group_meetings'
   | 'get_coverage'
+
+export type FindingStatus = 'current' | 'changed' | 'withdrawn'
 
 export interface Finding {
   id: string
   section: Section
+  /** The confirmed item this finding answers; null for unprompted findings. */
+  item_id: string | null
+  /** The item's text, for display. */
   brief_item: string | null
+  claimant: Claimant | null
+  /** Copied from apply_verdict_rule; the validator rejects any other value. */
   verdict: Verdict
   statement: string
   people: PersonId[]
@@ -124,6 +204,11 @@ export interface Finding {
   evidence_ids: string[]
   check_output: CheckOutput
   derivation: Derivation
+  /** Set when any cited evidence falls in a suspect reliability window. */
+  reliability_note?: string
+  /** 'changed' or 'withdrawn' after a dispute; the replacement finding sets `supersedes`. */
+  status: FindingStatus
+  supersedes?: string
 }
 
 // ---------- Transparency: how a finding was derived ----------
@@ -165,10 +250,19 @@ export interface Derivation {
   corroboration: Corroboration[]
 }
 
+/** Per person who made statements: each claim and whether the phones support it. */
+export interface PersonClaims {
+  person_id: PersonId
+  claims: { item_id: string; text: string; verdict: Verdict; finding_ids: string[] }[]
+}
+
 export interface Report {
   assumptions: string[]
   findings: Finding[]
+  /** Written by the orchestrator: the only free text in the report. */
   next_steps: string[]
+  by_person: PersonClaims[]
+  reliability_notes: { finding_id: string; note: string; window: ReliabilityWindow }[]
 }
 
 // Raw outputs from the deterministic checks. Every number shown in a statement comes from here.
@@ -324,6 +418,8 @@ export interface Signal {
   /** 0–1, computed by the check in code. */
   strength: number
   summary: string
+  /** Reasons from suspect reliability windows that this signal's evidence falls in. */
+  reliability_flags?: ReliabilityReason[]
 }
 
 /** Signals grouped by triage (shared people, overlapping time). */

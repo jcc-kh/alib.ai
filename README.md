@@ -12,22 +12,30 @@
 
 Investigators often hold data from several phones in one case. Reading them by hand takes days, and some facts only show up when you compare phones. One example: a message that is still on Paul's phone but has been deleted from Amy's.
 
-Alib.ai does that comparison. The investigator writes a short **brief** in three parts: what they believe, what confuses them, and what they don't know. An AI agent checks the brief against every phone and returns a report. Every finding cites the exact data rows behind it.
+Alib.ai does that comparison. The investigator writes a short **brief** in three parts: what they believe, what confuses them, and what they don't know. They can also add **statements** made by people in the case ("I was at home all evening"). An AI agent splits the brief and statements into separate claims, the investigator confirms them, and the agent checks each one against every phone. The report shows, for each person, which of their claims the phones support or contradict. Every finding cites the exact data rows behind it.
 
 ## How it works
 
 ![Alib.ai system architecture](docs/architecture.png)
 
-Three stages:
+On case load:
 
-1. **Sweep (code only, on case load).** Every check runs across every pair of people and the whole date range. Each hit is saved as a *signal*, with the rows that support it.
-2. **Triage (agents).** Signals are grouped into incidents, and incidents are ranked by how many checks agree and how many phones are involved. Signals with an ordinary explanation are dismissed, with the reason recorded. Moments where three or more phones act together are flagged as anchors. The result is an **opening briefing**, on screen before you type anything.
-3. **Brief refines (agents).** Your brief is matched to existing signals first. New checks run only for what the sweep didn't cover, and everything is re-ranked by relevance to your questions.
+1. **Integrity pass (code only).** Before anything else, the data is checked for signs it can't be taken at face value. Each phone's clock offset is estimated from calls that appear on both phones, and timestamps are corrected before messages are compared. Location fixes that imply impossible travel speeds, and GPS fixes far from the same phone's Wi-Fi or cell fixes, mark that phone and time window as *suspect*.
+2. **Sweep (code only).** Every check runs across every pair of people and the whole date range. Each hit is saved as a *signal*, with the rows that support it.
+3. **Triage (agents).** Signals are grouped into incidents, and incidents are ranked by how many checks agree and how many phones are involved. Signals with an ordinary explanation are dismissed, with the reason recorded. Moments where three or more phones act together are flagged as anchors. The result is an **opening briefing**, on screen before you type anything.
 
-**Agents never compute, and checks never conclude.** Every comparison is a plain Python function that returns the rows it used. The agents decide *which* checks answer *which* question and write one plain sentence per finding. A code validator then rejects any sentence that:
-- doesn't cite evidence
+When you submit a brief or statements:
+
+4. **Parse and confirm.** The agent splits them into separate claims, each attributed to whoever made it. **You approve or edit the list before any check runs.**
+5. **Refine (agents).** Each claim is matched to existing signals first. New checks run only for what the sweep didn't cover, and everything is re-ranked by relevance to your questions.
+6. **Assemble (code).** The report is put together in code from the structured findings. The only free text an agent writes is a short next-steps paragraph.
+7. **Review.** If you dispute a data row, it is excluded, every check that cited it reruns, and findings that changed are marked.
+
+**Agents never compute, and checks never conclude.** Every comparison is a plain Python function that returns the rows it used, and every verdict comes from a rule in code. The agents decide *which* checks answer *which* question and write one plain sentence per finding. A code validator then rejects any sentence that:
+- doesn't cite evidence, or cites a row the investigator disputed
 - uses a number that didn't come from a check
-- says a *person* was somewhere instead of their *phone*
+- has a verdict different from the one the code rule gave
+- rests on a suspect window without saying so
 
 ## The demo case (synthetic)
 
@@ -49,19 +57,20 @@ All people, companies, places and data are invented.
 
 ## The agents
 
-They are built with LangChain **deepagents** (`create_deep_agent`). Each subagent writes its findings to its own file (for example `findings/location.json`). The orchestrator reads those files and can **chain** them: one subagent's result triggers a follow-up task for another.
+They are built with LangChain **deepagents** (`create_deep_agent`): one orchestrator on a stronger model and five domain subagents on a faster one. Every subagent returns structured `Finding` objects, with the verdict copied from a code rule and each number traced to a check-output field. The orchestrator reads them and can **chain** them: one subagent's result triggers a follow-up task for another. There is no report-writing agent, because the report is assembled in code, and no auditing agent, because `validate_report()` does that job.
 
 | Agent | Owns | Checks |
 |---|---|---|
-| **orchestrator** | Triage on case load; refining the brief; dispatching follow-ups | `run_sweep`, `propose_incidents`, `anchor_moments`, `rank_incidents`, `match_brief_item` (code helpers) |
-| **relationship-mapper** | Identity matching across phones; the people map the others use | `identity_match`, `shared_unknown_number`*, `contact_graph` |
-| **location-analyst** | Where each phone was | `location_timeline`, `location_gaps`, `distance_between`, `silent_meetings` |
+| **orchestrator** | Triage on case load; parsing the brief and statements into claims; pausing for the investigator to confirm them; dispatching follow-ups; the next-steps paragraph | `confirm_items`, `propose_incidents`, `anchor_moments`, `rank_incidents`, `match_brief_item`, `get_coverage`, `get_reliability` (code helpers) |
+| **relationship-mapper** | Identity matching across phones; the people map the others use; possible burner numbers | `identity_match`, `unresolved_identifiers`, `contact_graph` |
+| **location-analyst** | Where each phone was | `location_timeline`, `location_gaps`, `distance_between`, `silent_meetings`, `group_meetings`† |
 | **comms-analyst** | Messages and calls | `missing_messages`, `call_log_mismatch`*, `contact_went_quiet`*, `search_messages` |
 | **financial-analyst** | Money | `money_chains`, `transfer_after_meeting`* |
 | **device-forensics** | Deletions and power | `deletions`, `power_events`, `synchronised_behaviour` |
-| **report-writer** | Words, merges and ranks findings | none (output passes `validate_report()`) |
 
-\* optional, built if time allows.
+Every subagent also gets `get_reliability`, `apply_verdict_rule`, `get_events` and `get_coverage`.
+
+\* optional, built if time allows. † stretch.
 
 ## The data format
 
@@ -76,11 +85,11 @@ Any source can be supported by writing an adapter that outputs this format.
 
 - **Verdicts:**
   - `confirmed`: data on at least two phones agrees.
-  - `inconsistent`: the data contradicts the brief.
+  - `inconsistent`: the data contradicts the claim.
   - `cannot_tell`: the phones hold nothing that settles it. The agent says so instead of guessing.
 - **Every statement cites evidence rows.** Each row shows its id, its source phone and its timestamp.
-- **Phones, not people.** A finding reads "Amy's phone was at Northgate Mall", never "Amy was at Northgate Mall".
-- **"Inconsistent", never "lied" or "guilty".** The report describes data, and the investigator draws the conclusions.
+- **Names stand for phones.** "Amy was at Northgate Mall" means Amy's phone was there. Every report states this once in its assumptions, because a phone's location is not proof of where its owner was.
+- **"Inconsistent", never "lied" or "guilty".** The report describes data, and the investigator draws the conclusions. Words like "suspicious", "proves" and "clearly" are banned too.
 - **Phone data is assumed genuine.** Spoofing detection is out of scope, and the report says so.
 
 ## Trust and transparency
@@ -91,7 +100,7 @@ Every finding can be checked by the person reading it. Each one opens with four 
 |---|---|
 | **Evidence** | The picture: a map, a money chain, a thread diff, a timeline |
 | **How we know** | The step-by-step derivation, marking which steps were plain code and which were the language model. It also shows where each number came from, which phones hold each fact, and the validator checks the sentence passed. |
-| **Verify** | Your browser recomputes the key numbers from the raw rows, without trusting the check's own output, and shows ✓ or ✗ for each. Here you can also record "I checked this" or "I dispute this". |
+| **Verify** | Your browser recomputes the key numbers from the raw rows, without trusting the check's own output, and shows ✓ or ✗ for each. Here you can also record "I checked this" or "I dispute this". A dispute excludes the row and reruns every check that cited it. |
 | **Sources** | For each row: the bundle hash, file, line number and the original JSON line, so you can open the source file and find it |
 
 Alib.ai also **briefs you before you ask.** As soon as the phones are loaded, it sweeps every pair and presents what stands out, ranked, with anchor moments, a week timeline, a per-person location timeline (stays, travel and gaps) and a relations graph. Location gaps are reported only as "no location data". A gap is raised by default only when the phone was clearly in use during it (`location_off`), because phones lose location for innocent reasons all the time. It also lists what it checked and dismissed, and why. You can **ask questions at any time.** Every answer cites its rows or says "cannot tell".
@@ -179,14 +188,20 @@ Deep links such as `#/pro/review` or `#/noir/board` load a completed demo case a
 | Revision 2: sweep → triage → brief refines; signals, incidents, anchors, dismissals; location timeline and typed gaps; follow-up chaining | ✅ Built in the mock |
 | UI revamp: guided flow, Pro dashboard (light/dark) and Noir case-file UI, live agent board + envelopes, charts from computed rows | ✅ Built in the mock |
 | Background data: full week of messages, calls, locations, transactions per phone (seeded), counts computed | ✅ Built in the mock (`src/mock/background.ts`) |
-| Synthetic data generator and answer key | ⏳ Next | (including gap plants G1 and its decoy)
-| Ingest pipeline, SQLite store, checks and tests | ⏳ Next |
+| Revision 3: integrity pass, statements, item confirmation, disputes that rerun checks, report assembled in code, hardened validator, multi-seed evaluation | ✅ Designed in [ARCHITECTURE.md](ARCHITECTURE.md); not yet in the mock |
+| Synthetic data generator and answer key (gap plant G1 and its decoy, planted clock skew and spoofed GPS, a burner number, innocent noise, statements) | ⏳ Next |
+| SQLite case store, integrity pass, checks and tests | ⏳ Next |
 | deepagents orchestrator, subagents, briefing and Ask | ⏳ Next |
+| Report assembly, validator, reviews and reruns | ⏳ Next |
 | FastAPI with SSE | ⏳ Next |
+| Multi-seed evaluation (precision and recall per check) | ⏳ Next |
+| Ingest pipeline from Case Bundle v1 | Upstream; out of scope for this build |
 
 **Open questions:**
 - Does Arlequin accept a fully synthetic case for Track 1?
-- Which model will the agents use: Anthropic API or Amazon Bedrock? It is configurable through the `MODEL` env var.
+- Which models will the agents use: Anthropic API or Amazon Bedrock? They are configurable through the `ORCHESTRATOR_MODEL` and `SUBAGENT_MODEL` env vars.
+
+**Decided:** the build runs on the synthetic case for now. [data/README.md](data/README.md) recommends MSAB 2026 as a later real case; it needs a Case Bundle adapter (ingest), which is out of scope for this build.
 
 ## Repo layout
 
@@ -195,6 +210,9 @@ README.md                  you are here
 ARCHITECTURE.md            full engineering design
 DERIVATION.md              how every statement is derived and traced to source
 docs/architecture.png      system diagram (source: docs/architecture-diagram.html)
+data/README.md             which real multi-phone case to use; recommends MSAB 2026
+data/datasets/             one page per candidate dataset, plus schema dumps
+data/scripts/              fetch phone databases cheaply, list their tables
 schema/case-bundle-v1/     ingest format spec + example bundle
 frontend/src/
   api/types.ts             the API contract (shared shapes)
@@ -208,4 +226,4 @@ frontend/src/
   ui/noir/                 case-file UI: locker, back room, board, theory, interrogation
 ```
 
-These folders are planned and not yet created: `data/` (the generator), `backend/` (ingest, checks, agents, API) and `backend/tests/`. See [ARCHITECTURE.md](ARCHITECTURE.md).
+These are planned and not yet created: `data/generate.py` (the synthetic generator), `backend/` (case store, integrity pass, checks, agents, report, API and tests) and `eval/` (multi-seed evaluation). See [ARCHITECTURE.md](ARCHITECTURE.md) §13.

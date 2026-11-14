@@ -23,7 +23,8 @@ Datasets we ruled out are in [others.md](datasets/others.md).
 
 **Use MSAB 2026.** It is the only candidate where we have both phones on disk and have confirmed the core requirement: the same conversations appear on both phones.
 
-- Blaise and Emily's text thread is on both phones (12 rows on his, 15 on hers), with differences in counts and times to explain.
+- Blaise and Emily's text thread is on both phones, and **one of Emily's texts is missing from her own phone**.
+- It has a real plot: a recipe handover, a copycat account, and an employer investigating her employee. See [the storyline](datasets/msab-2026-storyline.md).
 - Their Signal chat is readable in plain text on Emily's phone. Blaise's copy is encrypted.
 - Their Instagram messages are on both phones.
 - Every answer is published, so we can score the agent.
@@ -71,6 +72,7 @@ pip install -r requirements.txt
 | `extract_dbs_from_zip.py` | Pulls every database out of a local phone-copy zip |
 | `dump_schema.py` | Writes the table, row-count and column listing for a folder of databases |
 | `fetch_gdrive.sh` | Downloads Google Drive files by id, skipping any that Drive refuses. Drive often blocks these files, so expect to fall back to a browser |
+| `msab_events_iphone.py`, `msab_events_samsung.py` | Turn each MSAB phone into one list of dated events (messages, calls, mail, notes, browsing). The storyline cites their row ids |
 | `summarize_ios.py` | Prints message, call, contact and account counts for an iPhone |
 
 The exact commands for both MSAB phones are in [datasets/msab-2026.md](datasets/msab-2026.md).
