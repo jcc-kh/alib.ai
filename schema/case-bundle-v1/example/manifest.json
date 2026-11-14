@@ -1,0 +1,11 @@
+{
+  "schema_version": "case-bundle/1.0",
+  "case_id": "harbor-supply-2026-04",
+  "title": "Harbor Supply Co. missing funds (excerpt)",
+  "timezone": "-04:00",
+  "devices": ["paul-iphone"],
+  "places": [
+    { "name": "Sunset Park", "kind": "park", "lat": 40.905, "lon": -72.04, "radius_m": 300 },
+    { "name": "Dock Cafe", "kind": "cafe", "lat": 40.9905, "lon": -71.9842, "radius_m": 60 }
+  ]
+}

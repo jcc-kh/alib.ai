@@ -1,0 +1,4 @@
+{"person_id": "paul", "display_name": "Paul Tan", "role": "Bookkeeper at Harbor Supply Co.", "identifiers": [{"kind": "phone", "value": "+1 555 010 0101"}, {"kind": "handle", "platform": "Snapline", "value": "@paultan_"}]}
+{"person_id": "amy", "display_name": "Amy Lim", "role": "Paul's friend", "identifiers": [{"kind": "phone", "value": "+1 555 010 0202"}]}
+{"person_id": "ken", "display_name": "Ken Ong", "role": "Paul's friend", "identifiers": [{"kind": "phone", "value": "+1 555 010 0303"}]}
+{"person_id": "cara", "display_name": "Cara Diaz", "role": "Supplier to Harbor Supply Co.", "identifiers": [{"kind": "phone", "value": "+1 555 010 0404"}, {"kind": "handle", "platform": "Snapline", "value": "@cara.diaz"}]}

@@ -340,10 +340,10 @@ const ev = (owner: PersonId, type: string) => syncEvents.filter((e) => e.device_
 export const GRAPH: Graph = {
   nodes: PEOPLE.map((p) => ({ id: p.person_id, label: p.name, color: p.color })),
   edges: [
-    { source: 'paul', target: 'amy', channel: 'call', label: '6 calls on both phones', evidence_ids: s1Items.filter((i) => i.channel === 'call').flatMap((i) => [i.on_a!, i.on_b!]) },
+    { source: 'paul', target: 'amy', channel: 'call', label: '2 calls in the window, on both phones', evidence_ids: s1Items.filter((i) => i.channel === 'call').flatMap((i) => [i.on_a!, i.on_b!]) },
     { source: 'paul', target: 'amy', channel: 'message', label: "3 texts, on Paul's phone only", evidence_ids: s1Items.filter((i) => i.channel === 'message').map((i) => i.on_a!) },
     { source: 'paul', target: 'amy', channel: 'transfer', label: '$50 "lunch"', evidence_ids: lunchIds },
-    { source: 'paul', target: 'ken', channel: 'call', label: '9 calls on both phones', evidence_ids: [paulKenCall, kenPaulCall] },
+    { source: 'paul', target: 'ken', channel: 'call', label: 'Call on 14 Apr, on both phones', evidence_ids: [paulKenCall, kenPaulCall] },
     { source: 'paul', target: 'ken', channel: 'transfer', label: '$5,000, no memo', evidence_ids: l1.row_ids },
     { source: 'paul', target: 'ken', channel: 'deleted_thread', label: 'Thread deleted on both phones, 17 Apr', evidence_ids: [...ev('paul', 'thread_deleted'), ev('ken', 'thread_deleted')[0]] },
     { source: 'ken', target: 'cara', channel: 'transfer', label: '$4,500 "materials"', evidence_ids: l2.row_ids },

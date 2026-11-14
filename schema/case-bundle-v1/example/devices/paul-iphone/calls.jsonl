@@ -1,0 +1,1 @@
+{"record_id": "k263", "app": "Phone", "direction": "out", "from": {"kind": "phone", "value": "+1 555 010 0101"}, "to": [{"kind": "phone", "value": "+1 555 010 0202"}], "start_time": "2026-04-14T18:41:00-04:00", "duration_s": 0, "status": "missed"}
