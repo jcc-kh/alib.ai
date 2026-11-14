@@ -1,0 +1,2 @@
+remotezip>=0.12
+requests>=2.31
