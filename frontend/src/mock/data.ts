@@ -462,6 +462,6 @@ export const NEXT_STEPS = [
 
 export const ASSUMPTIONS = [
   'Phone data is treated as genuine; spoofing is not assessed.',
-  "A phone's location is not proof of where its owner was.",
+  "Names stand for each person's phone: \"Amy was at Northgate Mall\" means Amy's phone was there. A phone's location is not proof of where its owner was.",
   'Data covers 13 to 19 April 2026 only.',
 ]

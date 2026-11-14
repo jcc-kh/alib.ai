@@ -263,14 +263,13 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
 function validatorFor(statement: string, evidence: string[], numbers: NumberTrace[]): ValidatorCheck[] {
   return [
     { rule: 'Cites evidence', passed: evidence.length > 0, detail: `${evidence.length} evidence ids, all resolve through /api/evidence` },
-    { rule: 'Phones, not people', passed: !/\b(Paul|Amy|Ken|Cara) (was|were) (at|in|near)\b/.test(statement), detail: 'No sentence places a person somewhere; locations are attributed to phones' },
     { rule: 'Neutral wording', passed: !/lied|guilty|lying/i.test(statement), detail: 'No "lied", "lying" or "guilty"' },
     { rule: 'Numbers traced to check output', passed: numbers.every((n) => statement.includes(n.text)), detail: `${numbers.length} numbers, each matched to a check-output field` },
     { rule: 'One sentence', passed: (statement.match(/[.!?](\s|$)/g) ?? []).length === 1, detail: 'Single sentence, plain language' },
   ]
 }
 
-export function scenarioFinding(sid: ScenarioId, opts: { id: string; section: Section; brief_item: string | null; verdict?: Verdict; matched?: boolean }): Finding {
+export function scenarioFinding(sid: ScenarioId, opts: { id: string; section: Section; brief_item: string | null; item_id?: string | null; verdict?: Verdict; matched?: boolean }): Finding {
   const sc = SCENARIOS[sid]
   const asBelief = opts.section === 'confirmed' || opts.section === 'inconsistent'
   const verdict = opts.verdict ?? (asBelief ? sc.verdictAsBelief : 'confirmed')
@@ -297,7 +296,10 @@ export function scenarioFinding(sid: ScenarioId, opts: { id: string; section: Se
   return {
     id: opts.id,
     section: opts.section,
+    item_id: opts.item_id ?? (opts.brief_item ? `item:${opts.id}` : null),
     brief_item: opts.brief_item,
+    claimant: opts.brief_item ? 'investigator' : null,
+    status: 'current',
     verdict,
     statement: sc.statement,
     people: sc.people,
@@ -319,7 +321,10 @@ export function cannotTellFinding(id: string, item: string): Finding {
   return {
     id,
     section: 'answers',
+    item_id: `item:${id}`,
     brief_item: item,
+    claimant: 'investigator',
+    status: 'current',
     verdict: 'cannot_tell',
     statement,
     people: ['paul', 'amy', 'ken', 'cara'],

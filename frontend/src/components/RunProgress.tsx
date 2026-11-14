@@ -8,14 +8,12 @@ export interface LaneState {
 }
 
 export const AGENTS: { name: SubagentName; role: string }[] = [
-  { name: 'orchestrator', role: 'Matches, routes, chains' },
+  { name: 'orchestrator', role: 'Matches, routes, chains, writes next steps' },
   { name: 'location-analyst', role: 'Together or apart' },
   { name: 'comms-analyst', role: 'Messages and calls' },
   { name: 'relationship-mapper', role: 'Who knows whom' },
   { name: 'financial-analyst', role: 'Money chains' },
-  { name: 'device-forensics', role: 'Deletions, power-offs' },
-  { name: 'report-writer', role: 'Writes and validates' },
-]
+  { name: 'device-forensics', role: 'Deletions, power-offs' },]
 
 export default function RunProgress({ todos, lanes, hops = [] }: { todos: Todo[]; lanes: Partial<Record<SubagentName, LaneState>>; hops?: { from: SubagentName; to: SubagentName; note: string }[] }) {
   const done = todos.filter((t) => t.status === 'done').length
