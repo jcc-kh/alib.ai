@@ -4,3 +4,6 @@ dist/
 __pycache__/
 .env
 data/out/
+
+# Raw forensic downloads (large, never commit)
+data/raw/
