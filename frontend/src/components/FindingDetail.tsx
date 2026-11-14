@@ -11,6 +11,7 @@ import MoneyChain from './evidence/MoneyChain'
 import MeetingsList from './evidence/MeetingsList'
 import SyncTimeline from './evidence/SyncTimeline'
 import CoverageView from './evidence/CoverageView'
+import GapView from './evidence/GapView'
 
 type Tab = 'evidence' | 'how' | 'verify' | 'sources'
 
@@ -83,6 +84,8 @@ export default function FindingDetail({ finding }: { finding: Finding }) {
             <MeetingsList out={o} places={caseInfo.places} />
           ) : o.kind === 'sync' ? (
             <SyncTimeline out={o} />
+          ) : o.kind === 'gap' ? (
+            <GapView out={o} />
           ) : (
             <CoverageView out={o} />
           ))}

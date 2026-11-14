@@ -101,6 +101,23 @@ export function verifyFinding(f: Finding, rows: EvidenceByPhone): VerifyResult[]
         { label: 'Deletion after the messages', claimed: 'yes', recomputed: del && unmatched.every((m) => m.timestamp < del.timestamp) ? 'yes' : 'no', ok: !!del && unmatched.every((m) => m.timestamp < del.timestamp), how: 'thread_deleted timestamp is later than every missing message' },
       ]
     }
+    case 'gap': {
+      const before = all(rows).find((r) => r.id === o.bounding.before.id)
+      const after = all(rows).find((r) => r.id === o.bounding.after.id)
+      const span = before && after ? caseMinutes(after.timestamp) - caseMinutes(before.timestamp) - 2 * o.thresholds.interval_min : NaN
+      const inside = all(rows).filter(
+        (r) => ['messages', 'calls', 'transactions'].includes(r.table) && r.device_owner === o.person && before && after && r.timestamp > before.timestamp && r.timestamp < after.timestamp,
+      )
+      const locInside = all(rows).filter((r) => r.table === 'locations' && r.device_owner === o.person && before && after && r.timestamp > before.timestamp && r.timestamp < after.timestamp)
+      const power = all(rows).filter((r) => r.table === 'device_events' && r.device_owner === o.person && r.fields.event_type === 'power_off')
+      const type = power.length ? 'powered_off' : inside.length ? 'location_off' : 'unexplained'
+      return [
+        { label: 'Gap length', claimed: `${o.minutes} min`, recomputed: `${Math.round(span)} min`, ok: Math.round(span) === o.minutes, how: `First row after minus last row before, less one ${o.thresholds.interval_min}-min interval each side` },
+        { label: 'Location rows inside the gap', claimed: '0', recomputed: String(locInside.length), ok: locInside.length === 0, how: 'Cited location rows strictly between the two bounding rows' },
+        { label: 'Activity inside the gap', claimed: String(o.activity.length), recomputed: String(inside.length), ok: inside.length === o.activity.length, how: "Messages, calls and transfers on this phone between the bounding rows" },
+        { label: 'Gap type', claimed: o.gap_type, recomputed: type, ok: type === o.gap_type, how: 'power_off covers it → powered_off; else activity → location_off; else unexplained' },
+      ]
+    }
     case 'coverage': {
       return o.devices.map((d) => {
         const r = rows[d.owner] ?? []

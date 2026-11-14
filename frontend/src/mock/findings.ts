@@ -3,10 +3,22 @@
 // statement always carries the same evidence, number traces and validator results.
 
 import type { CheckName, CheckOutput, Corroboration, DerivationStep, Finding, NumberTrace, PersonId, Section, SubagentName, ValidatorCheck, Verdict } from '../api/types'
-import { COVERAGE_IDS, NUMBERS, PEOPLE, S1, S2, S4, S4_FIRST, S5, S7, coverageFor } from './data'
+import { COVERAGE_IDS, G1, NUMBERS, PEOPLE, S1, S2, S4, S4_FIRST, S5, S7, coverageFor } from './data'
 import { fmtDateTime, fmtKm, fmtTime } from '../lib/format'
 
-export type ScenarioId = 'S1' | 'S2' | 'S4a' | 'S4b' | 'S5' | 'S7'
+export type ScenarioId = 'S1' | 'S2' | 'S4a' | 'S4b' | 'S5' | 'S7' | 'G1'
+
+/** Sweep signal ids and the triage incident each scenario belongs to (see mock/signals.ts). */
+export const SIGNAL_OF: Record<ScenarioId, string[]> = {
+  S7: ['sig_01'],
+  S4a: ['sig_05'],
+  S4b: ['sig_05'],
+  G1: ['sig_06'],
+  S5: ['sig_07'],
+  S1: ['sig_08'],
+  S2: ['sig_10'],
+}
+export const INCIDENT_OF: Record<ScenarioId, string> = { S7: 'INC-1', S4a: 'INC-2', S4b: 'INC-2', G1: 'INC-2', S1: 'INC-3', S2: 'INC-3', S5: 'INC-4' }
 
 interface ScenarioDef {
   family: string
@@ -24,6 +36,8 @@ interface ScenarioDef {
   rule: (asBelief: boolean) => { detail: string; code?: string }
   numbers: NumberTrace[]
   corroboration: Corroboration[]
+  /** Follow-up hops between subagents, recorded as derivation steps. */
+  follow_ups?: DerivationStep[]
 }
 
 const TOTAL_MSGS = PEOPLE.reduce((n, p) => n + p.counts.messages, 0)
@@ -31,6 +45,56 @@ const TOTAL_CALLS = PEOPLE.reduce((n, p) => n + p.counts.calls, 0)
 const words = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five']
 
 export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
+  G1: {
+    family: 'G1',
+    check: 'location_gaps',
+    agent: 'location-analyst',
+    route_reason: 'A gap in location data is a question about where a phone was, so the location analyst owns it and asks other subagents what the phone did during it.',
+    tools: ["location_gaps(person='ken', start='2026-04-13', end='2026-04-19', min_gap_min=45)"],
+    people: ['ken', 'cara'],
+    verdictAsBelief: 'confirmed',
+    statement: `Ken's phone had no location data from ${fmtTime(G1.start)} to ${fmtTime(G1.end)} on 15 April, while it sent a message at ${fmtTime(G1.activity[0].t)} and the $4,500 transfer to Cara at ${fmtTime(G1.activity[1].t)}.`,
+    output: G1,
+    evidence: [G1.bounding.before.id, G1.bounding.after.id, ...G1.activity.map((a) => a.id), S4.links[1].row_ids[1]],
+    data: `Read Ken's location rows in order and found ${G1.minutes} minutes with none, between the rows at ${fmtTime(G1.bounding.before.t)} and ${fmtTime(G1.bounding.after.t)}. Then read every message, call, transfer and power event on Ken's phone inside that window.`,
+    compute: {
+      detail: `Gap = (first row after − last row before) − one ${G1.thresholds.interval_min}-minute interval each side. Keep gaps ≥ ${G1.thresholds.min_gap_min} min, then classify.`,
+      code: `gap = [${fmtTime(G1.start)}, ${fmtTime(G1.end)}] → ${G1.minutes} min ≥ ${G1.thresholds.min_gap_min};  power_off covering it: none;  activity inside: ${G1.activity.length} rows  ⇒  gap_type = "location_off"`,
+    },
+    rule: () => ({
+      detail: 'location_off (the phone was in use while reporting no location) is raised by default. Wording rule: report "no location data", never a claim about intent. Phones lose location for innocent reasons; a gap during clear use is the one case worth raising.',
+      code: 'raise if gap_type == "location_off" or overlaps(another_signal)',
+    }),
+    numbers: [
+      { text: fmtTime(G1.start), field: 'location_gaps.start', value: fmtDateTime(G1.start) },
+      { text: fmtTime(G1.end), field: 'location_gaps.end', value: fmtDateTime(G1.end) },
+      { text: fmtTime(G1.activity[0].t), field: 'location_gaps.activity[0].t (via comms-analyst)', value: fmtDateTime(G1.activity[0].t) },
+      { text: '$4,500', field: 'money_chains.links[1].amount (via financial-analyst)', value: '4500' },
+      { text: fmtTime(G1.activity[1].t), field: 'location_gaps.activity[1].t', value: fmtDateTime(G1.activity[1].t) },
+    ],
+    corroboration: [
+      { fact: 'No location rows 14:00–16:30', phones: { paul: 'n/a', amy: 'n/a', ken: 'absent', cara: 'n/a' } },
+      { fact: 'Message sent 15:10', phones: { paul: 'n/a', amy: 'n/a', ken: 'present', cara: 'n/a' } },
+      { fact: '$4,500 Ken → Cara 15:40', phones: { paul: 'n/a', amy: 'n/a', ken: 'present', cara: 'present' } },
+    ],
+    follow_ups: [
+      {
+        kind: 'follow_up',
+        actor: 'model',
+        title: 'Follow-up: location-analyst → financial-analyst',
+        detail: 'The location analyst wrote the gap to findings/location.json with follow_up "money moved during the gap?". The orchestrator dispatched it to the financial analyst, which found the $4,500 transfer at 15:40, link 2 of money-chain signal sig_05.',
+        code: "get_events(person='ken', table='transactions', start='2026-04-15T14:00-04:00', end='2026-04-15T16:30-04:00')",
+      },
+      {
+        kind: 'follow_up',
+        actor: 'model',
+        title: 'Follow-up: orchestrator → comms-analyst',
+        detail: 'To check whether the phone was in use for anything else, the orchestrator asked the comms analyst for messages and calls in the same window. One outgoing SMS at 15:10.',
+        code: "search_messages(person='ken', start='2026-04-15T14:00-04:00', end='2026-04-15T16:30-04:00')",
+      },
+    ],
+  },
+
   S2: {
     family: 'S2',
     check: 'distance_between',
@@ -206,17 +270,25 @@ function validatorFor(statement: string, evidence: string[], numbers: NumberTrac
   ]
 }
 
-export function scenarioFinding(sid: ScenarioId, opts: { id: string; section: Section; brief_item: string | null; verdict?: Verdict }): Finding {
+export function scenarioFinding(sid: ScenarioId, opts: { id: string; section: Section; brief_item: string | null; verdict?: Verdict; matched?: boolean }): Finding {
   const sc = SCENARIOS[sid]
   const asBelief = opts.section === 'confirmed' || opts.section === 'inconsistent'
   const verdict = opts.verdict ?? (asBelief ? sc.verdictAsBelief : 'confirmed')
   const rule = sc.rule(asBelief)
+  const sigs = SIGNAL_OF[sid]
+  const inc = INCIDENT_OF[sid]
   const steps: DerivationStep[] = [
-    opts.brief_item
-      ? { kind: 'question', actor: 'model', title: 'Brief item', detail: `“${opts.brief_item}” People resolved: ${sc.people.join(', ')}.` }
-      : { kind: 'question', actor: 'code', title: 'Unprompted sweep', detail: 'run_sweep() ran all 5 checks over all 6 phone pairs for 13–19 April. This result did not overlap any brief item, so it was kept.' },
-    { kind: 'route', actor: 'model', title: `Routed to ${sc.agent}`, detail: sc.route_reason },
+    { kind: 'signal', actor: 'code', title: `Signal ${sigs.join(', ')} from the sweep`, detail: 'On case load, run_sweep() ran every check over every pair of phones for 13–19 April, before anyone wrote a brief. This hit was saved to the signals table with its evidence ids and strength.' },
+    { kind: 'grouped', actor: 'code', title: `Grouped into ${inc}`, detail: `propose_incidents() grouped signals that share people and overlap in time; the orchestrator accepted the grouping. ${inc} is ranked in the opening briefing.` },
+    ...(opts.brief_item
+      ? [
+          { kind: 'question' as const, actor: 'model' as const, title: 'Brief item', detail: `“${opts.brief_item}” People resolved: ${sc.people.join(', ')}.` },
+          { kind: 'route' as const, actor: 'code' as const, title: `Matched to ${inc}`, detail: `match_brief_item() found ${inc} shares the item's people and dates, so the existing signal was reused and no new check was run.`, code: `match_brief_item("${opts.brief_item.slice(0, 48)}${opts.brief_item.length > 48 ? '…' : ''}") → ${inc} [${sigs.join(', ')}]` },
+        ]
+      : []),
+    { kind: 'route', actor: 'model', title: `Owned by ${sc.agent}`, detail: sc.route_reason },
     ...sc.tools.map((t) => ({ kind: 'tool' as const, actor: 'code' as const, title: 'Check called', detail: 'Deterministic Python over the case store. No model involved.', code: t })),
+    ...(sc.follow_ups ?? []),
     { kind: 'data', actor: 'code', title: 'Data read', detail: `${sc.data} ${sc.evidence.length} rows kept as evidence.` },
     { kind: 'compute', actor: 'code', title: 'Computation', detail: sc.compute.detail, code: sc.compute.code },
     { kind: 'rule', actor: 'code', title: `Verdict: ${verdict.replace('_', ' ')}`, detail: rule.detail, code: rule.code },
@@ -258,6 +330,7 @@ export function cannotTellFinding(id: string, item: string): Finding {
     derivation: {
       steps: [
         { kind: 'question', actor: 'model', title: 'Brief item', detail: `“${item}”` },
+        { kind: 'route', actor: 'code', title: 'No matching signal', detail: 'match_brief_item() found no signal or incident for this item, so a targeted check was needed.', code: `match_brief_item("${item.slice(0, 48)}") → []` },
         { kind: 'route', actor: 'model', title: 'Routed to device-forensics', detail: 'The item refers to a period, so the first step is to check whether the phones cover it.' },
         { kind: 'tool', actor: 'code', title: 'Check called', detail: 'Returns the earliest and latest row on every phone.', code: 'get_coverage()' },
         { kind: 'rule', actor: 'code', title: 'Verdict: cannot tell', detail: 'The period named in the item lies outside every phone’s coverage, so no check can confirm or contradict it. The agent must answer cannot_tell instead of guessing.' },
@@ -278,9 +351,10 @@ export function route(text: string): ScenarioId | null {
   if (/know each other|never met|don.t know|strangers|relationship|connected/.test(t) && t.includes('cara')) return 'S5'
   if (/5,?000/.test(t) || (t.includes('sent ken') && /\$/.test(t))) return 'S4a'
   if (/money|funds|end up|where did|transfer|4,?500/.test(t)) return 'S4b'
+  if (/location (off|gap|data)|gap|no location|went dark on 15|in use/.test(t)) return 'G1'
   if (/audit|react|announcement|power|17 april|turn(ed)? off/.test(t)) return 'S7'
   if (/delet|missing message|texts?|messages?/.test(t) && t.includes('amy')) return 'S1'
   return null
 }
 
-export const SWEEP_ORDER: ScenarioId[] = ['S1', 'S2', 'S5', 'S4b', 'S7']
+export const SWEEP_ORDER: ScenarioId[] = ['S1', 'S2', 'S5', 'S4b', 'G1', 'S7']

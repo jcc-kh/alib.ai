@@ -6,13 +6,17 @@
 //   GET  /api/graph         -> getGraph
 //   GET  /api/briefing      -> getBriefing (proactive, generated at ingest)
 //   POST /api/ask (SSE)     -> ask
+//   GET  /api/timeline      -> getTimeline (stays: stay / travel / gap per person)
+//   GET  /api/signals       -> getSignals (every sweep hit)
 
-import type { AgentEvent, Answer, AskEvent, Brief, Briefing, CaseInfo, EvidenceByPhone, Graph, IngestReport, IngestStage, Report } from './types'
+import type { AgentEvent, Answer, AskEvent, Brief, Briefing, CaseInfo, EvidenceByPhone, Graph, IngestReport, IngestStage, Report, Segment, Signal } from './types'
 import { GRAPH, PEOPLE, PLACES, ROWS } from '../mock/data'
 import { INGEST_REPORT, INGEST_STAGES } from '../mock/ingest'
 import { planRun } from '../mock/report'
 import { buildBriefing } from '../mock/briefing'
 import { answerQuestion } from '../mock/ask'
+import { SEGMENTS } from '../mock/segments'
+import { SIGNALS } from '../mock/signals'
 
 const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
@@ -104,4 +108,14 @@ export async function ask(question: string, onEvent: (e: AskEvent) => void): Pro
   await sleep(300)
   onEvent({ type: 'answer', answer })
   return answer
+}
+
+export async function getTimeline(): Promise<Segment[]> {
+  await sleep(150)
+  return SEGMENTS
+}
+
+export async function getSignals(): Promise<Signal[]> {
+  await sleep(100)
+  return SIGNALS
 }

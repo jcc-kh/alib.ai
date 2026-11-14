@@ -95,7 +95,7 @@ export interface Todo {
 
 export type AgentEvent =
   | { type: 'todos'; todos: Todo[] }
-  | { type: 'subagent'; agent: SubagentName; status: 'start' | 'tool' | 'done'; todo_id?: string; tool?: string; note?: string }
+  | { type: 'subagent'; agent: SubagentName; status: 'start' | 'tool' | 'done' | 'follow_up'; todo_id?: string; tool?: string; note?: string; to?: SubagentName }
   | { type: 'report'; report: Report }
   | { type: 'error'; message: string }
 
@@ -109,6 +109,7 @@ export type CheckName =
   | 'money_chains'
   | 'silent_meetings'
   | 'synchronised_behaviour'
+  | 'location_gaps'
   | 'get_coverage'
 
 export interface Finding {
@@ -127,7 +128,7 @@ export interface Finding {
 
 // ---------- Transparency: how a finding was derived ----------
 
-export type DerivationStepKind = 'question' | 'route' | 'tool' | 'data' | 'compute' | 'rule' | 'statement'
+export type DerivationStepKind = 'question' | 'signal' | 'grouped' | 'route' | 'tool' | 'follow_up' | 'data' | 'compute' | 'rule' | 'statement'
 
 export interface DerivationStep {
   kind: DerivationStepKind
@@ -235,7 +236,25 @@ export interface CoverageOutput {
   devices: { owner: PersonId; first: { id: string; t: string }; last: { id: string; t: string } }[]
 }
 
-export type CheckOutput = DistanceOutput | MissingOutput | ChainOutput | MeetingsOutput | SyncOutput | CoverageOutput
+export type GapType = 'powered_off' | 'location_off' | 'unexplained'
+
+export interface GapOutput {
+  kind: 'gap'
+  person: PersonId
+  start: string
+  end: string
+  minutes: number
+  gap_type: GapType
+  raised: boolean
+  /** The last location row before and the first after the gap. */
+  bounding: { before: { id: string; t: string }; after: { id: string; t: string } }
+  /** Messages, calls or transfers on this phone that fall inside the gap. */
+  activity: { id: string; t: string; table: EvidenceTable; label: string }[]
+  power_event_ids: string[]
+  thresholds: { min_gap_min: number; interval_min: number }
+}
+
+export type CheckOutput = DistanceOutput | MissingOutput | ChainOutput | MeetingsOutput | SyncOutput | CoverageOutput | GapOutput
 
 // ---------- Evidence ----------
 
@@ -292,36 +311,96 @@ export interface Graph {
   edges: GraphEdge[]
 }
 
-// ---------- Proactive briefing ----------
+// ---------- Sweep, triage, briefing ----------
+
+/** One hit from a check during the sweep. */
+export interface Signal {
+  signal_id: string
+  check: CheckName | 'deletions' | 'power_events'
+  people: PersonId[]
+  start: string
+  end: string
+  evidence_ids: string[]
+  /** 0–1, computed by the check in code. */
+  strength: number
+  summary: string
+}
+
+/** Signals grouped by triage (shared people, overlapping time). */
+export interface Incident {
+  incident_id: string
+  signal_ids: string[]
+  people: PersonId[]
+  start: string
+  end: string
+  n_checks: number
+  n_phones: number
+  strength: number
+  rank: number
+  headline: string
+  why_it_matters: string
+  rank_reason: string
+  anchor_id?: string
+  findings: Finding[]
+  follow_ups: string[]
+}
+
+/** A time where signals from three or more phones cluster. */
+export interface Anchor {
+  anchor_id: string
+  start: string
+  end: string
+  phones: PersonId[]
+  signal_ids: string[]
+  label: string
+  finding_id: string
+}
+
+export interface Dismissal {
+  signal_id: string | null
+  title: string
+  reason: string
+  rule: string
+  by: 'code rule' | 'agent'
+}
 
 export interface TimelineEvent {
   id: string
   owner: PersonId
   t: string
   end?: string
-  kind: 'location' | 'meeting' | 'message' | 'transfer' | 'deletion' | 'power_off' | 'trigger'
+  kind: 'location' | 'meeting' | 'message' | 'transfer' | 'deletion' | 'power_off' | 'trigger' | 'gap'
   label: string
   finding_id?: string
-  /** For transfers: draw a link to another phone's row. */
+  gap_type?: GapType
+  /** For transfers and meetings: draw a link to another phone's row. */
   link_to?: PersonId
-}
-
-export interface BriefingItem {
-  finding: Finding
-  headline: string
-  why_it_matters: string
-  rank_reason: string
-  follow_ups: string[]
 }
 
 export interface Briefing {
   generated_from: string
   headline: string
   stats: { label: string; value: string }[]
-  items: BriefingItem[]
+  anchors: Anchor[]
+  incidents: Incident[]
   timeline: TimelineEvent[]
-  /** Patterns the checks looked at and rejected, with the rule that rejected them. */
-  dismissed: { title: string; why: string }[]
+  dismissed: Dismissal[]
+  signals_total: number
+}
+
+/** Location timeline segment (the `stays` table). */
+export interface Segment {
+  segment_id: string
+  person: PersonId
+  kind: 'stay' | 'travel' | 'gap'
+  start: string
+  end: string
+  place?: string
+  from?: string
+  to?: string
+  gap_type?: GapType
+  raised?: boolean
+  finding_id?: string
 }
 
 // ---------- Ask (questions with cited answers) ----------

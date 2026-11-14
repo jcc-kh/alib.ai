@@ -1,6 +1,7 @@
 import type { TimelineEvent } from '../api'
 import { PEOPLE, personColor, personName } from '../mock/data'
 import { caseMinutes } from '../lib/format'
+import { GAP_STYLE } from './LocationLanes'
 
 const W = 1100
 const LABEL = 84
@@ -56,6 +57,16 @@ export default function WeekTimeline({
             const y = rowY(e.owner)
             const w = Math.max(4, x(e.end!) - x(e.t))
             const fill = e.kind === 'meeting' ? '#e8a33d' : e.kind === 'power_off' ? '#4a4642' : personColor(e.owner)
+            if (e.kind === 'gap') {
+              const gs = GAP_STYLE[e.gap_type!]
+              const raised = !!e.finding_id
+              return (
+                <g key={e.id} opacity={dim(e)} onClick={() => click(e)} className={raised ? 'cursor-pointer' : ''}>
+                  <title>{e.label}</title>
+                  <rect x={x(e.t)} y={y - 11} width={w} height={22} rx={3} fill={`url(#wk-hatch-${e.gap_type})`} stroke={gs.color} strokeWidth={raised ? 1.2 : 0.5} opacity={raised ? 1 : 0.55} />
+                </g>
+              )
+            }
             return (
               <g key={e.id} opacity={dim(e)} onClick={() => click(e)} className={e.finding_id ? 'cursor-pointer' : ''}>
                 <title>{e.label}</title>
@@ -98,6 +109,12 @@ export default function WeekTimeline({
             )
           })}
         <defs>
+          {(Object.keys(GAP_STYLE) as (keyof typeof GAP_STYLE)[]).map((g) => (
+            <pattern key={g} id={`wk-hatch-${g}`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <rect width="6" height="6" fill="#101010" />
+              <line x1="0" y1="0" x2="0" y2="6" stroke={GAP_STYLE[g].color} strokeWidth="2.5" />
+            </pattern>
+          ))}
           <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
             <path d="M 0 0 L 10 5 L 0 10 z" fill="#4fc493" />
           </marker>
@@ -109,7 +126,8 @@ export default function WeekTimeline({
         <Legend swatch={<span className="h-2.5 w-2.5 rounded-full bg-sage" />} label="Money transfer" />
         <Legend swatch={<span className="h-2.5 w-2.5 rounded-full bg-azure-soft" />} label="Message" />
         <Legend swatch={<span className="h-2 w-2 rotate-45 bg-terra-soft" />} label="Thread deleted" />
-        <Legend swatch={<span className="h-1.5 w-4 rounded-sm bg-[#4a4642]" />} label="Powered off" />
+        <Legend swatch={<span className="h-2.5 w-4 rounded-sm border border-terra-soft bg-[repeating-linear-gradient(45deg,#e07a5f_0_2px,transparent_2px_5px)]" />} label="No location data, phone in use" />
+        <Legend swatch={<span className="h-2.5 w-4 rounded-sm border border-[#8a847c] bg-[repeating-linear-gradient(45deg,#8a847c_0_2px,transparent_2px_5px)]" />} label="No location data, powered off" />
         <Legend swatch={<span className="h-2.5 w-2.5 rounded-full border border-fg" />} label="Audit notice" />
       </div>
     </div>

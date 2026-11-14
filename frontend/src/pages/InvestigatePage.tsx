@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { analyse, type AgentEvent, type Brief, type CaseInfo, type Finding, type Report, type Section, type SubagentName, type Todo } from '../api'
 import { Eyebrow, PersonChip, Title, VerdictBadge } from '../components/ui'
 import FindingDetail from '../components/FindingDetail'
@@ -25,8 +25,9 @@ const SECTIONS: { key: Section; title: string }[] = [
 
 type RunState = 'edit' | 'running' | 'done' | 'error'
 
-export default function InvestigatePage({ caseInfo }: { caseInfo: CaseInfo }) {
-  const [brief, setBrief] = useState<Brief>(DEMO_BRIEF)
+export default function InvestigatePage({ caseInfo, seed }: { caseInfo: CaseInfo; seed?: { brief: Brief; nonce: number } | null }) {
+  const [brief, setBrief] = useState<Brief>(seed?.brief ?? DEMO_BRIEF)
+  const [hops, setHops] = useState<{ from: SubagentName; to: SubagentName; note: string }[]>([])
   const [state, setState] = useState<RunState>('edit')
   const [todos, setTodos] = useState<Todo[]>([])
   const [lanes, setLanes] = useState<Partial<Record<SubagentName, LaneState>>>({})
@@ -37,6 +38,11 @@ export default function InvestigatePage({ caseInfo }: { caseInfo: CaseInfo }) {
 
   function onEvent(e: AgentEvent) {
     if (e.type === 'todos') setTodos(e.todos)
+    if (e.type === 'subagent' && e.status === 'follow_up' && e.to) {
+      const hop = { from: e.agent, to: e.to, note: e.note ?? '' }
+      setHops((h) => [...h, hop])
+      return
+    }
     if (e.type === 'subagent')
       setLanes((prev) => {
         const cur = prev[e.agent] ?? { status: 'idle', calls: 0, last: '' }
@@ -47,19 +53,20 @@ export default function InvestigatePage({ caseInfo }: { caseInfo: CaseInfo }) {
       })
   }
 
-  async function run() {
+  async function run(b: Brief = brief) {
     abortRef.current?.abort()
     const ctrl = new AbortController()
     abortRef.current = ctrl
     setState('running')
     setTodos([])
     setLanes({})
+    setHops([])
     setReport(null)
     setSelected(null)
     setError(null)
     window.scrollTo({ top: 0 })
     try {
-      const r = await analyse(brief, onEvent, ctrl.signal)
+      const r = await analyse(b, onEvent, ctrl.signal)
       setReport(r)
       setSelected(r.findings[0] ?? null)
       setState('done')
@@ -70,16 +77,25 @@ export default function InvestigatePage({ caseInfo }: { caseInfo: CaseInfo }) {
     }
   }
 
+  // A brief handed over from the briefing page runs straight away.
+  useEffect(() => {
+    if (seed) {
+      setBrief(seed.brief)
+      run(seed.brief)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed?.nonce])
+
   return (
     <div className="mx-auto max-w-[1280px]">
       <section className="frame px-12 pb-10 pt-16">
         <Eyebrow>Investigate · {caseInfo.title}</Eyebrow>
         <Title size="xl" className="mt-3 max-w-3xl">
-          Test your account against the phones.
+          Sharpen the briefing with your brief.
         </Title>
         <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-muted">
-          Write down what you believe, what confuses you and what you don't know. Each line is checked against all four phones, then everything else is swept
-          for patterns you didn't ask about.
+          The phones were already swept and triaged when the case loaded. Write down what you believe, what confuses you and what you don't know: each line is
+          matched to existing signals first, and new checks run only for what the sweep didn't cover.
         </p>
       </section>
       <div className="dot-rule" />
@@ -101,7 +117,7 @@ export default function InvestigatePage({ caseInfo }: { caseInfo: CaseInfo }) {
             ))}
           </div>
           <div className="mt-8 flex items-center gap-6">
-            <button onClick={run} className="btn-primary px-6 py-2.5 text-sm font-medium">
+            <button onClick={() => run()} className="btn-primary px-6 py-2.5 text-sm font-medium">
               Analyse
             </button>
             <span className="text-xs text-faint">
@@ -113,7 +129,7 @@ export default function InvestigatePage({ caseInfo }: { caseInfo: CaseInfo }) {
 
       {state === 'running' && (
         <section className="frame px-12 py-12">
-          <RunProgress todos={todos} lanes={lanes} />
+          <RunProgress todos={todos} lanes={lanes} hops={hops} />
         </section>
       )}
 
@@ -123,7 +139,7 @@ export default function InvestigatePage({ caseInfo }: { caseInfo: CaseInfo }) {
             <div className="font-serif text-2xl text-terra-soft">The analysis did not finish</div>
             <p className="mt-2 text-sm text-muted">{error}</p>
             <div className="mt-5 flex gap-3">
-              <button onClick={run} className="btn-primary px-4 py-2 text-sm font-medium">
+              <button onClick={() => run()} className="btn-primary px-4 py-2 text-sm font-medium">
                 Retry
               </button>
               <button onClick={() => setState('edit')} className="btn-ghost px-4 py-2 text-sm">

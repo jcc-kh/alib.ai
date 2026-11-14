@@ -1,26 +1,29 @@
 import { useEffect, useState } from 'react'
-import { getCase, type CaseInfo, type Finding } from './api'
+import { getCase, type Brief, type CaseInfo, type Finding } from './api'
 import { AppContext, type Page } from './state'
 import IngestPage from './pages/IngestPage'
 import BriefingPage from './pages/BriefingPage'
 import InvestigatePage from './pages/InvestigatePage'
+import TimelinePage from './pages/TimelinePage'
 import FindingDrawer from './components/FindingDrawer'
 import AskDrawer from './components/AskDrawer'
 
 const PAGES: [Page, string][] = [
-  ['ingest', 'Ingest'],
   ['briefing', 'Briefing'],
+  ['timeline', 'Location timeline'],
   ['investigate', 'Investigate'],
+  ['ingest', 'Ingest'],
 ]
 
 export default function App() {
   const [page, setPage] = useState<Page>(() => {
     const h = window.location.hash.slice(1)
-    return (PAGES.find(([p]) => p === h)?.[0] ?? 'ingest') as Page
+    return (PAGES.find(([p]) => p === h)?.[0] ?? 'briefing') as Page
   })
   const [caseInfo, setCaseInfo] = useState<CaseInfo | null>(null)
   const [drawer, setDrawer] = useState<Finding | null>(null)
   const [ask, setAsk] = useState<{ open: boolean; seed?: string; nonce: number }>({ open: false, nonce: 0 })
+  const [refineSeed, setRefineSeed] = useState<{ brief: Brief; nonce: number } | null>(null)
 
   useEffect(() => {
     getCase().then(setCaseInfo)
@@ -35,6 +38,10 @@ export default function App() {
     openFinding: (f: Finding) => setDrawer(f),
     openAsk: (q?: string) => setAsk((a) => ({ open: true, seed: q, nonce: a.nonce + 1 })),
     go: setPage,
+    refine: (brief: Brief) => {
+      setRefineSeed((s) => ({ brief, nonce: (s?.nonce ?? 0) + 1 }))
+      setPage('investigate')
+    },
   }
 
   return (
@@ -42,7 +49,7 @@ export default function App() {
       <div className="min-h-full">
         <header className="sticky top-0 z-30 border-b border-line bg-canvas/90 backdrop-blur">
           <div className="frame mx-auto flex h-16 max-w-[1280px] items-center px-6">
-            <button onClick={() => setPage("ingest")} className="flex items-baseline">
+            <button onClick={() => setPage('briefing')} className="flex items-baseline">
               <span className="font-serif text-[26px] leading-none text-fg">Alib</span>
               <span className="font-serif text-[26px] leading-none text-terra">.ai</span>
             </button>
@@ -63,9 +70,10 @@ export default function App() {
         </header>
 
         <main>
-          {page === 'ingest' && <IngestPage />}
           {page === 'briefing' && <BriefingPage />}
-          {page === 'investigate' && caseInfo && <InvestigatePage caseInfo={caseInfo} />}
+          {page === 'timeline' && caseInfo && <TimelinePage caseInfo={caseInfo} />}
+          {page === 'investigate' && caseInfo && <InvestigatePage caseInfo={caseInfo} seed={refineSeed} />}
+          {page === 'ingest' && <IngestPage />}
         </main>
 
         <footer className="dot-rule mx-auto max-w-[1280px]">

@@ -8,7 +8,7 @@ export interface LaneState {
 }
 
 export const AGENTS: { name: SubagentName; role: string }[] = [
-  { name: 'orchestrator', role: 'Plans, routes, sweeps' },
+  { name: 'orchestrator', role: 'Matches, routes, chains' },
   { name: 'location-analyst', role: 'Together or apart' },
   { name: 'comms-analyst', role: 'Messages and calls' },
   { name: 'relationship-mapper', role: 'Who knows whom' },
@@ -17,7 +17,7 @@ export const AGENTS: { name: SubagentName; role: string }[] = [
   { name: 'report-writer', role: 'Writes and validates' },
 ]
 
-export default function RunProgress({ todos, lanes }: { todos: Todo[]; lanes: Partial<Record<SubagentName, LaneState>> }) {
+export default function RunProgress({ todos, lanes, hops = [] }: { todos: Todo[]; lanes: Partial<Record<SubagentName, LaneState>>; hops?: { from: SubagentName; to: SubagentName; note: string }[] }) {
   const done = todos.filter((t) => t.status === 'done').length
   return (
     <div className="grid grid-cols-[1fr_1fr] gap-12">
@@ -62,6 +62,21 @@ export default function RunProgress({ todos, lanes }: { todos: Todo[]; lanes: Pa
             )
           })}
         </div>
+        {hops.length > 0 && (
+          <div className="mt-6">
+            <Eyebrow>Follow-up hops</Eyebrow>
+            <ul className="mt-3 space-y-2">
+              {hops.map((h, i) => (
+                <li key={i} className="rise rounded-lg border border-amber/40 px-3 py-2 text-xs">
+                  <div className="font-mono text-amber">
+                    {h.from} → {h.to}
+                  </div>
+                  <div className="mt-0.5 text-muted">{h.note}</div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   )

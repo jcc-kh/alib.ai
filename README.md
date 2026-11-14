@@ -111,19 +111,24 @@ npm run dev
 Open http://localhost:5173 in Chrome on a laptop-size screen.
 
 ### Demo click-path
-1. **Ingest.** Click **Load the sample case** and watch the six pipeline stages run. Check the per-phone counts and the ingest notes. Then click **Read the briefing**.
-2. **Briefing.** This is what Alib.ai found on its own:
-   - **Week timeline:** hover a finding to light up its events, or click any marker.
-   - **Five ranked patterns**, each with "why it matters" and follow-up questions.
-   - **Relations graph:** click an edge to see its rows.
-   - **Checked and dismissed:** the decoys, and the rule that rejected each one.
-3. **Open a finding** with **Evidence and how we know**. Go through the tabs: Evidence, How we know, Verify (it should show all ✓), and Sources (expand a row to see its raw JSON line).
-4. **Ask.** Click a follow-up chip, or **Ask Alib.ai** in the header. Watch the steps stream in, then open the cited evidence. Try `Did Paul meet Cara in March?` to get a **cannot tell** answer.
-5. **Investigate.** The brief is pre-filled. Click **Analyse**. The to-do list and the agents' tool calls run for about 17 seconds. The report then appears: the index is on the left and the selected finding, with the same four tabs, is on the right.
-6. **Try variations in the brief:**
-   - Add `Paul met Cara in March.` and you get **cannot tell**.
-   - Delete `Paul and Cara don't know each other.` and the sweep still surfaces the Dock Cafe pattern under **What you didn't ask about**.
+1. **Briefing (opens on load).** No brief has been entered yet. Check:
+   - the **anchor moment** (17 April around 10:00, found without being told about the audit)
+   - the **week timeline**, with gaps hatched; faint gaps were checked and not raised
+   - **4 ranked incidents** built from 11 signals, each showing how many checks agree and how many phones are involved
+   - the **people map**
+   - **checked and dismissed**, which includes Amy's unexplained 50-minute gap and Ken's overnight power-off, each with the rule that dismissed it
+2. **Open the chained finding.** In incident 02, click the one marked **chained**. Work through the four tabs:
+   - **Evidence** shows Ken's lane with the hatched `location_off` gap, plus the SMS and transfer inside it.
+   - **How we know** shows sweep → triage → check → follow-up to financial-analyst → follow-up to comms-analyst.
+   - **Verify** recomputes the gap length, activity count and gap type from raw rows.
+   - **Sources** shows the file and line for each row.
+3. **Location timeline.** It opens on Wednesday 15 April with Ken's gap selected. The map shows where every phone was in that window. Switch to **Whole week**. The table at the bottom lists every gap with its type and whether it was raised.
+4. **Ask.** Try `Was any phone's location off while it was in use?` or `Did Paul meet Cara in March?` (cannot tell).
+5. **Sharpen with your brief.** On the Briefing page, click **Refine with my brief**. Each line is matched to an existing incident (`match_brief_item → INC-…`). The money question triggers live **follow-up hops** between subagents. The report puts the chained gap finding under Answers.
+6. **Try variations in the brief** on the Investigate page:
+   - Add `Paul met Cara in March.` and you get **cannot tell** (a targeted check, because no signal matches).
    - Open http://localhost:5173/?fail=1#investigate and click Analyse to see the error state and **Retry**.
+7. **Ingest** is still available from the nav, to show the six-stage pipeline.
 
 ## Status
 
@@ -134,7 +139,7 @@ Open http://localhost:5173 in Chrome on a laptop-size screen.
 | Fact-check: in-browser recomputation from raw rows; row provenance | ✅ Built (works on any rows from `/api/evidence`) |
 | API contract (`frontend/src/api/types.ts`) | ✅ Defined |
 | Case Bundle v1 format and example | ✅ Defined |
-| Architecture revision: sweep → triage → brief refines; signals, stays and incidents tables; location timeline and gaps; findings files and chaining | 📐 Designed ([ARCHITECTURE.md](ARCHITECTURE.md)); mock UI not yet updated |
+| Revision 2: sweep → triage → brief refines; signals, incidents, anchors, dismissals; location timeline and typed gaps; follow-up chaining | ✅ Built in the mock (Briefing as home, Location timeline page, gap evidence view, live follow-up hops) |
 | Synthetic data generator and answer key | ⏳ Next | (including gap plants G1 and its decoy)
 | Ingest pipeline, SQLite store, checks and tests | ⏳ Next |
 | deepagents orchestrator, subagents, briefing and Ask | ⏳ Next |
@@ -156,9 +161,10 @@ frontend/
   src/api/types.ts         the API contract (shared shapes)
   src/api/index.ts         swap point: mock today, FastAPI later
   src/api/mock.ts          mock API (simulated agent run, briefing, Ask)
-  src/mock/                synthetic case data, findings with derivations, briefing, Ask
+  src/mock/                case data, findings + derivations, signals/incidents (signals.ts),
+                           stays (segments.ts), briefing, Ask
   src/lib/verify.ts        independent recomputation used by the Verify tab
-  src/pages/               IngestPage, BriefingPage, InvestigatePage
+  src/pages/               BriefingPage (home), TimelinePage, InvestigatePage, IngestPage
   src/components/          FindingDetail (4 tabs), drawers, WeekTimeline, RunProgress
   src/components/evidence/ one view per check + relations graph
 ```

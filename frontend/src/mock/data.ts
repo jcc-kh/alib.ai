@@ -5,6 +5,8 @@
 
 import type {
   ChainOutput,
+  GapOutput,
+  GapType,
   CoverageOutput,
   DistanceOutput,
   EvidenceRow,
@@ -56,6 +58,7 @@ export const PLACES: Place[] = [
   { name: 'Northgate Mall', kind: 'mall', lat: 41.11, lon: -71.99 },
   { name: 'FreshMart', kind: 'supermarket', lat: 41.03, lon: -72.03 },
   { name: 'Riverside Gym', kind: 'gym', lat: 41.045, lon: -72.052 },
+  { name: 'Pier 9 Warehouse', kind: 'work', lat: 40.938, lon: -71.962 },
   { name: 'Tan residence', kind: 'home', lat: 40.975, lon: -72.02 },
   { name: 'Lim residence', kind: 'home', lat: 41.061, lon: -71.996 },
   { name: 'Ong residence', kind: 'home', lat: 41.021, lon: -71.951 },
@@ -367,6 +370,69 @@ const lunchIds = [
   addRow('amy', 'transactions', ts(16, 13, 20), 'Received $50 from Paul Tan (Swiftpay), memo "lunch"', { app: 'Swiftpay', from: NUMBERS.paul, to: NUMBERS.amy, amount: 50, currency: 'USD', memo: 'lunch' }),
 ]
 const ev = (owner: PersonId, type: string) => syncEvents.filter((e) => e.device_owner === owner && e.event_type === type).map((e) => e.id)
+
+// =====================================================================
+// Location gaps (revision 2). A gap runs from the slot after the last location row to the slot
+// before the next one, so rows at 13:50 and 16:40 mean "no location data from 14:00 to 16:30".
+// =====================================================================
+const addMin = (iso: string, m: number) => {
+  const d = new Date(new Date(iso).getTime() + m * 60000 - 4 * 3600000)
+  return `${d.toISOString().slice(0, 19)}${TZ}`
+}
+function makeGap(
+  person: PersonId,
+  last: string,
+  next: string,
+  places: [string, string],
+  gap_type: GapType,
+  raised: boolean,
+  activity: GapOutput['activity'] = [],
+  power_event_ids: string[] = [],
+): GapOutput {
+  const before = locRow(person, last, places[0], 20)
+  const after = locRow(person, next, places[1], 20)
+  const start = addMin(last, 10)
+  const end = addMin(next, -10)
+  return {
+    kind: 'gap',
+    person,
+    start,
+    end,
+    minutes: Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000),
+    gap_type,
+    raised,
+    bounding: { before: { id: before.id, t: before.t }, after: { id: after.id, t: after.t } },
+    activity,
+    power_event_ids,
+    thresholds: { min_gap_min: 45, interval_min: 10 },
+  }
+}
+
+// G1: Ken's phone, 15 Apr 14:00–16:30, no location rows but a message at 15:10 and the $4,500 transfer at 15:40.
+const g1MsgT = ts(15, 15, 10)
+const g1Msg = addRow('ken', 'messages', g1MsgT, 'To Dave (saved contact): "Out for a bit, back around 5."', {
+  thread_id: 'sms:dave', app: 'SMS', direction: 'out', from: NUMBERS.ken, to: '+1 555 010 0611', body: 'Out for a bit, back around 5.',
+})
+export const G1: GapOutput = makeGap('ken', ts(15, 13, 50), ts(15, 16, 40), ['Ong residence', 'Ong residence'], 'location_off', true, [
+  { id: g1Msg, t: g1MsgT, table: 'messages', label: 'SMS sent to Dave' },
+  { id: l2.row_ids[0], t: l2.t, table: 'transactions', label: '$4,500 Swiftpay transfer to Cara' },
+])
+
+// G1 decoy: Amy's phone, 16 Apr 09:10–10:00, no location rows and no activity of any kind.
+export const AMY_GAP: GapOutput = makeGap('amy', ts(16, 9, 0), ts(16, 10, 10), ['Lim residence', 'Northgate Mall'], 'unexplained', false)
+
+// Existing decoy: Ken's phone off overnight 15→16 Apr.
+const kenOff = addRow('ken', 'device_events', ts(15, 23, 10), 'power_off: Device powered off', { event_type: 'power_off', detail: 'Device powered off' })
+const kenOn = addRow('ken', 'device_events', ts(16, 7, 0), 'power_on: Device powered on', { event_type: 'power_on', detail: 'Device powered on' })
+export const KEN_NIGHT: GapOutput = makeGap('ken', ts(15, 23, 10), ts(16, 7, 10), ['Ong residence', 'Ong residence'], 'powered_off', false, [], [kenOff, kenOn])
+
+// S7 power-offs show up as powered_off gaps; raised because they overlap the synchronised-behaviour signal.
+const powerIds = (owner: PersonId) => syncEvents.filter((e) => e.device_owner === owner && e.event_type !== 'thread_deleted').map((e) => e.id)
+export const S7_GAPS: GapOutput[] = [
+  makeGap('paul', ts(17, 10, 20), ts(17, 13, 10), ['Harbor Supply Co.', 'Harbor Supply Co.'], 'powered_off', true, [], powerIds('paul')),
+  makeGap('ken', ts(17, 10, 40), ts(17, 13, 40), ['Ong residence', 'Ong residence'], 'powered_off', true, [], powerIds('ken')),
+  makeGap('cara', ts(17, 11, 10), ts(17, 14, 10), ['Pier 9 Warehouse', 'Pier 9 Warehouse'], 'powered_off', true, [], powerIds('cara')),
+]
 
 export const GRAPH: Graph = {
   nodes: PEOPLE.map((p) => ({ id: p.person_id, label: p.name, color: p.color })),

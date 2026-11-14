@@ -12,6 +12,7 @@ const ANSWERS: Record<ScenarioId, (q: string) => string> = {
   S4a: () => "Yes. The $5,000 transfer from Paul to Ken at 11:05 on 15 April is on both phones, with no memo.",
   S4b: () => "Ken's phone sent $4,500 of it to Cara 4 h 35 min later, with the memo \"materials\". Cara's phone shows it arriving. No other onward transfer above $500 exists in the data.",
   S7: () => "Yes. Starting 20 minutes after the 10:00 audit notice, within one 50-minute window, Paul's, Ken's and Cara's phones each deleted a WhatsApp thread and powered off, coming back on at 13:05, 13:30 and 14:00. Amy's phone did neither.",
+  G1: () => "Yes, once. Ken's phone had no location data from 14:00 to 16:30 on 15 April, but in that window it sent a message at 15:10 and the $4,500 transfer to Cara at 15:40. Other gaps in the data are explained by the phone being off, or show no activity, so they are not raised.",
   S1: () => "Three texts. Paul's phone sent them to Amy at 18:32 on 14 April, asking her to come to Sunset Park. They are not on Amy's phone, which deleted the thread on 17 April at 20:15.",
 }
 
@@ -20,6 +21,7 @@ export const SUGGESTED_QUESTIONS = [
   'Do Paul and Cara know each other?',
   'Where did the missing money end up?',
   'What did Paul text Amy on 14 April?',
+  "Was any phone's location off while it was in use?",
   'Did Paul meet Cara in March?',
 ]
 

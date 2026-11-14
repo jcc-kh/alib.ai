@@ -4,7 +4,10 @@ import { Eyebrow } from './ui'
 
 const KIND_LABEL: Record<DerivationStepKind, string> = {
   question: 'Question',
+  signal: 'Sweep',
+  grouped: 'Triage',
   route: 'Routing',
+  follow_up: 'Follow-up',
   tool: 'Check',
   data: 'Data',
   compute: 'Compute',
