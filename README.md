@@ -18,17 +18,13 @@ Alib.ai does that comparison. The investigator writes a short **brief** in three
 
 ![Alib.ai system architecture](docs/architecture.png)
 
-```
- Phone data           Ingest              Case store        Checks (code)           Agents (LLM)                 Report
- ───────────          ──────              ──────────        ─────────────           ────────────                 ──────
- Case Bundle  ──►  load → validate  ──►   SQLite     ◄──  missing_messages    ◄──  orchestrator plans to-dos  ──►  Confirmed
- (one folder       → normalise →          one row per      distance_between         and routes each brief          Inconsistent
-  per phone)       resolve people         phone, with      money_chains             item to specialist             Answers
-                   → store                device_owner     silent_meetings          subagents, then sweeps         Didn't ask about
-                                                           synchronised_behaviour   for anything unasked           Next steps
-```
+Three stages:
 
-**Code finds the facts, and the model routes and phrases them.** Every comparison is a plain Python function that returns the rows it used. The agents decide *which* checks answer *which* question and write one plain sentence per finding. A code validator then rejects any sentence that:
+1. **Sweep (code only, on case load).** Every check runs across every pair of people and the whole date range. Each hit is saved as a *signal*, with the rows that support it.
+2. **Triage (agents).** Signals are grouped into incidents, and incidents are ranked by how many checks agree and how many phones are involved. Signals with an ordinary explanation are dismissed, with the reason recorded. Moments where three or more phones act together are flagged as anchors. The result is an **opening briefing**, on screen before you type anything.
+3. **Brief refines (agents).** Your brief is matched to existing signals first. New checks run only for what the sweep didn't cover, and everything is re-ranked by relevance to your questions.
+
+**Agents never compute, and checks never conclude.** Every comparison is a plain Python function that returns the rows it used. The agents decide *which* checks answer *which* question and write one plain sentence per finding. A code validator then rejects any sentence that:
 - doesn't cite evidence
 - uses a number that didn't come from a check
 - says a *person* was somewhere instead of their *phone*
@@ -53,17 +49,19 @@ All people, companies, places and data are invented.
 
 ## The agents
 
-They are built with LangChain **deepagents** (`create_deep_agent`). The orchestrator uses the built-in to-do list and dispatches domain subagents in parallel.
+They are built with LangChain **deepagents** (`create_deep_agent`). Each subagent writes its findings to its own file (for example `findings/location.json`). The orchestrator reads those files and can **chain** them: one subagent's result triggers a follow-up task for another.
 
-| Agent | Looks at | Calls |
+| Agent | Owns | Checks |
 |---|---|---|
-| **orchestrator** | The brief | Splits it into items, writes the to-do list, routes items, runs the unprompted sweep |
-| **location-analyst** | Location history | `distance_between`, `silent_meetings` |
-| **comms-analyst** | Messages and calls | `missing_messages`, `search_messages` |
-| **relationship-mapper** | Contacts, calls, messages, social follows and likes, co-location, deleted threads | `contact_graph`, `silent_meetings` |
-| **financial-analyst** | Transfers | `money_chains` |
-| **device-forensics** | Deletions, power-offs, triggers, data coverage | `synchronised_behaviour`, `get_coverage` |
-| **report-writer** | Subagent results | Assembles the report and next steps, then the validator runs |
+| **orchestrator** | Triage on case load; refining the brief; dispatching follow-ups | `run_sweep`, `propose_incidents`, `anchor_moments`, `rank_incidents`, `match_brief_item` (code helpers) |
+| **relationship-mapper** | Identity matching across phones; the people map the others use | `identity_match`, `shared_unknown_number`*, `contact_graph` |
+| **location-analyst** | Where each phone was | `location_timeline`, `location_gaps`, `distance_between`, `silent_meetings` |
+| **comms-analyst** | Messages and calls | `missing_messages`, `call_log_mismatch`*, `contact_went_quiet`*, `search_messages` |
+| **financial-analyst** | Money | `money_chains`, `transfer_after_meeting`* |
+| **device-forensics** | Deletions and power | `deletions`, `power_events`, `synchronised_behaviour` |
+| **report-writer** | Words, merges and ranks findings | none (output passes `validate_report()`) |
+
+\* optional, built if time allows.
 
 ## The data format
 
@@ -96,7 +94,7 @@ Every finding can be checked by the person reading it. Each one opens with four 
 | **Verify** | Your browser recomputes the key numbers from the raw rows, without trusting the check's own output, and shows ✓ or ✗ for each. Here you can also record "I checked this" or "I dispute this". |
 | **Sources** | For each row: the bundle hash, file, line number and the original JSON line, so you can open the source file and find it |
 
-Alib.ai also **briefs you before you ask.** As soon as the phones are loaded, it sweeps every pair and presents what stands out, ranked, with a week timeline and a relations graph. It also lists what it checked and dismissed, and why. You can **ask questions at any time.** Every answer cites its rows or says "cannot tell".
+Alib.ai also **briefs you before you ask.** As soon as the phones are loaded, it sweeps every pair and presents what stands out, ranked, with anchor moments, a week timeline, a per-person location timeline (stays, travel and gaps) and a relations graph. Location gaps are reported only as "no location data". A gap is raised by default only when the phone was clearly in use during it (`location_off`), because phones lose location for innocent reasons all the time. It also lists what it checked and dismissed, and why. You can **ask questions at any time.** Every answer cites its rows or says "cannot tell".
 
 Engineers: see [DERIVATION.md](DERIVATION.md) for exactly how each statement is derived.
 
@@ -136,7 +134,8 @@ Open http://localhost:5173 in Chrome on a laptop-size screen.
 | Fact-check: in-browser recomputation from raw rows; row provenance | ✅ Built (works on any rows from `/api/evidence`) |
 | API contract (`frontend/src/api/types.ts`) | ✅ Defined |
 | Case Bundle v1 format and example | ✅ Defined |
-| Synthetic data generator and answer key | ⏳ Next |
+| Architecture revision: sweep → triage → brief refines; signals, stays and incidents tables; location timeline and gaps; findings files and chaining | 📐 Designed ([ARCHITECTURE.md](ARCHITECTURE.md)); mock UI not yet updated |
+| Synthetic data generator and answer key | ⏳ Next | (including gap plants G1 and its decoy)
 | Ingest pipeline, SQLite store, checks and tests | ⏳ Next |
 | deepagents orchestrator, subagents, briefing and Ask | ⏳ Next |
 | FastAPI with SSE | ⏳ Next |
