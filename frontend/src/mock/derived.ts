@@ -178,6 +178,6 @@ function graph(): Graph {
   }
   // Below-threshold co-location: shown faintly so the investigator sees what was set aside.
   edges.push({ source: 'amy', target: 'ken', channel: 'colocation', label: 'together once at FreshMart (needs 2+)', weak: true, count: 1, first: ROWS.get(FRESHMART_IDS[0])!.timestamp, evidence_ids: FRESHMART_IDS })
-  return { nodes: PEOPLE.map((p) => ({ id: p.person_id, label: p.name, color: p.color })), edges }
+  return { nodes: PEOPLE.map((p) => ({ id: p.person_id, label: p.name, color: p.color })), edges, cells: [] }
 }
 export const GRAPH = graph()

@@ -71,11 +71,11 @@
 <div class="abs" style="left:56px; top:34px;">
   <div class="eyebrow">System architecture · revision 3</div>
   <h1 style="margin-top:6px"><span>Alib</span><span style="color:#c8553a">.ai</span> · three layers and the screens they feed</h1>
-  <div class="sub">Code finds the facts, the network connects them, and the model routes and phrases. Every sentence cites the rows behind it.</div>
+  <div class="sub">Discovery finds the shape, code decides what is evidence, and the model routes and phrases. Every sentence cites the rows behind it.</div>
 </div>
 <div class="abs legend" style="right:56px; top:56px;">
   <span><i style="border-color:var(--code)"></i>Deterministic code</span>
-  <span><i style="border-color:var(--net)"></i>Network model (code)</span>
+  <span><i style="border-color:var(--net)"></i>Discovery (topological)</span>
   <span><i style="border-color:var(--model)"></i>Language model</span>
   <span><i style="border-color:var(--ui)"></i>Front end</span>
 </div>
@@ -91,12 +91,12 @@
     <div class="box ui page">
       <div class="pt">Briefing</div><div class="ep">GET /briefing</div>
       <div class="pd">Opens on load: top incidents, anchor moments, timeline</div>
-      <div class="pills"><span class="pill p2">2 incidents</span><span class="pill p1">1 signals</span></div>
+      <div class="pills"><span class="pill p2">2 leads · incidents</span><span class="pill p1">1 signals</span></div>
     </div>
     <div class="box ui page">
       <div class="pt">Relations graph</div><div class="ep">GET /graph · on Briefing</div>
-      <div class="pd">People and unknown numbers, edges by channel</div>
-      <div class="pills"><span class="pill p2">2 people map · edges</span></div>
+      <div class="pd">People, unknown numbers, edges by channel, shaded groups</div>
+      <div class="pills"><span class="pill p2">2 groups · edges</span></div>
     </div>
     <div class="box ui page">
       <div class="pt">Location timeline</div><div class="ep">GET /timeline</div>
@@ -156,53 +156,63 @@
 </div>
 
 <!-- connector 2 -> 3 -->
-<div class="conn" style="top:650px;"><span class="ar" style="color:var(--net)">↑</span>people map, incidents and anchor moments: what triage ranks and the orchestrator routes on</div>
+<div class="conn" style="top:650px;"><span class="ar" style="color:var(--net)">↑</span>leads ("pattern, not verified"), the people map and incidents: what triage ranks and the orchestrator routes on</div>
 
-<!-- ===== Layer 2 · Network model ===== -->
+<!-- ===== Layer 2 · Discovery (topological network model) ===== -->
 <div class="layer" style="top:684px; height:272px; border:1.5px solid color-mix(in srgb, var(--net) 55%, transparent);">
   <div class="side">
-    <div class="t"><span class="n" style="color:var(--net)">2</span>Network model</div>
-    <div class="s">Who is connected to whom, by which channel, and when. Built in code from check output.</div>
-    <div class="never"><b>Never</b> concludes: the graph is descriptive and gives no verdicts. Every edge carries evidence ids.</div>
+    <div class="t"><span class="n" style="color:var(--net)">2</span>Discovery</div>
+    <div class="s">Topological network model: organises the case into pairs <b style="color:var(--fg);font-weight:500">and groups</b>, and finds unusual higher-order structure with no labels or training.</div>
+    <div class="never"><b>Never</b> decides. A lead becomes a finding only when a check confirms it.</div>
   </div>
-  <div class="body" style="display:grid; grid-template-columns: 520px 1fr; gap:24px; align-items:center;">
-    <svg viewBox="-40 0 600 270" width="520" height="234">
+  <div class="body" style="display:grid; grid-template-columns: 500px 1fr; gap:22px; align-items:center;">
+    <svg viewBox="-40 0 600 270" width="500" height="225">
       <defs>
         <style>
           .nd { fill: #1d1d1d; stroke: #4fc493; stroke-width: 1.6; }
           .nl { font: 600 14px Inter, sans-serif; fill: #f5f1ea; text-anchor: middle; }
           .el { font: 12px Inter, sans-serif; fill: #a39d94; paint-order: stroke; stroke: #131313; stroke-width: 6px; stroke-linejoin: round; text-anchor: middle; }
+          .cl { font: 600 12px Inter, sans-serif; fill: #4fc493; text-anchor: middle; paint-order: stroke; stroke: #131313; stroke-width: 6px; stroke-linejoin: round; }
         </style>
+        <marker id="mt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#f5f1ea" fill-opacity=".8"/></marker>
       </defs>
-      <line x1="90" y1="55" x2="90" y2="215" stroke="#f5f1ea" stroke-opacity=".55" stroke-width="1.6" stroke-dasharray="7 5"/>
-      <text class="el" x="80" y="132" style="text-anchor:end">3 texts,</text><text class="el" x="80" y="147" style="text-anchor:end">thread deleted</text><text class="el" x="80" y="162" style="text-anchor:end">on Amy's phone</text>
-      <line x1="90" y1="55" x2="470" y2="55" stroke="#4fc493" stroke-width="1.6" stroke-dasharray="2 5"/>
-      <text class="el" x="280" y="48">co-located 4 days · no contact</text>
-      <line x1="90" y1="55" x2="470" y2="215" stroke="#f5f1ea" stroke-opacity=".8" stroke-width="2.6"/>
-      <text class="el" x="245" y="128">$5,000</text>
-      <line x1="470" y1="215" x2="470" y2="55" stroke="#f5f1ea" stroke-opacity=".8" stroke-width="2.6"/>
-      <text class="el" x="470" y="140">$4,500</text>
-      <line x1="280" y1="235" x2="90" y2="215" stroke="#f5f1ea" stroke-opacity=".45" stroke-width="1.4"/>
-      <line x1="280" y1="235" x2="470" y2="215" stroke="#f5f1ea" stroke-opacity=".45" stroke-width="1.4"/>
-      <text class="el" x="200" y="252">calls</text><text class="el" x="370" y="252">calls</text>
-      <circle class="nd" cx="90" cy="55" r="26"/><text class="nl" x="90" y="60">Paul</text>
-      <circle class="nd" cx="470" cy="55" r="26"/><text class="nl" x="470" y="60">Cara</text>
-      <circle class="nd" cx="90" cy="215" r="26"/><text class="nl" x="90" y="220">Amy</text>
+      <!-- rank-2 cell: the shaded group -->
+      <polygon points="300,40 470,215 130,215" fill="#4fc493" fill-opacity=".14" stroke="none"/>
+      <text class="cl" x="300" y="160">group cell</text>
+      <text class="el" x="300" y="176">relay + money loop</text>
+      <!-- rank-1 links (directed money flow round the triangle) -->
+      <line x1="322" y1="62" x2="452" y2="196" stroke="#f5f1ea" stroke-opacity=".8" stroke-width="2.2" marker-end="url(#mt)"/>
+      <text class="el" x="430" y="112">$5,000 · texts</text>
+      <line x1="442" y1="215" x2="160" y2="215" stroke="#f5f1ea" stroke-opacity=".8" stroke-width="2.2" marker-end="url(#mt)"/>
+      <text class="el" x="300" y="234">$4,500 · texts minutes later</text>
+      <line x1="146" y1="193" x2="280" y2="60" stroke="#f5f1ea" stroke-opacity=".8" stroke-width="2.2" marker-end="url(#mt)"/>
+      <text class="el" x="168" y="112">$1,200 "refund"</text>
+      <!-- outside the group -->
+      <line x1="-6" y1="80" x2="276" y2="44" stroke="#f5f1ea" stroke-opacity=".45" stroke-width="1.4" stroke-dasharray="6 4"/>
+      <text class="el" x="110" y="52">3 texts, deleted on Amy's</text>
+      <line x1="510" y1="70" x2="322" y2="46" stroke="#f5f1ea" stroke-opacity=".4" stroke-width="1.3"/>
+      <line x1="510" y1="70" x2="488" y2="196" stroke="#f5f1ea" stroke-opacity=".4" stroke-width="1.3"/>
+      <!-- rank-0 cells -->
+      <circle class="nd" cx="300" cy="40" r="26"/><text class="nl" x="300" y="45">Paul</text>
       <circle class="nd" cx="470" cy="215" r="26"/><text class="nl" x="470" y="220">Ken</text>
-      <rect x="236" y="222" width="88" height="26" rx="13" fill="#1d1d1d" stroke="#c8553a" stroke-width="1.6" stroke-dasharray="4 3"/>
-      <text class="nl" x="280" y="240" style="font-size:11.5px; font-weight:500; fill:#e07a5f">no one</text>
+      <circle class="nd" cx="130" cy="215" r="26"/><text class="nl" x="130" y="220">Cara</text>
+      <circle class="nd" cx="-14" cy="82" r="22"/><text class="nl" x="-14" y="87" style="font-size:13px">Amy</text>
+      <rect x="474" y="56" width="76" height="26" rx="13" fill="#1d1d1d" stroke="#c8553a" stroke-width="1.6" stroke-dasharray="4 3"/>
+      <text class="nl" x="512" y="74" style="font-size:11.5px; font-weight:500; fill:#e07a5f">no one</text>
     </svg>
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-      <div class="box net"><div class="k">identity_match</div><div class="bd">Numbers, emails and handles on every phone → one person each: the <b style="color:var(--fg); font-weight:500">people map</b> the other layers use.</div></div>
-      <div class="box net"><div class="k">contact_graph</div><div class="bd">Edges by channel: message, call, transfer, social, deleted thread, co-location. Each edge cites its rows.</div></div>
-      <div class="box net"><div class="k">unresolved_identifiers</div><div class="bd">Numbers that resolve to no one in the case but reach ≥2 people (possible burners).</div></div>
-      <div class="box net"><div class="k">propose_incidents · anchor_moments</div><div class="bd">Signals that share people and overlap in time → incidents. ≥3 phones acting at once → anchor moments.</div></div>
+    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;">
+      <div class="box net"><div class="k">1 · entities</div><div class="bd">People map, plus mentions a model extracts from text (aliases, products). Quotes checked against their row.</div></div>
+      <div class="box net"><div class="k">2 · complex</div><div class="bd">TopoNetX. Pairs (rank 1) and groups (rank 2): co-active sets, chats, chains, bursts.</div></div>
+      <div class="box net"><div class="k">3 · propagate</div><div class="bd">Features passed across ranks with fixed Hodge operators: a TNN layer without training.</div></div>
+      <div class="box net"><div class="k">4 · score → leads</div><div class="bd">Isolation forest, fixed seed. Each lead: rows, drivers, a proposed check.</div></div>
+      <div class="box net"><div class="k">5 · flows · holes</div><div class="bd">Hodge decomposition finds money loops; missing faces find pairs who never talk.</div></div>
+      <div class="box plain"><div class="k" style="color:var(--net)">lead → check → finding</div><div class="bd">Unconfirmed: "pattern, not verified". Roadmap: a trained TNN on generator cases.</div></div>
     </div>
   </div>
 </div>
 
 <!-- connector 1 -> 2 -->
-<div class="conn" style="top:964px;"><span class="ar" style="color:var(--code)">↑</span>signals: one row per hit, with the people involved, a time range, evidence ids and strength</div>
+<div class="conn" style="top:964px;"><span class="ar" style="color:var(--code)">↑</span>corrected rows, suspect windows and signals feed discovery · each lead's proposed check runs here, through the agents</div>
 
 <!-- ===== Layer 1 · Deterministic checks ===== -->
 <div class="layer" style="top:998px; height:244px; border:1.5px solid color-mix(in srgb, var(--code) 60%, transparent);">
@@ -247,7 +257,7 @@
 
 <div class="foot">
   <span><b>Checks never conclude.</b> They return rows and numbers.</span>
-  <span><b>The network never judges.</b> It connects people and events.</span>
+  <span><b>Discovery never decides.</b> It finds leads; a check makes them evidence.</span>
   <span><b>Agents never compute.</b> They route, follow up and write one sentence per finding.</span>
 </div>
 

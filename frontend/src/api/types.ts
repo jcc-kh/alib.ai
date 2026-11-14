@@ -233,6 +233,8 @@ export interface Finding {
   /** 'changed' or 'withdrawn' after a dispute; the replacement finding sets `supersedes`. */
   status: FindingStatus
   supersedes?: string
+  /** Set when this finding confirms a discovery lead. */
+  lead_id?: string
 }
 
 // ---------- Transparency: how a finding was derived ----------
@@ -287,6 +289,8 @@ export interface Report {
   next_steps: string[]
   by_person: PersonClaims[]
   reliability_notes: { finding_id: string; note: string; window: ReliabilityWindow }[]
+  /** Open leads, shown as "pattern, not verified". */
+  leads: Lead[]
 }
 
 // Raw outputs from the deterministic checks. Every number shown in a statement comes from here.
@@ -492,9 +496,44 @@ export interface GraphEdge {
   evidence_ids: string[]
 }
 
+/** A cell of the discovery complex: rank 0 an entity, rank 1 a pairwise link, rank 2 a group. */
+export interface GraphCell {
+  cell_id: string
+  rank: 0 | 1 | 2
+  /** e.g. 'group_window', 'group_chat', 'chain', 'burst', 'message', 'transfer', 'mention' */
+  kind: string
+  /** Entity ids: person ids, identifiers, accounts, places or mentions. */
+  members: string[]
+  start: string
+  end: string
+  evidence_ids: string[]
+}
+
 export interface Graph {
   nodes: { id: PersonId; label: string; color: string }[]
   edges: GraphEdge[]
+  /** Rank-2 cells (groups) from discovery, so the relations panel can shade them. */
+  cells: GraphCell[]
+}
+
+// ---------- Discovery leads ----------
+
+export type LeadKind = 'relay' | 'circulation' | 'recurring_group' | 'hole' | 'burst' | 'alias' | 'other'
+
+/** A pattern discovery found. Never a verdict: it becomes a finding only once its proposed check confirms it. */
+export interface Lead {
+  lead_id: string
+  kind: LeadKind
+  cell: GraphCell
+  /** Unsupervised score (isolation forest), higher is more unusual. */
+  score: number
+  /** Why it scored: top features and the neighbouring cells that contributed through propagation. */
+  drivers: { feature: string; detail: string }[]
+  evidence_ids: string[]
+  proposed_check?: { check: CheckName | string; params: Record<string, unknown>; agent: SubagentName }
+  status: 'open' | 'promoted' | 'dismissed'
+  promoted_finding_id?: string
+  dismissed_reason?: string
 }
 
 // ---------- Sweep, triage, briefing ----------
@@ -583,6 +622,8 @@ export interface Briefing {
   timeline: TimelineEvent[]
   dismissed: Dismissal[]
   signals_total: number
+  /** Top leads from discovery: promoted ones link to their findings; open ones are "pattern, not verified". */
+  leads: Lead[]
 }
 
 /** Location timeline segment (the `stays` table). */

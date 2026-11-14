@@ -4,6 +4,8 @@
 
 **Load every phone in a case. Alib.ai sweeps them all and lays out who is connected, whose routine covers the scene, where every phone was when it mattered, what broke from routine, and who had a grievance. Every insight is one click from the rows behind it.**
 
+> **The pitch.** Investigators see the world in pairs: this phone called that one. But what matters is often a group: three people acting together, money going round in a circle, two people who never talk yet always meet. Alib.ai organises the whole case into a topological structure and finds those patterns without being told what to look for. Then it does what no pattern-finder does on its own: patterns the data proves become findings, with every row cited; patterns it can't prove stay labelled as leads. **AI finds the shape; code decides what's evidence.** It runs on the mathematics topological neural networks are built on, without training; our generator produces the labelled cases a trained TNN needs next.
+
 > Status: **clickable mock-up.** The UI runs on canned synthetic data with a simulated agent run. The real backend (ingest, checks, LangChain deepagents) is designed in [ARCHITECTURE.md](ARCHITECTURE.md) and plugs in behind the same API. Built for HackPrinceton (Arlequin Track 1, LangChain deepagents, Amazon).
 
 ---
@@ -32,21 +34,23 @@ On case load:
 
 1. **Integrity pass (code only).** Before anything else, the data is checked for signs it can't be taken at face value. Each phone's clock offset is estimated from calls that appear on both phones, and timestamps are corrected before messages are compared. Location fixes that imply impossible travel speeds, and GPS fixes far from the same phone's Wi-Fi or cell fixes, mark that phone and time window as *suspect*.
 2. **Sweep (code only).** Every check runs across every pair of people and the whole date range. Each hit is saved as a *signal*, with the rows that support it.
-3. **Triage (agents).** Signals are grouped into incidents, and incidents are ranked by how many checks agree and how many phones are involved. Signals with an ordinary explanation are dismissed, with the reason recorded. Moments where three or more phones act together are flagged as anchors. The result is an **opening briefing**, on screen before you type anything.
+3. **Discovery (network model).** Alongside the sweep, the whole case is organised into a combinatorial complex: people, numbers, accounts, places and things mentioned in messages, linked in pairs **and** in groups. Fixed topological operators spread information across those levels, and an unsupervised scorer ranks the most unusual structures: a relay through three phones, money going round in a circle, a group that keeps acting together, two people connected through others who never contact each other. Each becomes a **lead**, with its rows and a proposed check. No training and no labels; the same seed gives the same leads.
+4. **Triage (agents).** Signals are grouped into incidents, and incidents are ranked by how many checks agree and how many phones are involved. Signals with an ordinary explanation are dismissed, with the reason recorded. Moments where three or more phones act together are flagged as anchors. Each top lead's proposed check is run: confirmed leads become findings, the rest stay labelled "pattern, not verified". The result is an **opening briefing**, on screen before you type anything.
 
 After the briefing:
 
-4. **Lines of inquiry.** Each insight is filed under the question it answers (connections, routine areas, the time-of-death window, what changed, motive). Each question has its own page with the visual police use for it.
-5. **Ask.** Free-form questions go to the same orchestrator; answers cite findings or say "can't tell".
-6. **Review.** If you dispute a data row, it is excluded, every check that cited it reruns, and findings that changed are marked.
+5. **Lines of inquiry.** Each insight and confirmed lead is filed under the question it answers (connections, routine areas, the time-of-death window, what changed, motive). Each question has its own page with the visual police use for it.
+6. **Ask.** Free-form questions go to the same orchestrator; answers cite findings or say "can't tell".
+7. **Review.** If you dispute a data row, it is excluded, every check that cited it reruns, and findings that changed are marked.
 
 > The mock no longer includes hypothesis testing (parsing statements into claims and grading each one). [ARCHITECTURE.md](ARCHITECTURE.md) stages ③–⑤ still describe it as designed in revision 3; the team should decide whether to keep it in the backend.
 
-**Agents never compute, and checks never conclude.** Every comparison is a plain Python function that returns the rows it used, and every verdict comes from a rule in code. The agents decide *which* checks answer *which* question and write one plain sentence per finding. A code validator then rejects any sentence that:
+**Discovery finds leads, code proves facts, and agents never compute.** Every comparison is a plain Python function that returns the rows it used, and every verdict comes from a rule in code. The agents decide *which* checks answer *which* question and write one plain sentence per finding. A code validator then rejects any sentence that:
 - doesn't cite evidence, or cites a row the investigator disputed
 - uses a number that didn't come from a check
 - has a verdict different from the one the code rule gave
 - rests on a suspect window without saying so
+- cites a discovery lead that no check has confirmed
 
 ## The demo case (synthetic): Death at Pier 9
 
@@ -77,14 +81,14 @@ They are built with LangChain **deepagents** (`create_deep_agent`): one orchestr
 | Agent | Owns | Checks |
 |---|---|---|
 | **orchestrator** | Triage on case load; parsing the brief and statements into claims; pausing for the investigator to confirm them; dispatching follow-ups; the next-steps paragraph | `confirm_items`, `propose_incidents`, `anchor_moments`, `rank_incidents`, `match_brief_item`, `get_coverage`, `get_reliability` (code helpers) |
-| **relationship-mapper** | Identity matching across phones; the people map the others use; possible burner numbers | `identity_match`, `unresolved_identifiers`, `contact_graph` |
+| **relationship-mapper** | Identity matching across phones; the people map the others use; possible burner numbers; first reader of discovery leads, routing each proposed check | `identity_match`, `unresolved_identifiers`, `contact_graph`, `explain_lead` |
 | **location-analyst** | Where each phone was | `presence_window`, `activity_space`, `location_timeline`, `location_gaps`, `distance_between`, `silent_meetings`, `group_meetings`† |
 | **comms-analyst** | Messages and calls | `last_contacts`, `missing_messages`, `call_log_mismatch`*, `contact_went_quiet`*, `search_messages` |
 | **financial-analyst** | Money | `money_chains`, `transfer_after_meeting`* |
 | **device-forensics** | Deletions and power | `deletions`, `power_events`, `synchronised_behaviour` |
 | **social-analyst** | Social media posts, comments and follows | `social_profile`, `social_hostility` (fixed local classifier; reports tension, never placement) |
 
-Every subagent also gets `get_reliability`, `apply_verdict_rule`, `get_events` and `get_coverage`.
+Every subagent also gets `get_reliability`, `apply_verdict_rule`, `get_events`, `get_coverage` and the lead tools (`get_leads`, `explain_lead`, `promote_lead`).
 
 \* optional, built if time allows. † stretch.
 
@@ -104,6 +108,7 @@ Any source can be supported by writing an adapter that outputs this format.
   - `inconsistent`: the data contradicts the claim.
   - `cannot_tell`: the phones hold nothing that settles it. The agent says so instead of guessing.
 - **Every statement cites evidence rows.** Each row shows its id, its source phone and its timestamp.
+- **Leads are not findings.** A pattern discovery found is shown as "pattern, not verified", with its rows and the check that would confirm it. It gets a verdict only once that check confirms it.
 - **Names stand for phones.** "Amy was at Northgate Mall" means Amy's phone was there. Every report states this once in its assumptions, because a phone's location is not proof of where its owner was.
 - **"Inconsistent", never "lied" or "guilty".** The report describes data, and the investigator draws the conclusions. Words like "suspicious", "proves" and "clearly" are banned too.
 - **Phone data is assumed genuine.** Spoofing detection is out of scope, and the report says so.
@@ -166,13 +171,14 @@ Every insight opens the finding drawer: Evidence · How we know · Verify (recom
 | UI revamp: guided flow, Pro dashboard (light/dark), live agent network + envelopes, charts from computed rows | ✅ Built in the mock |
 | Pivot to insight discovery: murder case (5 phones incl. the victim's), lines of inquiry (link chart, routine-area map, alibi grid, pattern of life, social hostility), 4 new checks, social-analyst, generated portraits | ✅ Built in the mock; Noir UI and hypothesis testing removed |
 | Background data: full week of messages, calls, locations, transactions per phone (seeded), counts computed | ✅ Built in the mock (`src/mock/background.ts`) |
-| Revision 3: integrity pass, statements, item confirmation, disputes that rerun checks, report assembled in code, hardened validator, multi-seed evaluation | ✅ Designed in [ARCHITECTURE.md](ARCHITECTURE.md); not yet in the mock |
+| Revision 3: integrity pass, topological discovery and leads, statements, item confirmation, disputes that rerun checks, report assembled in code, hardened validator, multi-seed evaluation | ✅ Designed in [ARCHITECTURE.md](ARCHITECTURE.md); not yet in the mock |
 | Synthetic data generator and answer key (gap plant G1 and its decoy, planted clock skew and spoofed GPS, a burner number, innocent noise, statements) | ⏳ Next |
 | SQLite case store, integrity pass, checks and tests | ⏳ Next |
+| Discovery: combinatorial complex, training-free topological scoring, leads (a trained TNN is a stretch) | ⏳ Next |
 | deepagents orchestrator, subagents, briefing and Ask | ⏳ Next |
 | Report assembly, validator, reviews and reruns | ⏳ Next |
 | FastAPI with SSE | ⏳ Next |
-| Multi-seed evaluation (precision and recall per check) | ⏳ Next |
+| Multi-seed evaluation (precision and recall per check), and a head-to-head against a plain LLM given the same data | ⏳ Next |
 | Ingest pipeline from Case Bundle v1 | Upstream; out of scope for this build |
 
 **Open questions:**
