@@ -104,7 +104,7 @@ export function planRun(brief: Brief): Plan {
   push(200, { type: 'subagent', agent: 'orchestrator', status: 'done', note: 'Report ready' })
 
   // The mock takes no statements yet, so there are no per-person claims, and no planted suspect windows.
-  return { events, report: { assumptions: ASSUMPTIONS, findings, next_steps: NEXT_STEPS, by_person: [], reliability_notes: [] } }
+  return { events, report: { assumptions: ASSUMPTIONS, findings, next_steps: NEXT_STEPS, by_person: [], reliability_notes: [], leads: [] } }
 }
 
 function fileOf(agent: SubagentName) {

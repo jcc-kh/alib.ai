@@ -449,6 +449,8 @@ export const GRAPH: Graph = {
     { source: 'cara', target: 'paul', channel: 'social', label: "Cara's Snapline account follows and liked Paul's", evidence_ids: [caraFollowId, caraLikeId] },
     { source: 'amy', target: 'ken', channel: 'colocation', label: '1 occasion at FreshMart (below the 2-occasion threshold)', weak: true, evidence_ids: amyKenMall },
   ],
+  // Discovery's group cells are not in the mock yet.
+  cells: [],
 }
 
 export const NEXT_STEPS = [

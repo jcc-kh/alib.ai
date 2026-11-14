@@ -22,6 +22,15 @@ Every sentence in a briefing, report or Ask answer has this lineage:
 
 A finding answers an **item**: one atomic claim parsed from the investigator's brief or from a person's statement, confirmed by the investigator before any targeted check runs (§6.2).
 
+A finding can also start as a **lead** from discovery, the topological network model (ARCHITECTURE.md §6.4). A lead has its own lineage, but it joins the chain above only through a check:
+
+```
+ stored rows ─► entities + mentions ─► complex (pairs, groups) ─► fixed propagation ─► unusual cell ─► lead ─► proposed check ─► finding
+               (model quotes checked   (code)                      (code)             (isolation      (shown as     (code: confirms   (cites the check,
+                against their row)                                                     forest, code)   "pattern,     or not)           lead as origin)
+                                                                                                       not verified")
+```
+
 A finding may also carry **follow-up hops**: one subagent's result triggers a targeted check by another. Each hop is a step in `derivation.steps` with `kind: "follow_up"`, naming the subagent that asked, the subagent that ran, and the check call (§6.3).
 
 Each arrow is something an engineer can inspect:
@@ -49,6 +58,9 @@ Each arrow is something an engineer can inspect:
 | Ingest, normalise, resolve people | code (upstream, out of scope for this build) | Must be reproducible |
 | Estimate clock offsets; mark suspect windows (integrity pass) | **code** | Runs before every sweep; §3.12 |
 | Run every check over every pair on case load (sweep) | **code** | Produces `signals` with no model involved |
+| Extract mentions (aliases, organisations, products, places) from text | model | Natural language. Each mention keeps its source row and exact quote; code drops any quote not found in its row |
+| Build the complex, propagate features, score cells, decompose flows | **code** | Fixed operators and a seeded isolation forest, so leads are reproducible |
+| Promote a lead to a finding | **code** | Only through a confirming check call (`promote_lead`); §6.5 |
 | Compute signal `strength` | **code** | Per-check rule, §3.0 |
 | Propose incident groupings and count agreeing checks and phones | **code** | `propose_incidents()` |
 | Find anchor moments (≥3 phones clustered) | **code** | `anchor_moments()` |
@@ -361,7 +373,23 @@ step 5  follow_up   orchestrator → comms-analyst
 
 The merged finding cites the evidence of every hop. It must stay one sentence, with every number traced. Chains are capped at 3 hops per finding.
 
-### 6.4 Timeline and dismissed lists
+### 6.5 Leads from discovery
+
+A lead is a hypothesis with its working shown, never a verdict.
+
+| Part of a lead | What it holds | Shown in UI |
+|---|---|---|
+| Cell | The group or link that scored as unusual: its members, time span and kind (relay, circulation, recurring group, hole, burst) | Shaded group in the relations panel |
+| Rows | Every evidence row in the cell | **Evidence** and **Sources**, as for a finding |
+| Score and drivers | The isolation-forest score, the features that drove it (for example "3 phones, 5 days, each pair below threshold") and the neighbouring cells that contributed through propagation | **How we know**, marked as code steps |
+| Mentions | Any model-extracted mention it relies on, with the quote and its row | **How we know**, marked as a model step |
+| Proposed check | The deterministic check that would confirm it, with parameters | A "Check this" action |
+
+**Promotion.** The owning subagent runs the proposed check. If the check's verdict rule confirms the pattern, `promote_lead()` links the lead to that check call and the subagent writes a finding in the usual way: one sentence, numbers traced, verdict copied from the rule. The finding's derivation starts with the lead as a step ("found by discovery, score 0.91, drivers …") and then follows the normal chain. If the check doesn't confirm it, the lead stays open, labelled "pattern, not verified", or is dismissed with a reason.
+
+**Why this is safe.** Discovery is free to find patterns that may not be real, because nothing it finds can become a verdict without a check. The validator enforces this: a finding with a `lead_id` must have a linked confirming check call.
+
+### 6.6 Timeline and dismissed lists
 
 - The **week timeline** and the **location timeline** are drawn purely from `stays` and finding evidence. Each mark is a row id or a segment id, and clicking one opens its finding.
 - **Checked and dismissed** lists every dismissal with its reason and rule. This is how decoys stay visible without being flagged.
@@ -403,6 +431,8 @@ New in revision 3:
 - `Finding` gains `item_id`, `claimant`, `reliability_note?`, `status: current|changed|withdrawn`, `supersedes?`
 - `Report` gains `by_person[]` and `reliability_notes[]`
 - `AgentEvent` gains `items_proposed` and `rerun`; `SubagentName` loses `report-writer`
+- `Lead`: `{ lead_id, kind, cell, score, drivers[], evidence_ids, proposed_check?, status: open|promoted|dismissed, promoted_finding_id? }`; `GraphCell`: `{ cell_id, rank, kind, members, start, end, evidence_ids }`
+- `Briefing` and `Report` gain `leads`; `Graph` gains `cells`; `Finding` gains `lead_id?`
 
 `backend/schemas.py` must mirror these exactly.
 

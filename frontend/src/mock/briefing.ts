@@ -44,5 +44,7 @@ export function buildBriefing(): Briefing {
     timeline: raw.map((e, i) => ({ id: `tl${i}`, ...e })),
     dismissed: DISMISSALS,
     signals_total: SIGNALS.length,
+    // Discovery is not in the mock yet.
+    leads: [],
   }
 }

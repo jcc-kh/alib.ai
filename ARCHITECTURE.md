@@ -15,6 +15,7 @@ This document covers the target design for the backend build. For a link-by-link
 > - **Disputes change results:** a disputed row is excluded, the checks that cited it rerun, and changed findings are marked (§9).
 > - **Names stand for phones:** the "phones, not people" wording rule is dropped. A sentence may use a case person's name for their phone ("Amy was at Northgate Mall"); the report says so once, in its assumptions (§8.1). The neutral-wording list is extended (§8.2).
 > - **New check:** `unresolved_identifiers` (possible burners); stretch: group meetings (§6).
+> - **Discovery layer (new, stage ①b):** the network model organises the whole case into a combinatorial complex (pairs **and** groups) and finds unusual higher-order structure without labels or training, using the mathematics topological neural networks are built on. Its output is **leads**, which become findings only when a deterministic check confirms them. A trained TNN is the roadmap (§6.4).
 > - **Evaluation across seeds:** precision and recall per check over 10–20 generated cases, one seed held out (§12).
 > - **Ingestion is out of scope for this build.** The case store is assumed loaded, normalised and resolved (§3).
 
@@ -22,13 +23,13 @@ This document covers the target design for the backend build. For a link-by-link
 
 ## 1. Operating rule
 
-**Code finds facts; the model routes and phrases.** Agents never compute, and checks never conclude.
+**Discovery finds leads; code proves facts; the model routes and phrases.** Agents never compute, checks never conclude, and a lead is never a verdict.
 
-| | Checks and rules (code) | Agents (model) |
-|---|---|---|
-| What they are | Plain Python functions over SQLite. Each check answers **one fixed question**; each verdict rule maps a check output to a verdict. | LangChain deepagents: one orchestrator, five domain subagents |
-| What they do | Return JSON with the `evidence_ids` they used and **every number** the report will contain. Compute verdicts, strengths, reliability and rankings. | Parse the brief and statements into items. Choose which checks to run with what parameters. Follow up on results. Read message content. Phrase one sentence per finding. Write the next-steps paragraph. |
-| What they never do | Draw a conclusion in words, rank by judgement, or phrase anything | Do arithmetic, count rows, choose a verdict, or invent a row |
+| | Checks and rules (code) | Discovery (network model) | Agents (model) |
+|---|---|---|---|
+| What they are | Plain Python functions over SQLite. Each check answers **one fixed question**; each verdict rule maps a check output to a verdict. | A combinatorial complex of the whole case, fixed topological operators over it, and unsupervised scoring (§6.4). A language model extracts entities from text into the complex. | LangChain deepagents: one orchestrator, five domain subagents |
+| What they do | Return JSON with the `evidence_ids` they used and **every number** the report will contain. Compute verdicts, strengths, reliability and rankings. | Organise every row into pairs and groups. Rank the most unusual structures as **leads**, each with its rows, its drivers and a proposed confirming check. Find patterns nobody wrote a rule for. | Parse the brief and statements into items. Choose which checks to run with what parameters. Triage leads and propose checks to confirm them. Follow up on results. Read message content. Phrase one sentence per finding. Write the next-steps paragraph. |
+| What they never do | Draw a conclusion in words, rank by judgement, or phrase anything | Produce a verdict, or put a lead in the findings without a check confirming it | Do arithmetic, count rows, choose a verdict, or invent a row |
 
 Anything that looks like arithmetic in an agent's job is a **code helper the agent calls**: grouping signals by time overlap, counting agreeing checks, finding clusters of three or more phones, applying a verdict rule. The agent decides what to do with the result: merge, dismiss with a reason, or follow up.
 
@@ -39,10 +40,11 @@ Anything that looks like arithmetic in an agent's job is a **code helper the age
 ## 2. Pipeline overview
 
 ```
- Case store ─► ⓪ INTEGRITY (code) ─► ① SWEEP (code) ─► signals ─► ② TRIAGE (agents) ─► incidents ─► Opening briefing
- (loaded,       clock offsets          every check ×                group · rank · dismiss           (shown on page load)
-  resolved)     reliability            every pair ×                 · anchor moments                       │
-                stays                  full range                                                          ▼
+ Case store ─► ⓪ INTEGRITY (code) ─┬─► ①  SWEEP (code) ──────► signals ─┬─► ② TRIAGE (agents) ─► incidents ─► Opening briefing
+ (loaded,       clock offsets       │   every check × pair × range        │   group · rank · dismiss          + top leads
+  resolved)     reliability         │                                      │   · anchor moments                      │
+                stays               └─► ①b DISCOVER (code + extraction) ─► leads                                      ▼
+                                        complex · propagate · score
                                                     brief + statements ─► ③ PARSE (orchestrator) ─► items
                                                                                          │
                                                                      ④ CONFIRM (interrupt: investigator approves / edits)
@@ -58,14 +60,15 @@ Anything that looks like arithmetic in an agent's job is a **code helper the age
 |---|---|---|---|---|
 | ⓪ Integrity | Case store ready | code only | evidence tables | `clock_offsets`, `reliability`, `stays` |
 | ① Sweep | Integrity finished | code only | case store (corrected timestamps), `stays` | `signals` |
-| ② Triage | Sweep finished | agents + code helpers | `signals`, `reliability` | `incidents`, `dismissals`, `anchors`, opening `Briefing` |
+| ①b Discover | Integrity finished (runs alongside the sweep) | code, plus a model for entity extraction from text | case store, `stays`, `reliability` | `entities`, `cells`, `leads` |
+| ② Triage | Sweep and discovery finished | agents + code helpers | `signals`, `leads`, `reliability` | `incidents`, `dismissals`, `anchors`, opening `Briefing` (with top leads) |
 | ③ Parse | Investigator submits brief and/or statements | orchestrator | brief, `statements` | proposed `items` |
 | ④ Confirm | Items proposed | investigator (interrupt) | proposed `items` | confirmed `items` |
 | ⑤ Refine | Items confirmed | orchestrator + domain subagents | `signals`, `incidents`, targeted checks | `findings` |
 | ⑥ Assemble | All tasks done | code (+ orchestrator for next steps) | `findings`, `items`, `incidents` | `Report` |
 | ⑦ Review | Investigator marks a row | code, then affected subagents | `reviews` | rerun checks, updated `findings` marked `changed` |
 
-Stages ⓪ and ① are invoked by the same entry point (`prepare_case()`), so no agent run and no direct `run_sweep()` call can skip the integrity pass.
+Stages ⓪, ① and ①b are invoked by the same entry point (`prepare_case()`), so no agent run, no direct `run_sweep()` call and no discovery run can skip the integrity pass.
 
 ---
 
@@ -95,6 +98,9 @@ Raw `ts` is never overwritten. Checks read timestamps through the view `v_<table
 | `reliability` | `device_id, person, start, end, status (ok\|suspect), reasons[] (clock_skew\|impossible_travel\|source_disagreement), metrics_json, evidence_ids` | ⓪ Integrity |
 | `stays` | `segment_id, person, kind (stay\|travel\|gap), place, start, end, gap_type, evidence_ids` | ⓪ Integrity (via `location_timeline`) |
 | `signals` | `signal_id, check, people, start, end, evidence_ids, strength, output_json, reliability_flags` | ① Sweep |
+| `entities` | `entity_id, kind (person\|identifier\|account\|place\|mention), label, resolved_to?, source_row_id, quote, extractor` | ①b Discover (`mention` rows come from model extraction) |
+| `cells` | `cell_id, rank (0\|1\|2), kind, members[], start, end, evidence_ids, features_json` | ①b Discover |
+| `leads` | `lead_id, cell_id, kind, score, drivers_json, evidence_ids, proposed_check?, status (open\|promoted\|dismissed), promoted_finding_id?` | ①b Discover, ⑤ Refine |
 | `incidents` | `incident_id, signal_ids, people, start, end, n_checks, n_phones, rank, headline, anchor_id?` | ② Triage |
 | `dismissals` | `signal_id, reason, rule` | ② Triage |
 | `anchors` | `anchor_id, start, end, phones, signal_ids` | ② Triage (via code helper) |
@@ -125,7 +131,7 @@ Innocent noise the pass must **not** flag: indoor GPS loss (gap, not disagreemen
 
 ---
 
-## 6. Checks (`backend/checks/`)
+## 6. Checks and discovery (`backend/checks/`, `backend/discovery/`)
 
 Every check is a pure function over the views in §4. Thresholds are named keyword arguments with the defaults below. Each returns `{check, params, results[], evidence_ids[]}`; each result can be written as one `signals` row. Each check has a matching **verdict rule** in `backend/checks/verdicts.py` that maps (item, check output) to `confirmed | inconsistent | cannot_tell`.
 
@@ -168,7 +174,7 @@ Wording rule: a gap is always "**no location data**", never proof of intent.
 
 | Helper | Purpose |
 |---|---|
-| `prepare_case()` | ⓪ integrity pass then ① `run_sweep()`. The only way to start a sweep. |
+| `prepare_case()` | ⓪ integrity pass, then ① `run_sweep()` and ①b `discover()`. The only way to start either. |
 | `run_sweep()` | Every check × every pair × full range → `signals`. Refuses to run if the integrity pass has not completed for the current case version. |
 | `propose_incidents(signal_ids?)` | Groups signals sharing people and overlapping in time; returns candidates with `n_checks`, `n_phones` |
 | `anchor_moments(window_min=60, min_phones=3)` | Times where signals from ≥3 phones cluster |
@@ -178,8 +184,35 @@ Wording rule: a gap is always "**no location data**", never proof of intent.
 | `get_reliability(person?, start, end)` | Suspect windows overlapping the range (§5) |
 | `contact_graph(people?)` | Edges by channel |
 | `get_events`, `search_messages`, `get_coverage` | Raw lookups |
+| `get_leads(people?, start?, end?, kind?)` | Open leads from discovery, ranked by score (§6.4) |
+| `explain_lead(lead_id)` | The lead's cell, member rows, the features and neighbours that drove its score, and its proposed check |
+| `promote_lead(lead_id, call_id)` | Links a lead to the check call that confirmed it; only then can a finding cite it. Refuses if the call's verdict rule did not confirm |
 
 Every check has a unit test against `answer_key.json`: it must return the planted case and no decoy.
+
+### 6.4 Discovery: the topological network model (`backend/discovery/`, stage ①b)
+
+Checks find what someone wrote a rule for. Discovery finds what nobody did. It organises the whole case into one structure, pairs **and** groups, and ranks the higher-order patterns that are hardest for a person to see in the mass of rows: three phones acting together when no pair looks unusual, money going round in a circle, two people strongly connected through others who never contact each other.
+
+It uses the mathematics topological neural networks (TNNs) are built on, the combinatorial complex and its Hodge Laplacians, **without training**. A TNN is learned message passing over these operators; discovery uses the operators directly with fixed weights. That gives the same properties (unsupervised, higher-order, reproducible with a fixed seed) at hackathon cost. A trained TNN is the roadmap, below.
+
+**Pipeline:**
+
+| Step | What it does | Actor |
+|---|---|---|
+| **1. Entities** | Structured identities (people, numbers, accounts, places) from the people map, plus **mentions** a language model extracts from message, note, mail and search text: aliases ("Minnie E"), organisations, products, chemicals, places. Each mention stores its source row and the exact quote; code checks the quote appears in that row and drops it otherwise | code + model |
+| **2. Complex** | A combinatorial complex built with TopoNetX. **Rank 0:** entities. **Rank 1:** pairwise links (message, call, transfer, co-location, mention), each with time and rows. **Rank 2:** groups: sets of ≥3 entities active together within a sliding window (default 60 min), group chats, transfer chains, activity bursts | code |
+| **3. Features** | Per cell: channel mix, volume, time of day, duration, reliability flags, and how it deviates from that entity's own baseline over the week | code |
+| **4. Propagation** | Features are passed up and down the ranks *k* times (default 2) through the incidence matrices and normalised Hodge Laplacians, with fixed weights. This is a TNN layer without learned parameters, in the spirit of training-free graph methods (SGC, SIGN) | code |
+| **5. Scoring** | An isolation forest (fixed seed) over every cell's propagated features. The most unusual cells, mostly rank 2, become **leads** | code |
+| **6. Flows** | Hodge decomposition of transfer and message flows into gradient (source → sink), curl (local cycles) and harmonic (global loops) parts. A large cycle component is a **circulation** lead, with no rule written for it | code |
+| **7. Holes** | Pairs strongly connected through shared neighbours and shared places but with no direct link: a missing face in the complex. `silent_meetings` is one hand-written case of this. Persistent homology is the optional general method | code |
+
+**Leads, not findings.** Each lead carries its cell, member rows, a score, the drivers (top features and neighbouring cells), and a **proposed check** that would confirm it (for example "`money_chains` over these three phones, 15 Apr" or "`distance_between` Paul, Cara"). Leads are shown in the briefing and report under their own heading, labelled "pattern, not verified". A lead becomes evidence only when a deterministic check confirms it and `promote_lead()` links the two; the finding then cites the check, with the lead as its origin in the derivation. Unconfirmed leads never enter verdicts, and the validator rejects any finding that cites a lead without a confirming check call.
+
+**What discovery must find on the demo case** (planted by the generator, §12.1): the relay (Paul → Ken → Cara within minutes, each pair unremarkable), the circulation (money leaving Paul and partly returning through Ken and Cara), a recurring three-phone group below every pairwise threshold, and the Paul–Cara hole (S5).
+
+**Roadmap: a trained TNN (stretch).** The generator produces labelled cases at scale, which is the training data a TNN needs. Train a message-passing TNN (TopoModelX) on generator seeds to score cells, then compare it with the training-free pipeline on held-out seeds: planted higher-order patterns found at the same false-lead rate (§12.4). Risk: the network learns the generator's quirks, so it must also be checked on a real case before it is trusted. Not part of this build.
 
 ---
 
@@ -191,7 +224,7 @@ checkpointer = SqliteSaver(...)            # required by interrupt_on
 agent = create_deep_agent(
     model=init_chat_model(os.environ["ORCHESTRATOR_MODEL"]),   # stronger model
     tools=[confirm_items, match_brief_item, propose_incidents, anchor_moments,
-           rank_incidents, get_coverage, get_reliability],
+           rank_incidents, get_coverage, get_reliability, get_leads],
     subagents=[relationship_mapper, location_analyst, comms_analyst,
                financial_analyst, device_forensics],
     system_prompt=ORCHESTRATOR_PROMPT,
@@ -205,11 +238,11 @@ There is **no `report-writer`** (it had no tools, so no context to isolate; asse
 
 ### 7.1 Subagents
 
-Each is a dict with `name`, `description`, `system_prompt`, `tools`, `model` (a faster model, `SUBAGENT_MODEL`) and `response_format=FindingSet`. Every subagent also gets `get_reliability`, `apply_verdict_rule`, `get_events` and `get_coverage`.
+Each is a dict with `name`, `description`, `system_prompt`, `tools`, `model` (a faster model, `SUBAGENT_MODEL`) and `response_format=FindingSet`. Every subagent also gets `get_reliability`, `apply_verdict_rule`, `get_events`, `get_coverage`, `get_leads`, `explain_lead` and `promote_lead`, so any of them can confirm a lead in its own domain.
 
 | Subagent | Checks it may run |
 |---|---|
-| `relationship-mapper` | `identity_match`, `unresolved_identifiers`, `contact_graph` (its people map is read first by the others) |
+| `relationship-mapper` | `identity_match`, `unresolved_identifiers`, `contact_graph` (its people map is read first by the others). First reader of leads: explains them and routes each proposed check to the owning subagent |
 | `location-analyst` | `location_timeline`, `location_gaps`, `distance_between`, `silent_meetings`, `group_meetings`* |
 | `comms-analyst` | `missing_messages`, `call_log_mismatch`*, `contact_went_quiet`*, `search_messages` |
 | `financial-analyst` | `money_chains`, `transfer_after_meeting`* |
@@ -239,6 +272,7 @@ class Finding(BaseModel):
     evidence_ids: list[str]
     numbers: list[NumberTrace]
     follow_up: FollowUp | None = None   # addition to the handoff model; keeps §7.3 chaining
+    lead_id: str | None = None          # set when this finding confirms a discovery lead (§6.4)
 
 class FindingSet(BaseModel):
     findings: list[Finding]
@@ -258,14 +292,14 @@ After each round the orchestrator reads the new findings. A finding with `follow
 
 ### 7.5 Refine (stage ⑤)
 
-1. For each confirmed item, call `match_brief_item()` **first**; reuse existing signals where they settle it.
+1. For each confirmed item, call `match_brief_item()` **first**; reuse existing signals where they settle it. It also returns open leads sharing the item's people and dates, which the owning subagent may confirm with the lead's proposed check.
 2. Route uncovered items to the owning subagent for targeted checks. Dates outside coverage → `get_coverage()` → `cannot_tell`.
 3. Each subagent calls `apply_verdict_rule` and `get_reliability` for the windows it cites, then returns its `FindingSet`.
 4. The orchestrator labels each incident's relevance to the items; `rank_incidents(relevance=…)` re-sorts in code.
 
 ### 7.6 Triage (stage ②, no brief)
 
-1. `propose_incidents()` → candidates. 2. Agents merge or split (logged), and dismiss signals with an ordinary explanation (reason + rule). 3. `anchor_moments()`: on the demo case **17 April around 10:00** is flagged without the system being told about the audit. 4. `rank_incidents()` → top 5. 5. Each incident's `headline` is the sentence of its strongest validated finding (picked in code); `why_it_matters` is the code-generated rank reason (for example "3 checks agree across 3 phones").
+1. `propose_incidents()` → candidates. 2. Agents merge or split (logged), and dismiss signals with an ordinary explanation (reason + rule). 3. `anchor_moments()`: on the demo case **17 April around 10:00** is flagged without the system being told about the audit. 4. `rank_incidents()` → top 5. 5. Each incident's `headline` is the sentence of its strongest validated finding (picked in code); `why_it_matters` is the code-generated rank reason (for example "3 checks agree across 3 phones"). 6. `get_leads()`: the top leads from discovery are attached to the incidents they overlap, or listed on their own. For each, `relationship-mapper` runs or routes the proposed check; confirmed leads are promoted, the rest stay in the briefing as "patterns, not verified".
 
 **Verdicts** (rules in code):
 - `confirmed`: data on at least 2 phones agrees with the item.
@@ -283,6 +317,7 @@ After each round the orchestrator reads the new findings. A finding with `follow
 - **By person (new):** for each person who made statements, their claims with the verdict per claim: supported (`confirmed`), contradicted (`inconsistent`) or `cannot_tell`.
 - **Unprompted:** incidents matched to no item.
 - **Reliability notes:** findings resting on a suspect window are listed with the reason.
+- **Leads (new):** open leads from discovery, labelled "pattern, not verified", each with its rows, drivers and proposed check. Promoted leads appear as ordinary findings, with the lead shown as their origin.
 - **Next steps:** the only free text the orchestrator writes. It is one short paragraph, given the assembled report as input, and passes the same validator.
 - **Assumptions:** fixed text from code. It always includes: "Names stand for each person's phone. 'Amy was at Northgate Mall' means Amy's phone was there; a phone's location is not proof of where its owner was."
 
@@ -298,6 +333,7 @@ Drops any statement that fails a rule below, after one repair attempt:
 | Verdict copied | `verdict` equals the stored `apply_verdict_rule` result |
 | Reliability disclosed | If any cited evidence falls in a `suspect` window, the sentence contains the reliability phrase ("…, though this phone's clock/location data in that window is flagged as unreliable") |
 | One sentence | Exactly one terminal punctuation mark |
+| Leads are not verdicts | A finding with `lead_id` must have a `check_calls` row that `promote_lead()` linked to that lead, and its verdict comes from that call; leads themselves never carry a verdict |
 
 There is no "phones, not people" rule: a case person's name may stand for their phone, and the report's assumptions say so (§8.1). The old `<Name> (was|were) (at|in|near)` regex is removed.
 
@@ -320,7 +356,7 @@ The Verify tab's "I checked this" / "I dispute this" are stored as `reviews` (`n
 
 | Endpoint | Returns |
 |---|---|
-| `POST /api/case/prepare` | Runs `prepare_case()` (⓪ + ①) and triage ② in the background |
+| `POST /api/case/prepare` | Runs `prepare_case()` (⓪ + ① + ①b) and triage ② in the background |
 | `GET /api/case` | `CaseInfo` |
 | `GET /api/reliability?person=&start=&end=` | `ReliabilityWindow[]` and `ClockOffset[]` |
 | `GET /api/briefing` | `Briefing` |
@@ -332,7 +368,8 @@ The Verify tab's "I checked this" / "I dispute this" are stored as `reviews` (`n
 | `GET /api/reviews?target=` | `Review[]` |
 | `POST /api/ask` | SSE: `step`, then `answer` |
 | `GET /api/evidence?ids=` | Rows + provenance grouped by phone; 404 lists unknown ids |
-| `GET /api/graph` | Contact graph |
+| `GET /api/graph` | Contact graph, plus rank-2 cells (groups) so the relations panel can shade them |
+| `GET /api/leads?people=&start=&end=&status=` | `Lead[]`, ranked by score |
 
 `backend/schemas.py` mirrors [`frontend/src/api/types.ts`](frontend/src/api/types.ts). Contract changes in this revision:
 - `SubagentName` loses `report-writer`.
@@ -341,12 +378,13 @@ The Verify tab's "I checked this" / "I dispute this" are stored as `reviews` (`n
 - `Finding` gains `item_id`, `claimant`, `reliability_note?`, `status: 'current' | 'changed' | 'withdrawn'`, `supersedes?`.
 - `Report` gains `by_person: {person_id, claims: {item_id, text, verdict, finding_ids}[]}[]` and `reliability_notes`.
 - `CheckName` gains `unresolved_identifiers` (and `group_meetings` if built).
+- New: `Lead {lead_id, kind, cell, score, drivers, evidence_ids, proposed_check?, status, promoted_finding_id?}` and `GraphCell {cell_id, rank, kind, members, start, end, evidence_ids}`. `Briefing` and `Report` gain `leads`; `Graph` gains `cells`; `Finding` gains `lead_id?`.
 
 ---
 
 ## 11. Front end (`frontend/`)
 
-A placeholder built on mocks (React, Vite, TypeScript, Tailwind v4, react-leaflet). It is not a constraint on backend design. The swap point is [`frontend/src/api/index.ts`](frontend/src/api/index.ts). New UI the contract implies: an item-confirmation step before analysis, a statements input, a per-person claims section in the report, reliability badges on findings and timeline windows, and "changed" markers after a dispute.
+A placeholder built on mocks (React, Vite, TypeScript, Tailwind v4, react-leaflet). It is not a constraint on backend design. The swap point is [`frontend/src/api/index.ts`](frontend/src/api/index.ts). New UI the contract implies: an item-confirmation step before analysis, a statements input, a per-person claims section in the report, reliability badges on findings and timeline windows, "changed" markers after a dispute, a **leads** section ("patterns, not verified") on the briefing and report, and **shaded group cells** in the relations graph so the higher-order structure discovery found is visible.
 
 Current screens: **Briefing** (home; the relations graph is a panel on it, from `GET /api/graph`), **Location timeline**, **Investigate**, the **Ask** drawer and the **Finding detail** drawer. The **Ingest** page mocks the upstream ingest pipeline; no endpoint backs it in this build.
 
@@ -367,8 +405,13 @@ Seeded; writes the case straight into the case-store tables (via the thin loader
 | Plant | A burner number contacting ≥2 case people, resolving to no one | `unresolved_identifiers` returns it |
 | Innocent noise | Indoor GPS loss, normal drift within accuracy, deleted spam threads, overnight power-off | Not flagged by integrity; not raised as signals (or dismissed with a rule) |
 | Statements | Per-person statements for the demo case, some supported, some contradicted, one unknowable | Correct per-person verdicts |
+| Higher-order | **Relay:** Paul texts Ken, and within minutes Ken texts Cara, repeatedly; each pair alone is within normal volume | A rank-2 lead on {Paul, Ken, Cara}; no pairwise check fires |
+| Higher-order | **Circulation:** Cara's $1,200 "refund" to Paul on 18 Apr closes S4 (Paul → Ken → Cara) into a loop. `money_chains` sees only the A → B → C chain; the loop as a whole is new | A circulation lead from the flow decomposition |
+| Higher-order | **Recurring group:** three phones briefly active together on several days (calls, messages, power events within the same hour), with every pair below the pairwise thresholds | A rank-2 lead; no pairwise check fires |
+| Higher-order | **Hole:** Paul and Cara, both strongly connected to Ken and repeatedly co-located, with no direct contact (S5) | A hole lead, matching `silent_meetings` |
+| Higher-order decoys | A family group chat; a weekly gym class where several phones share a place; payroll-style transfers that look circular but are routine | Low score, or dismissed with a reason |
 
-A `noise` parameter (0–3) scales the amount of innocent noise and the tampering magnitudes.
+A `noise` parameter (0–3) scales the amount of innocent noise and the tampering magnitudes. The answer key also lists each seed's items with their expected verdicts and numbers, for the evaluations below.
 
 ### 12.2 Evaluation (`eval/run_eval.py`)
 
@@ -376,6 +419,49 @@ A `noise` parameter (0–3) scales the amount of innocent noise and the tamperin
 - Run `prepare_case()` and every check; compare with each answer key.
 - Report **precision and recall per check** and per integrity rule, plus clock-offset error, as a table and JSON.
 - An optional `--agents` mode runs the full pipeline on the demo brief and scores verdicts per item.
+
+### 12.3 Plain-LLM baseline (`eval/baselines.py`, `run_eval.py --baseline`)
+
+This answers "what can this do that an LLM can't?" with a measurement instead of an argument. The same cases and the same questions are given to a plain LLM, and all three arms are scored against the same answer key.
+
+| Arm | What it gets | What it lacks |
+|---|---|---|
+| **`llm-context`** | Every row of every phone as text (per phone, per table, with row ids), the case's items (brief + statements), and instructions to answer each item with a verdict, cited row ids and numbers | Checks, integrity pass, verdict rules, validator |
+| **`llm-sql`** | The same items, plus a read-only SQL tool on the same case store (raw tables, not the `v_*` views) and a description of the schema | The same; it can query, but must write its own comparisons |
+| **`alibai`** | The full pipeline: `prepare_case()`, agents, `assemble_report()`, `validate_report()` | — |
+
+**Fairness rules**, so the baseline is a real competitor, not a strawman:
+- The same model as the orchestrator (`ORCHESTRATOR_MODEL`) for both baseline arms.
+- The same confirmed items for every arm, taken from the answer key, so parsing differences don't count.
+- The baseline prompts state the same reporting rules: cite row ids, give numbers, answer `cannot_tell` when the data doesn't settle it.
+- The answer key is never in any prompt. `llm-context` cases are sized to fit the model's context window; if a case doesn't fit, that is reported, not silently truncated.
+- Both baseline arms return the same structured output as a subagent (`item_id`, `verdict`, `sentence`, `evidence_ids`, `numbers`), so scoring is identical.
+
+**Metrics, per arm:**
+
+| Metric | How it is scored |
+|---|---|
+| Verdict accuracy | Per item, against the answer key's expected verdict |
+| Planted-fact recall | Share of plants found: the deleted texts (S1), silent meetings (S5), money chain (S4), synchronised window (S7), gap type (G1), burner |
+| Decoy false positives | Decoys and innocent noise reported as findings |
+| Absence claims | Items whose correct answer rests on something being absent (missing texts, no contact); scored separately, because this is where a plain LLM is expected to fail |
+| Tampering | False `missing_messages` hits on the clock-skewed pair; findings on spoofed windows that don't mention the problem |
+| Citation validity | Share of cited ids that exist and are in the answer key's evidence for that item |
+| Number accuracy | Share of numbers that match the answer key's values |
+| Consistency | The same verdict across 3 runs of the same case |
+| Cost and time | Tokens and wall-clock time per case |
+
+**Runs:** at least 5 seeds including `HELD_OUT_SEED`, at noise levels 0 and 2, with 3 runs per arm. Every model response is cached under `eval/runs/` so the tables can be regenerated without calling the model again. The output is one table per metric and a single summary table for the pitch.
+
+### 12.4 Discovery evaluation (`run_eval.py --discovery`)
+
+Shows that discovery finds structure the rules can't, without overclaiming.
+- **Higher-order recall:** share of the planted higher-order patterns (§12.1) that appear among the top *k* leads (default *k* = 10), per seed.
+- **False-lead rate:** share of the top *k* leads that match no plant and no known decoy.
+- **Rules vs discovery:** the same planted patterns, scored for the pairwise checks alone. The expected result is that the checks miss the relay, circulation and recurring group, and discovery finds them.
+- **Promotion rate:** share of leads whose proposed check confirmed them.
+- **Ablation:** propagation off (*k* = 0) vs on, to show the higher-order operators are what find the group patterns.
+- **Stretch:** a trained TNN (§6.4), scored on the same metrics on held-out seeds.
 
 ---
 
@@ -389,12 +475,18 @@ backend/store/                schema.sql, views (ts_adj, dispute exclusion), loa
 backend/integrity/            clock.py, travel.py, sources.py, run.py (→ clock_offsets, reliability, stays)
 backend/checks/               location.py, comms.py, money.py, relations.py, device.py, optional.py,
                               verdicts.py, helpers.py (prepare_case, sweep, incidents, anchors, rank)
+backend/discovery/            entities.py (people map + model extraction), complex.py (TopoNetX),
+                              propagate.py (Hodge operators), score.py (isolation forest → leads),
+                              flows.py (Hodge decomposition), holes.py, leads.py (explain, promote)
 backend/agents/               orchestrator.py, subagents.py, models.py (Finding), prompts/
 backend/report/               assemble.py, validate.py
 backend/reviews.py            disputes → rerun
 backend/api.py                FastAPI + SSE
 backend/tests/                integrity, checks vs answer key, validator, reviews, triage, e2e (slow)
-eval/run_eval.py              multi-seed precision/recall
+eval/run_eval.py              multi-seed precision/recall; --baseline compares with a plain LLM
+eval/baselines.py             llm-context and llm-sql arms
+eval/score.py                 shared scoring against answer_key.json
+eval/runs/                    cached model responses, so tables can be regenerated
 frontend/                     placeholder UI on mocks
 ```
 
@@ -422,16 +514,21 @@ New in revision 3:
 - [ ] Every report's assumptions state that names stand for phones.
 - [ ] `unresolved_identifiers` returns the planted burner and not the known org's line.
 - [ ] `eval/run_eval.py` reports precision and recall per check over ≥10 seeds, with the held-out seed reported separately.
+- [ ] Discovery ranks the relay, the circulation and the recurring group among the top 10 leads on the demo case, none of which any pairwise check returns; each lead cites its rows and a proposed check.
+- [ ] No finding cites a lead without a confirming check call (validator-enforced).
+- [ ] Discovery is reproducible: the same seed gives the same leads in the same order.
+- [ ] `run_eval.py --baseline` scores `llm-context`, `llm-sql` and `alibai` on the same items over ≥5 seeds, including the held-out seed, and regenerates its tables from cached responses.
 
 ---
 
 ## 15. Build order
 
-1. Generator and answer key, including planted tampering and innocent noise, loaded straight into the case store
+1. Generator and answer key, including planted tampering, innocent noise and higher-order patterns, loaded straight into the case store
 2. Integrity pass; checks and verdict rules; tests against the answer key
+2b. Discovery (§6.4), in this order: complex with group cells; fixed propagation and isolation-forest leads; flow decomposition; the relations panel's shaded groups; holes via persistent homology (optional)
 3. Agents on the CLI: orchestrator, five subagents with structured output, `confirm_items` interrupt
 4. Report assembly and hardened `validate_report()`; reviews and reruns
 5. FastAPI endpoints and SSE
-6. Multi-seed evaluation script
+6. Multi-seed evaluation script, then the plain-LLM baseline (§12.3)
 
-Steps 1–2 and 6 need no model.
+Steps 1–2 and the check-level part of step 6 need no model. Step 2b needs one only for extracting mentions from text; the complex, propagation and scoring are code. A trained TNN is a stretch beyond step 6. The baseline in step 6 does, and it needs step 3 for the `alibai` arm.
