@@ -1,0 +1,3 @@
+{"record_id": "e001", "event_type": "thread_deleted", "timestamp": "2026-04-17T09:46:00-04:00", "detail": {"counterpart": {"kind": "phone", "value": "+1 555 010 0101"}, "app": "WhatsApp"}}
+{"record_id": "e002", "event_type": "power_off", "timestamp": "2026-04-17T09:55:00-04:00", "detail": {}}
+{"record_id": "e003", "event_type": "power_on", "timestamp": "2026-04-17T13:10:00-04:00", "detail": {}}

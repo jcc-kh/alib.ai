@@ -1,0 +1,6 @@
+{"record_id": "e001", "event_type": "power_off", "timestamp": "2026-04-16T21:16:00-04:00", "detail": {}}
+{"record_id": "e002", "event_type": "power_on", "timestamp": "2026-04-16T23:38:00-04:00", "detail": {}}
+{"record_id": "e003", "event_type": "thread_deleted", "timestamp": "2026-04-17T09:20:00-04:00", "detail": {"counterpart": {"kind": "phone", "value": "+1 555 010 0100"}, "app": "SMS"}}
+{"record_id": "e004", "event_type": "thread_deleted", "timestamp": "2026-04-17T09:21:00-04:00", "detail": {"counterpart": {"kind": "phone", "value": "+1 555 010 0404"}, "app": "WhatsApp"}}
+{"record_id": "e005", "event_type": "power_off", "timestamp": "2026-04-17T09:30:00-04:00", "detail": {}}
+{"record_id": "e006", "event_type": "power_on", "timestamp": "2026-04-17T12:40:00-04:00", "detail": {}}

@@ -1,0 +1,1 @@
+{"record_id": "e001", "event_type": "thread_deleted", "timestamp": "2026-04-17T09:25:00-04:00", "detail": {"counterpart": {"kind": "phone", "value": "+1 555 010 0100"}, "app": "SMS"}}

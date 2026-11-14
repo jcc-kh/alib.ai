@@ -1,0 +1,1376 @@
+{
+ "case_id": "pier9-2026-04",
+ "add_order": [
+  "ravi-iphone",
+  "paul-iphone",
+  "amy-pixel",
+  "cara-iphone",
+  "ken-galaxy"
+ ],
+ "stages": [
+  {
+   "step": 1,
+   "added": "ravi-iphone",
+   "devices": [
+    "ravi-iphone"
+   ],
+   "reveals": "The victim's phone alone. His contacts appear as numbers with the names he saved. The Pier 9 text to Paul and the argument with Amy are visible, from his side only.",
+   "nodes": [
+    {
+     "id": "ravi",
+     "kind": "case_person_with_phone",
+     "name": "Ravi Mehta"
+    },
+    {
+     "id": "amy",
+     "kind": "case_person_no_phone_yet",
+     "number": "+1 555 010 0202",
+     "saved_as": [
+      "Amy"
+     ],
+     "contacted_by": [
+      "ravi"
+     ]
+    },
+    {
+     "id": "cara",
+     "kind": "case_person_no_phone_yet",
+     "number": "+1 555 010 0404",
+     "saved_as": [
+      "Novak Marine - Cara"
+     ],
+     "contacted_by": [
+      "ravi"
+     ]
+    },
+    {
+     "id": "dana",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0611",
+     "saved_as": [
+      "Dana"
+     ],
+     "contacted_by": [
+      "ravi"
+     ]
+    },
+    {
+     "id": "ken",
+     "kind": "case_person_no_phone_yet",
+     "number": "+1 555 010 0303",
+     "saved_as": [
+      "Ken W warehouse"
+     ],
+     "contacted_by": [
+      "ravi"
+     ]
+    },
+    {
+     "id": "lena",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0150",
+     "saved_as": [
+      "Lena HR"
+     ],
+     "contacted_by": [
+      "ravi"
+     ]
+    },
+    {
+     "id": "paul",
+     "kind": "case_person_no_phone_yet",
+     "number": "+1 555 010 0101",
+     "saved_as": [
+      "Paul B (books)"
+     ],
+     "contacted_by": [
+      "ravi"
+     ]
+    }
+   ],
+   "edges": [
+    {
+     "a": "amy",
+     "b": "ravi",
+     "channel": "call",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "ravi",
+     "channel": "message",
+     "events": 9,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "ravi",
+     "channel": "transfer",
+     "events": 1,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "cara",
+     "b": "ravi",
+     "channel": "message",
+     "events": 8,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "dana",
+     "b": "ravi",
+     "channel": "message",
+     "events": 11,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "ken",
+     "b": "ravi",
+     "channel": "message",
+     "events": 9,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "lena",
+     "b": "ravi",
+     "channel": "call",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "lena",
+     "b": "ravi",
+     "channel": "message",
+     "events": 17,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "paul",
+     "b": "ravi",
+     "channel": "call",
+     "events": 3,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "paul",
+     "b": "ravi",
+     "channel": "message",
+     "events": 36,
+     "on_one_phone_only": 0
+    }
+   ],
+   "plants_detectable": [
+    "LAST"
+   ],
+   "statements_checkable": []
+  },
+  {
+   "step": 2,
+   "added": "paul-iphone",
+   "devices": [
+    "ravi-iphone",
+    "paul-iphone"
+   ],
+   "reveals": "Paul becomes a full node. His SMS thread with Ravi is missing from his own phone. The payments to and from Cara appear, and so does an unsaved number.",
+   "nodes": [
+    {
+     "id": "ravi",
+     "kind": "case_person_with_phone",
+     "name": "Ravi Mehta"
+    },
+    {
+     "id": "paul",
+     "kind": "case_person_with_phone",
+     "name": "Paul Becker"
+    },
+    {
+     "id": "amy",
+     "kind": "case_person_no_phone_yet",
+     "number": "+1 555 010 0202",
+     "saved_as": [
+      "Amy",
+      "Amy B"
+     ],
+     "contacted_by": [
+      "paul",
+      "ravi"
+     ]
+    },
+    {
+     "id": "burner",
+     "kind": "unsaved_number",
+     "number": "+1 555 010 0777",
+     "saved_as": [],
+     "contacted_by": [
+      "paul"
+     ]
+    },
+    {
+     "id": "cara",
+     "kind": "case_person_no_phone_yet",
+     "number": "+1 555 010 0404",
+     "saved_as": [
+      "C. Novak (supplier)",
+      "Novak Marine - Cara"
+     ],
+     "contacted_by": [
+      "paul",
+      "ravi"
+     ]
+    },
+    {
+     "id": "dana",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0611",
+     "saved_as": [
+      "Dana"
+     ],
+     "contacted_by": [
+      "ravi"
+     ]
+    },
+    {
+     "id": "ken",
+     "kind": "case_person_no_phone_yet",
+     "number": "+1 555 010 0303",
+     "saved_as": [
+      "Ken",
+      "Ken W warehouse"
+     ],
+     "contacted_by": [
+      "paul",
+      "ravi"
+     ]
+    },
+    {
+     "id": "lena",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0150",
+     "saved_as": [
+      "Lena HR",
+      "Lena Park"
+     ],
+     "contacted_by": [
+      "paul",
+      "ravi"
+     ]
+    },
+    {
+     "id": "priya",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0622",
+     "saved_as": [
+      "Priya"
+     ],
+     "contacted_by": [
+      "paul"
+     ]
+    }
+   ],
+   "edges": [
+    {
+     "a": "amy",
+     "b": "paul",
+     "channel": "message",
+     "events": 24,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "paul",
+     "channel": "transfer",
+     "events": 1,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "ravi",
+     "channel": "call",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "ravi",
+     "channel": "message",
+     "events": 9,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "ravi",
+     "channel": "transfer",
+     "events": 1,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "burner",
+     "b": "paul",
+     "channel": "call",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "cara",
+     "b": "paul",
+     "channel": "message",
+     "events": 1,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "cara",
+     "b": "paul",
+     "channel": "transfer",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "cara",
+     "b": "ravi",
+     "channel": "message",
+     "events": 8,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "dana",
+     "b": "ravi",
+     "channel": "message",
+     "events": 11,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "ken",
+     "b": "paul",
+     "channel": "message",
+     "events": 7,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "ken",
+     "b": "ravi",
+     "channel": "message",
+     "events": 9,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "lena",
+     "b": "paul",
+     "channel": "message",
+     "events": 15,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "lena",
+     "b": "ravi",
+     "channel": "call",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "lena",
+     "b": "ravi",
+     "channel": "message",
+     "events": 17,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "paul",
+     "b": "priya",
+     "channel": "call",
+     "events": 6,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "paul",
+     "b": "priya",
+     "channel": "message",
+     "events": 22,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "paul",
+     "b": "ravi",
+     "channel": "call",
+     "events": 3,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "paul",
+     "b": "ravi",
+     "channel": "message",
+     "events": 36,
+     "on_one_phone_only": 36
+    }
+   ],
+   "plants_detectable": [
+    "LAST",
+    "MISSING_PAUL",
+    "GPAUL",
+    "CHAIN"
+   ],
+   "statements_checkable": [
+    "st1",
+    "st2"
+   ]
+  },
+  {
+   "step": 3,
+   "added": "amy-pixel",
+   "devices": [
+    "ravi-iphone",
+    "paul-iphone",
+    "amy-pixel"
+   ],
+   "reveals": "Amy's texts with Ravi are missing from her phone, and her location is off while she calls him. Three phones now show the same shared contacts.",
+   "nodes": [
+    {
+     "id": "ravi",
+     "kind": "case_person_with_phone",
+     "name": "Ravi Mehta"
+    },
+    {
+     "id": "paul",
+     "kind": "case_person_with_phone",
+     "name": "Paul Becker"
+    },
+    {
+     "id": "amy",
+     "kind": "case_person_with_phone",
+     "name": "Amy Brooks"
+    },
+    {
+     "id": "burner",
+     "kind": "unsaved_number",
+     "number": "+1 555 010 0777",
+     "saved_as": [],
+     "contacted_by": [
+      "paul"
+     ]
+    },
+    {
+     "id": "cara",
+     "kind": "case_person_no_phone_yet",
+     "number": "+1 555 010 0404",
+     "saved_as": [
+      "C. Novak (supplier)",
+      "Novak Marine - Cara"
+     ],
+     "contacted_by": [
+      "paul",
+      "ravi"
+     ]
+    },
+    {
+     "id": "dana",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0611",
+     "saved_as": [
+      "Dana",
+      "Dana M"
+     ],
+     "contacted_by": [
+      "amy",
+      "ravi"
+     ]
+    },
+    {
+     "id": "jo",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0633",
+     "saved_as": [
+      "Jo"
+     ],
+     "contacted_by": [
+      "amy"
+     ]
+    },
+    {
+     "id": "ken",
+     "kind": "case_person_no_phone_yet",
+     "number": "+1 555 010 0303",
+     "saved_as": [
+      "Ken",
+      "Ken W warehouse"
+     ],
+     "contacted_by": [
+      "paul",
+      "ravi"
+     ]
+    },
+    {
+     "id": "lena",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0150",
+     "saved_as": [
+      "Lena HR",
+      "Lena Park"
+     ],
+     "contacted_by": [
+      "paul",
+      "ravi"
+     ]
+    },
+    {
+     "id": "priya",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0622",
+     "saved_as": [
+      "Priya"
+     ],
+     "contacted_by": [
+      "paul"
+     ]
+    }
+   ],
+   "edges": [
+    {
+     "a": "amy",
+     "b": "dana",
+     "channel": "message",
+     "events": 10,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "jo",
+     "channel": "call",
+     "events": 5,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "jo",
+     "channel": "message",
+     "events": 38,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "paul",
+     "channel": "message",
+     "events": 24,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "paul",
+     "channel": "transfer",
+     "events": 1,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "ravi",
+     "channel": "call",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "ravi",
+     "channel": "message",
+     "events": 9,
+     "on_one_phone_only": 9
+    },
+    {
+     "a": "amy",
+     "b": "ravi",
+     "channel": "transfer",
+     "events": 1,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "burner",
+     "b": "paul",
+     "channel": "call",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "cara",
+     "b": "paul",
+     "channel": "message",
+     "events": 1,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "cara",
+     "b": "paul",
+     "channel": "transfer",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "cara",
+     "b": "ravi",
+     "channel": "message",
+     "events": 8,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "dana",
+     "b": "ravi",
+     "channel": "message",
+     "events": 11,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "ken",
+     "b": "paul",
+     "channel": "message",
+     "events": 7,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "ken",
+     "b": "ravi",
+     "channel": "message",
+     "events": 9,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "lena",
+     "b": "paul",
+     "channel": "message",
+     "events": 15,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "lena",
+     "b": "ravi",
+     "channel": "call",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "lena",
+     "b": "ravi",
+     "channel": "message",
+     "events": 17,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "paul",
+     "b": "priya",
+     "channel": "call",
+     "events": 6,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "paul",
+     "b": "priya",
+     "channel": "message",
+     "events": 22,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "paul",
+     "b": "ravi",
+     "channel": "call",
+     "events": 3,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "paul",
+     "b": "ravi",
+     "channel": "message",
+     "events": 36,
+     "on_one_phone_only": 36
+    }
+   ],
+   "plants_detectable": [
+    "LAST",
+    "MISSING_AMY",
+    "MISSING_PAUL",
+    "GPAUL",
+    "GAMY",
+    "CHAIN",
+    "LATE"
+   ],
+   "statements_checkable": [
+    "st1",
+    "st2",
+    "st4",
+    "st5"
+   ]
+  },
+  {
+   "step": 4,
+   "added": "cara-iphone",
+   "devices": [
+    "ravi-iphone",
+    "paul-iphone",
+    "amy-pixel",
+    "cara-iphone"
+   ],
+   "reveals": "Both sides of the money loop are confirmed. Paul's and Cara's phones meet at Dock Cafe four times. The unsaved number now links two people. One leftover WhatsApp message contradicts both deletions.",
+   "nodes": [
+    {
+     "id": "ravi",
+     "kind": "case_person_with_phone",
+     "name": "Ravi Mehta"
+    },
+    {
+     "id": "paul",
+     "kind": "case_person_with_phone",
+     "name": "Paul Becker"
+    },
+    {
+     "id": "amy",
+     "kind": "case_person_with_phone",
+     "name": "Amy Brooks"
+    },
+    {
+     "id": "cara",
+     "kind": "case_person_with_phone",
+     "name": "Cara Novak"
+    },
+    {
+     "id": "burner",
+     "kind": "unsaved_number",
+     "number": "+1 555 010 0777",
+     "saved_as": [],
+     "contacted_by": [
+      "cara",
+      "paul"
+     ]
+    },
+    {
+     "id": "dana",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0611",
+     "saved_as": [
+      "Dana",
+      "Dana M"
+     ],
+     "contacted_by": [
+      "amy",
+      "ravi"
+     ]
+    },
+    {
+     "id": "jo",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0633",
+     "saved_as": [
+      "Jo"
+     ],
+     "contacted_by": [
+      "amy"
+     ]
+    },
+    {
+     "id": "ken",
+     "kind": "case_person_no_phone_yet",
+     "number": "+1 555 010 0303",
+     "saved_as": [
+      "Ken",
+      "Ken W warehouse"
+     ],
+     "contacted_by": [
+      "paul",
+      "ravi"
+     ]
+    },
+    {
+     "id": "lena",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0150",
+     "saved_as": [
+      "Harbor Supply HR",
+      "Lena HR",
+      "Lena Park"
+     ],
+     "contacted_by": [
+      "cara",
+      "paul",
+      "ravi"
+     ]
+    },
+    {
+     "id": "priya",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0622",
+     "saved_as": [
+      "Priya"
+     ],
+     "contacted_by": [
+      "paul"
+     ]
+    },
+    {
+     "id": "tom",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0655",
+     "saved_as": [
+      "Tom driver"
+     ],
+     "contacted_by": [
+      "cara"
+     ]
+    }
+   ],
+   "edges": [
+    {
+     "a": "amy",
+     "b": "dana",
+     "channel": "message",
+     "events": 10,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "jo",
+     "channel": "call",
+     "events": 5,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "jo",
+     "channel": "message",
+     "events": 38,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "paul",
+     "channel": "message",
+     "events": 24,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "paul",
+     "channel": "transfer",
+     "events": 1,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "ravi",
+     "channel": "call",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "ravi",
+     "channel": "message",
+     "events": 9,
+     "on_one_phone_only": 9
+    },
+    {
+     "a": "amy",
+     "b": "ravi",
+     "channel": "transfer",
+     "events": 1,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "burner",
+     "b": "cara",
+     "channel": "call",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "burner",
+     "b": "paul",
+     "channel": "call",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "cara",
+     "b": "lena",
+     "channel": "message",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "cara",
+     "b": "paul",
+     "channel": "message",
+     "events": 1,
+     "on_one_phone_only": 1
+    },
+    {
+     "a": "cara",
+     "b": "paul",
+     "channel": "transfer",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "cara",
+     "b": "ravi",
+     "channel": "message",
+     "events": 8,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "cara",
+     "b": "tom",
+     "channel": "call",
+     "events": 5,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "cara",
+     "b": "tom",
+     "channel": "message",
+     "events": 38,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "dana",
+     "b": "ravi",
+     "channel": "message",
+     "events": 11,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "ken",
+     "b": "paul",
+     "channel": "message",
+     "events": 7,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "ken",
+     "b": "ravi",
+     "channel": "message",
+     "events": 9,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "lena",
+     "b": "paul",
+     "channel": "message",
+     "events": 15,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "lena",
+     "b": "ravi",
+     "channel": "call",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "lena",
+     "b": "ravi",
+     "channel": "message",
+     "events": 17,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "paul",
+     "b": "priya",
+     "channel": "call",
+     "events": 6,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "paul",
+     "b": "priya",
+     "channel": "message",
+     "events": 22,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "paul",
+     "b": "ravi",
+     "channel": "call",
+     "events": 3,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "paul",
+     "b": "ravi",
+     "channel": "message",
+     "events": 36,
+     "on_one_phone_only": 36
+    }
+   ],
+   "plants_detectable": [
+    "LAST",
+    "MISSING_AMY",
+    "MISSING_PAUL",
+    "GPAUL",
+    "GAMY",
+    "CHAIN",
+    "MEET",
+    "SYNC",
+    "BURNER",
+    "LEFTOVER",
+    "LATE",
+    "ALIAS"
+   ],
+   "statements_checkable": [
+    "st1",
+    "st2",
+    "st3",
+    "st4",
+    "st5",
+    "st7",
+    "st8"
+   ]
+  },
+  {
+   "step": 5,
+   "added": "ken-galaxy",
+   "devices": [
+    "ravi-iphone",
+    "paul-iphone",
+    "amy-pixel",
+    "cara-iphone",
+    "ken-galaxy"
+   ],
+   "reveals": "Ken's hostile posts appear, but his phone was 9 km away all evening. His phone's clock runs 90 seconds fast.",
+   "nodes": [
+    {
+     "id": "ravi",
+     "kind": "case_person_with_phone",
+     "name": "Ravi Mehta"
+    },
+    {
+     "id": "paul",
+     "kind": "case_person_with_phone",
+     "name": "Paul Becker"
+    },
+    {
+     "id": "amy",
+     "kind": "case_person_with_phone",
+     "name": "Amy Brooks"
+    },
+    {
+     "id": "cara",
+     "kind": "case_person_with_phone",
+     "name": "Cara Novak"
+    },
+    {
+     "id": "ken",
+     "kind": "case_person_with_phone",
+     "name": "Ken Walsh"
+    },
+    {
+     "id": "burner",
+     "kind": "unsaved_number",
+     "number": "+1 555 010 0777",
+     "saved_as": [],
+     "contacted_by": [
+      "cara",
+      "paul"
+     ]
+    },
+    {
+     "id": "dana",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0611",
+     "saved_as": [
+      "Dana",
+      "Dana M"
+     ],
+     "contacted_by": [
+      "amy",
+      "ravi"
+     ]
+    },
+    {
+     "id": "jo",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0633",
+     "saved_as": [
+      "Jo"
+     ],
+     "contacted_by": [
+      "amy"
+     ]
+    },
+    {
+     "id": "lena",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0150",
+     "saved_as": [
+      "HR Lena",
+      "Harbor Supply HR",
+      "Lena HR",
+      "Lena Park"
+     ],
+     "contacted_by": [
+      "cara",
+      "ken",
+      "paul",
+      "ravi"
+     ]
+    },
+    {
+     "id": "marco",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0644",
+     "saved_as": [
+      "Marco"
+     ],
+     "contacted_by": [
+      "ken"
+     ]
+    },
+    {
+     "id": "priya",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0622",
+     "saved_as": [
+      "Priya"
+     ],
+     "contacted_by": [
+      "paul"
+     ]
+    },
+    {
+     "id": "tom",
+     "kind": "outside_contact",
+     "number": "+1 555 010 0655",
+     "saved_as": [
+      "Tom driver"
+     ],
+     "contacted_by": [
+      "cara"
+     ]
+    }
+   ],
+   "edges": [
+    {
+     "a": "amy",
+     "b": "dana",
+     "channel": "message",
+     "events": 10,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "jo",
+     "channel": "call",
+     "events": 5,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "jo",
+     "channel": "message",
+     "events": 38,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "paul",
+     "channel": "message",
+     "events": 24,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "paul",
+     "channel": "transfer",
+     "events": 1,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "ravi",
+     "channel": "call",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "amy",
+     "b": "ravi",
+     "channel": "message",
+     "events": 9,
+     "on_one_phone_only": 9
+    },
+    {
+     "a": "amy",
+     "b": "ravi",
+     "channel": "transfer",
+     "events": 1,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "burner",
+     "b": "cara",
+     "channel": "call",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "burner",
+     "b": "paul",
+     "channel": "call",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "cara",
+     "b": "lena",
+     "channel": "message",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "cara",
+     "b": "paul",
+     "channel": "message",
+     "events": 1,
+     "on_one_phone_only": 1
+    },
+    {
+     "a": "cara",
+     "b": "paul",
+     "channel": "transfer",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "cara",
+     "b": "ravi",
+     "channel": "message",
+     "events": 8,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "cara",
+     "b": "tom",
+     "channel": "call",
+     "events": 5,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "cara",
+     "b": "tom",
+     "channel": "message",
+     "events": 38,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "dana",
+     "b": "ravi",
+     "channel": "message",
+     "events": 11,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "ken",
+     "b": "lena",
+     "channel": "message",
+     "events": 12,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "ken",
+     "b": "marco",
+     "channel": "call",
+     "events": 4,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "ken",
+     "b": "marco",
+     "channel": "message",
+     "events": 42,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "ken",
+     "b": "paul",
+     "channel": "message",
+     "events": 7,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "ken",
+     "b": "ravi",
+     "channel": "message",
+     "events": 9,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "lena",
+     "b": "paul",
+     "channel": "message",
+     "events": 15,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "lena",
+     "b": "ravi",
+     "channel": "call",
+     "events": 2,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "lena",
+     "b": "ravi",
+     "channel": "message",
+     "events": 17,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "paul",
+     "b": "priya",
+     "channel": "call",
+     "events": 6,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "paul",
+     "b": "priya",
+     "channel": "message",
+     "events": 22,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "paul",
+     "b": "ravi",
+     "channel": "call",
+     "events": 3,
+     "on_one_phone_only": 0
+    },
+    {
+     "a": "paul",
+     "b": "ravi",
+     "channel": "message",
+     "events": 36,
+     "on_one_phone_only": 36
+    }
+   ],
+   "plants_detectable": [
+    "LAST",
+    "MISSING_AMY",
+    "MISSING_PAUL",
+    "GPAUL",
+    "GAMY",
+    "CHAIN",
+    "MEET",
+    "SYNC",
+    "BURNER",
+    "LEFTOVER",
+    "HOSTILE",
+    "LATE",
+    "ALIAS"
+   ],
+   "statements_checkable": [
+    "st1",
+    "st2",
+    "st3",
+    "st4",
+    "st5",
+    "st6",
+    "st7",
+    "st8"
+   ]
+  }
+ ]
+}

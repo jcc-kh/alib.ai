@@ -1,0 +1,482 @@
+{
+ "case_id": "pier9-2026-04",
+ "seed": 42,
+ "tampering": [
+  {
+   "device": "ken-galaxy",
+   "kind": "clock_offset",
+   "seconds": 90,
+   "affects": [
+    "messages",
+    "calls",
+    "device_events",
+    "notes",
+    "web_history"
+   ],
+   "not_affected": [
+    "locations (GPS time)",
+    "transactions and social (server time)"
+   ]
+  }
+ ],
+ "plants": [
+  {
+   "id": "LAST",
+   "label": "Ravi's text naming Pier 9, 21:30",
+   "check": "search_messages",
+   "needs": [
+    "ravi"
+   ],
+   "evidence": {
+    "ravi-iphone": [
+     "m0085",
+     "m0086"
+    ]
+   },
+   "note": "On Ravi's phone only once Paul's is added, because Paul deleted the thread."
+  },
+  {
+   "id": "MISSING_AMY",
+   "label": "Ravi and Amy's texts of 16 Apr, deleted from Amy's phone",
+   "check": "missing_messages",
+   "needs": [
+    "ravi",
+    "amy"
+   ],
+   "evidence": {
+    "ravi-iphone": [
+     "m0089",
+     "m0090",
+     "m0094",
+     "m0095",
+     "m0096"
+    ]
+   },
+   "missing_on": {
+    "amy-pixel": [
+     46,
+     47,
+     48,
+     49,
+     51
+    ]
+   }
+  },
+  {
+   "id": "MISSING_PAUL",
+   "label": "Ravi and Paul's whole SMS thread, deleted from Paul's phone",
+   "check": "missing_messages",
+   "needs": [
+    "ravi",
+    "paul"
+   ],
+   "evidence": {
+    "ravi-iphone": [
+     "m0085",
+     "m0086"
+    ]
+   },
+   "missing_on": {
+    "paul-iphone": [
+     79,
+     80,
+     1,
+     2,
+     3,
+     4,
+     14,
+     15,
+     18,
+     19,
+     30,
+     31,
+     34,
+     35,
+     38,
+     39,
+     40,
+     45,
+     46,
+     47,
+     48,
+     49,
+     50,
+     54,
+     55,
+     58,
+     59,
+     71,
+     72,
+     73,
+     74,
+     86,
+     87,
+     88,
+     89,
+     90
+    ]
+   }
+  },
+  {
+   "id": "GPAUL",
+   "label": "Paul's phone off near the scene, 21:16 to 23:38",
+   "check": "location_gaps",
+   "needs": [
+    "paul"
+   ],
+   "evidence": {
+    "paul-iphone": [
+     "e001",
+     "e002"
+    ]
+   },
+   "gap_type": "powered_off"
+  },
+  {
+   "id": "GAMY",
+   "label": "Amy's location off while her phone called Ravi",
+   "check": "location_gaps",
+   "needs": [
+    "amy"
+   ],
+   "evidence": {
+    "amy-pixel": [
+     "k003",
+     "k004"
+    ]
+   },
+   "gap_type": "location_off"
+  },
+  {
+   "id": "CHAIN",
+   "label": "Paul paid Cara $4,800; Cara sent $4,320 back 4 h 35 min later",
+   "check": "money_chains",
+   "needs": [
+    "paul"
+   ],
+   "evidence": {
+    "paul-iphone": [
+     "t002",
+     "t003"
+    ],
+    "cara-iphone": [
+     "t001",
+     "t002"
+    ]
+   },
+   "note": "Visible from either phone; confirmed on both once Cara's is added."
+  },
+  {
+   "id": "MEET",
+   "label": "Paul's and Cara's phones together at Dock Cafe on four days, no contact on record",
+   "check": "silent_meetings",
+   "needs": [
+    "paul",
+    "cara"
+   ],
+   "occasions": [
+    "2026-04-13 08:10",
+    "2026-04-15 07:50",
+    "2026-04-16 12:30",
+    "2026-04-18 09:00"
+   ]
+  },
+  {
+   "id": "SYNC",
+   "label": "After the 09:05 news alert, three phones deleted threads within 26 minutes",
+   "check": "synchronised_behaviour",
+   "needs": [
+    "paul",
+    "amy",
+    "cara"
+   ],
+   "evidence": {
+    "paul-iphone": [
+     "e003",
+     "e004",
+     "e005",
+     "e006"
+    ],
+    "amy-pixel": [
+     "e001"
+    ],
+    "cara-iphone": [
+     "e001",
+     "e002",
+     "e003"
+    ]
+   }
+  },
+  {
+   "id": "BURNER",
+   "label": "An unsaved number contacted by both Paul and Cara",
+   "check": "unresolved_identifiers",
+   "needs": [
+    "paul",
+    "cara"
+   ],
+   "evidence": {
+    "paul-iphone": [
+     "k003",
+     "k006"
+    ],
+    "cara-iphone": [
+     "k002",
+     "k004"
+    ]
+   },
+   "identifier": "+1 555 010 0777"
+  },
+  {
+   "id": "LEFTOVER",
+   "label": "One WhatsApp message from Cara survives on Paul's phone after both deleted the chat",
+   "check": "missing_messages",
+   "needs": [
+    "paul",
+    "cara"
+   ],
+   "evidence": {
+    "paul-iphone": [
+     "m0098"
+    ]
+   },
+   "missing_on": {
+    "cara-iphone": [
+     51
+    ]
+   }
+  },
+  {
+   "id": "HOSTILE",
+   "label": "Ken's hostile posts about Ravi after his dismissal",
+   "check": "hostility",
+   "needs": [
+    "ken"
+   ],
+   "evidence": {
+    "ken-galaxy": [
+     "si002",
+     "si003",
+     "si004",
+     "si005",
+     "si006",
+     "si007"
+    ]
+   }
+  },
+  {
+   "id": "LATE",
+   "label": "Amy's 22:05 text reached Paul's phone 93 minutes late, because it was off",
+   "check": "integrity",
+   "needs": [
+    "paul",
+    "amy"
+   ],
+   "evidence": {
+    "paul-iphone": [
+     "m0091"
+    ],
+    "amy-pixel": [
+     "m0050"
+    ]
+   },
+   "note": "Not a missing message. A check that compares arrival times would raise a false alarm."
+  },
+  {
+   "id": "ALIAS",
+   "label": "Cara's phone is logged in to a second Snapline account",
+   "check": "identity_match",
+   "needs": [
+    "cara"
+   ],
+   "evidence": {
+    "cara-iphone": [
+     "s2"
+    ]
+   }
+  }
+ ],
+ "decoys": [
+  {
+   "label": "Ken's phone off overnight, 14 to 15 Apr",
+   "evidence": {
+    "ken-galaxy": [
+     "e001",
+     "e002"
+    ]
+   },
+   "why": "Ordinary overnight power-off, overlapping nothing."
+  },
+  {
+   "label": "Cara's 50-minute location gap on 19 Apr",
+   "why": "No activity of any kind during it."
+  },
+  {
+   "label": "Amy's and Ken's phones at FreshMart together once, 14 Apr 17:30",
+   "why": "One occasion; below the two-occasion threshold."
+  },
+  {
+   "label": "Paul sent Amy $50, memo \"lunch\"",
+   "evidence": {
+    "paul-iphone": [
+     "t004"
+    ],
+    "amy-pixel": [
+     "t002"
+    ]
+   },
+   "why": "Below the $500 minimum and not passed on."
+  },
+  {
+   "label": "Amy posted \"Done being lied to.\"",
+   "evidence": {
+    "amy-pixel": [
+     "si002"
+    ]
+   },
+   "why": "Names no one."
+  },
+  {
+   "label": "Short indoor GPS dropouts on every phone",
+   "why": "Two missing fixes a day, well under the 45-minute gap threshold."
+  },
+  {
+   "label": "Verification-code and marketing texts",
+   "why": "Sent by known organisations listed in the manifest."
+  }
+ ],
+ "statements": [
+  {
+   "statement_id": "st1",
+   "person_id": "paul",
+   "expected": "inconsistent",
+   "why": "Paul's phone was at the Harbor Rd lot at 21:10, then powered off until 23:38.",
+   "needs": [
+    "paul-iphone"
+   ]
+  },
+  {
+   "statement_id": "st2",
+   "person_id": "paul",
+   "expected": "confirmed",
+   "why": "A 64-second call at 20:58 is on both phones.",
+   "needs": [
+    "paul-iphone",
+    "ravi-iphone"
+   ]
+  },
+  {
+   "statement_id": "st3",
+   "person_id": "paul",
+   "expected": "inconsistent",
+   "why": "Their phones were together at Dock Cafe on four days.",
+   "needs": [
+    "paul-iphone",
+    "cara-iphone"
+   ]
+  },
+  {
+   "statement_id": "st4",
+   "person_id": "amy",
+   "expected": "inconsistent",
+   "why": "Two calls at 22:30 and 22:31 are on both phones; five texts are on Ravi's phone only.",
+   "needs": [
+    "amy-pixel",
+    "ravi-iphone"
+   ]
+  },
+  {
+   "statement_id": "st5",
+   "person_id": "amy",
+   "expected": "cannot_tell",
+   "why": "Amy's phone has no location data from 21:40 to 22:50.",
+   "needs": [
+    "amy-pixel"
+   ]
+  },
+  {
+   "statement_id": "st6",
+   "person_id": "ken",
+   "expected": "confirmed",
+   "why": "Ken's phone was at Riverside Gym and then at home, about 9 km away.",
+   "needs": [
+    "ken-galaxy"
+   ]
+  },
+  {
+   "statement_id": "st7",
+   "person_id": "cara",
+   "expected": "confirmed",
+   "why": "Cara's phone stayed at the Novak residence.",
+   "needs": [
+    "cara-iphone"
+   ]
+  },
+  {
+   "statement_id": "st8",
+   "person_id": "cara",
+   "expected": "cannot_tell",
+   "why": "No messages or calls between them survive on either phone, but both deleted a WhatsApp chat on 17 Apr.",
+   "needs": [
+    "paul-iphone",
+    "cara-iphone"
+   ]
+  }
+ ],
+ "truth_only": {
+  "paul_cara_chat": [
+   {
+    "t": "2026-04-14T20:15:00-04:00",
+    "from": "paul",
+    "body": "Next one goes through tomorrow. HSC-2291."
+   },
+   {
+    "t": "2026-04-14T20:17:00-04:00",
+    "from": "cara",
+    "body": "Same split?"
+   },
+   {
+    "t": "2026-04-14T20:18:00-04:00",
+    "from": "paul",
+    "body": "10% for you, rest back to me by end of day."
+   },
+   {
+    "t": "2026-04-15T15:42:00-04:00",
+    "from": "cara",
+    "body": "Sent."
+   },
+   {
+    "t": "2026-04-15T15:45:00-04:00",
+    "from": "paul",
+    "body": "Got it."
+   },
+   {
+    "t": "2026-04-16T18:20:00-04:00",
+    "from": "paul",
+    "body": "He's seen the invoices. Wants to meet at Pier 9 tonight."
+   },
+   {
+    "t": "2026-04-16T18:24:00-04:00",
+    "from": "cara",
+    "body": "Don't say anything about me."
+   },
+   {
+    "t": "2026-04-16T18:25:00-04:00",
+    "from": "paul",
+    "body": "I'll handle it."
+   },
+   {
+    "t": "2026-04-17T09:08:00-04:00",
+    "from": "cara",
+    "body": "Have you seen the news??"
+   },
+   {
+    "t": "2026-04-17T09:15:00-04:00",
+    "from": "paul",
+    "body": "Delete this chat. Turn your phone off."
+   }
+  ],
+  "note": "This WhatsApp chat was deleted from both phones, so no phone holds it. A correct system answers cannot_tell about its content.",
+  "who_was_at_the_scene": "Not defined. The data does not establish who was at Pier 9 during the window, and no system should claim it does."
+ }
+}

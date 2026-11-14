@@ -1,0 +1,9 @@
+{
+ "device_id": "ravi-iphone",
+ "owner": "ravi",
+ "model": "iPhone 15 Pro",
+ "extraction_tool": "synthetic-generator pier9 1.0",
+ "extracted_at": "2026-04-21T09:14:00-04:00",
+ "coverage_start": "2026-04-13T00:00:00-04:00",
+ "coverage_end": "2026-04-17T08:00:00-04:00"
+}

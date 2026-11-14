@@ -1,0 +1,1 @@
+{"record_id": "t001", "app": "Swiftpay", "direction": "out", "from": {"kind": "phone", "value": "+1 555 010 0100"}, "to": {"kind": "phone", "value": "+1 555 010 0202"}, "amount": 600, "currency": "USD", "timestamp": "2026-04-13T10:00:00-04:00", "memo": "utilities"}

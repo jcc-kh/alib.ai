@@ -1,0 +1,147 @@
+{
+ "schema_version": "case-bundle/1.0",
+ "case_id": "pier9-2026-04",
+ "title": "Death at Pier 9",
+ "timezone": "-04:00",
+ "devices": [
+  "ravi-iphone",
+  "paul-iphone",
+  "amy-pixel",
+  "cara-iphone",
+  "ken-galaxy"
+ ],
+ "add_order": [
+  "ravi-iphone",
+  "paul-iphone",
+  "amy-pixel",
+  "cara-iphone",
+  "ken-galaxy"
+ ],
+ "places": [
+  {
+   "name": "Pier 9 Warehouse",
+   "kind": "work",
+   "lat": 40.938,
+   "lon": -71.962,
+   "radius_m": 150
+  },
+  {
+   "name": "Harbor Rd lot",
+   "kind": "parking",
+   "lat": 40.946,
+   "lon": -71.966,
+   "radius_m": 80
+  },
+  {
+   "name": "Harbor Supply Co.",
+   "kind": "work",
+   "lat": 41.0,
+   "lon": -72.0,
+   "radius_m": 120
+  },
+  {
+   "name": "Dock Cafe",
+   "kind": "cafe",
+   "lat": 40.9905,
+   "lon": -71.9842,
+   "radius_m": 60
+  },
+  {
+   "name": "Sunset Park",
+   "kind": "park",
+   "lat": 40.905,
+   "lon": -72.04,
+   "radius_m": 300
+  },
+  {
+   "name": "Northgate Mall",
+   "kind": "mall",
+   "lat": 41.11,
+   "lon": -71.99,
+   "radius_m": 250
+  },
+  {
+   "name": "FreshMart",
+   "kind": "supermarket",
+   "lat": 41.03,
+   "lon": -72.03,
+   "radius_m": 100
+  },
+  {
+   "name": "Riverside Gym",
+   "kind": "gym",
+   "lat": 41.045,
+   "lon": -72.052,
+   "radius_m": 80
+  },
+  {
+   "name": "Mehta residence",
+   "kind": "home",
+   "lat": 40.972,
+   "lon": -71.978,
+   "radius_m": 60
+  },
+  {
+   "name": "Becker residence",
+   "kind": "home",
+   "lat": 40.975,
+   "lon": -72.02,
+   "radius_m": 60
+  },
+  {
+   "name": "Brooks residence",
+   "kind": "home",
+   "lat": 41.061,
+   "lon": -71.996,
+   "radius_m": 60
+  },
+  {
+   "name": "Walsh residence",
+   "kind": "home",
+   "lat": 41.021,
+   "lon": -71.951,
+   "radius_m": 60
+  },
+  {
+   "name": "Novak residence",
+   "kind": "home",
+   "lat": 40.961,
+   "lon": -71.94,
+   "radius_m": 60
+  }
+ ],
+ "known_orgs": [
+  {
+   "name": "Port Calder News",
+   "identifier": "78234"
+  },
+  {
+   "name": "Swiftpay",
+   "identifier": "22000"
+  },
+  {
+   "name": "Snapline",
+   "identifier": "51515"
+  },
+  {
+   "name": "Calder Mobile",
+   "identifier": "611611"
+  },
+  {
+   "name": "Harbor Supply Co. payroll",
+   "identifier": "acct:HSC-PAYROLL"
+  }
+ ],
+ "extensions": [
+  "messages.source_seq",
+  "messages.received_timestamp",
+  "messages.state",
+  "emails.jsonl",
+  "notes.jsonl",
+  "web_history.jsonl",
+  "social_interactions.where",
+  "statements.jsonl",
+  "known_orgs",
+  "add_order"
+ ]
+}

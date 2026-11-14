@@ -1,0 +1,9 @@
+{
+ "device_id": "cara-iphone",
+ "owner": "cara",
+ "model": "iPhone 13",
+ "extraction_tool": "synthetic-generator pier9 1.0",
+ "extracted_at": "2026-04-21T09:14:00-04:00",
+ "coverage_start": "2026-04-13T00:00:00-04:00",
+ "coverage_end": "2026-04-19T23:50:00-04:00"
+}

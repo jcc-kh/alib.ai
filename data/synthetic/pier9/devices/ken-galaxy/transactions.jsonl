@@ -1,0 +1,1 @@
+{"record_id": "t001", "app": "Swiftpay", "direction": "in", "from": {"kind": "account", "value": "acct:HSC-PAYROLL"}, "to": {"kind": "phone", "value": "+1 555 010 0303"}, "amount": 1840, "currency": "USD", "timestamp": "2026-04-14T09:00:00-04:00", "memo": "payroll wk 15"}
