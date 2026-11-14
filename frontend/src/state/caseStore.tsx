@@ -1,39 +1,30 @@
-// One case-flow store shared by both UIs (Pro and Noir).
-// Stages: empty → ingesting → ingested → analysing → analysed → refining → refined.
+// One case-flow store for the dashboard.
+// Stages: empty → ingesting → ingested → analysing → analysed.
 
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
-  analyse,
   analyseCase,
   ask as askApi,
   getCase,
   ingest as ingestApi,
   type AgentEnvelope,
-  type AgentEvent,
   type Answer,
-  type Brief,
   type Briefing,
   type CaseInfo,
   type Finding,
   type FollowUp,
   type IngestReport,
   type IngestStage,
-  type Report,
   type SubagentName,
-  type Todo,
   type ToolCall,
 } from '../api'
 import { INGEST_STAGES } from '../mock/ingest'
 
-export type Stage = 'empty' | 'ingesting' | 'ingested' | 'analysing' | 'analysed' | 'refining' | 'refined'
-export const STAGE_ORDER: Stage[] = ['empty', 'ingesting', 'ingested', 'analysing', 'analysed', 'refining', 'refined']
+export type Stage = 'empty' | 'ingesting' | 'ingested' | 'analysing' | 'analysed'
+export const STAGE_ORDER: Stage[] = ['empty', 'ingesting', 'ingested', 'analysing', 'analysed']
 export const atLeast = (s: Stage, min: Stage) => STAGE_ORDER.indexOf(s) >= STAGE_ORDER.indexOf(min)
 
-export const DEMO_BRIEF: Brief = {
-  believe: ['Paul and Amy were together on the evening of 14 April.', "Paul and Cara don't know each other."],
-  confused: ["Paul sent Ken $5,000 on 15 April and can't explain why."],
-  unknown: ['Where did the missing money end up?', 'Did anyone react to the audit announcement?'],
-}
+export const DEMO_CASE_NAME = 'Death at Pier 9'
 
 export interface AgentLive {
   status: 'idle' | 'running' | 'done'
@@ -51,22 +42,13 @@ export interface RunState {
   envelopes: Partial<Record<SubagentName, AgentEnvelope>>
 }
 
-export interface RefineState {
-  brief: Brief
-  todos: Todo[]
-  lanes: Partial<Record<SubagentName, AgentLive>>
-  hops: { from: SubagentName; to: SubagentName; note: string }[]
-  report: Report | null
-  error: string | null
-}
-
 export interface AskTurn {
   q: string
   steps: string[]
   answer: Answer | null
 }
 
-const AGENTS: SubagentName[] = ['orchestrator', 'relationship-mapper', 'location-analyst', 'comms-analyst', 'financial-analyst', 'device-forensics', 'report-writer']
+export const AGENTS: SubagentName[] = ['orchestrator', 'relationship-mapper', 'location-analyst', 'comms-analyst', 'financial-analyst', 'device-forensics', 'social-analyst']
 const idleAgents = () => Object.fromEntries(AGENTS.map((a) => [a, { status: 'idle', current: '', calls: 0 }])) as Record<SubagentName, AgentLive>
 const emptyRun = (): RunState => ({ phase: 'idle', elapsed_ms: 0, agents: idleAgents(), calls: [], hops: [], logs: [], envelopes: {} })
 
@@ -77,17 +59,20 @@ interface CaseStore {
   ingestReport: IngestReport | null
   run: RunState
   briefing: Briefing | null
-  refine: RefineState
   finding: Finding | null
   openedEnvelope: AgentEnvelope | null
   askTurns: AskTurn[]
   askBusy: boolean
+  caseName: string
+  /** Days of April (inclusive) the investigator chose to analyse. */
+  range: [number, number]
   // actions
+  setCaseName: (n: string) => void
+  setRange: (r: [number, number]) => void
+  newCase: () => void
   startIngest: (file?: File | null, fast?: boolean) => Promise<void>
   startAnalysis: (speed?: number) => Promise<void>
   fastForward: () => Promise<void>
-  setBrief: (b: Brief) => void
-  runRefine: (b?: Brief) => Promise<void>
   openFinding: (f: Finding | null) => void
   openEnvelope: (e: AgentEnvelope | null) => void
   ask: (q: string) => Promise<void>
@@ -103,12 +88,18 @@ export function CaseProvider({ children }: { children: ReactNode }) {
   const [ingestReport, setIngestReport] = useState<IngestReport | null>(null)
   const [run, setRun] = useState<RunState>(emptyRun)
   const [briefing, setBriefing] = useState<Briefing | null>(null)
-  const [refine, setRefine] = useState<RefineState>({ brief: DEMO_BRIEF, todos: [], lanes: {}, hops: [], report: null, error: null })
   const [finding, setFinding] = useState<Finding | null>(null)
   const [openedEnvelope, setOpenedEnvelope] = useState<AgentEnvelope | null>(null)
   const [askTurns, setAskTurns] = useState<AskTurn[]>([])
   const [askBusy, setAskBusy] = useState(false)
   const runAbort = useRef<AbortController | null>(null)
+  const [caseName, setCaseName] = useState('')
+  const [range, setRangeState] = useState<[number, number]>([13, 19])
+  const rangeRef = useRef<[number, number]>([13, 19])
+  const setRange = useCallback((r: [number, number]) => {
+    rangeRef.current = r
+    setRangeState(r)
+  }, [])
 
   const startIngest = useCallback(async (file?: File | null, fast = false) => {
     setStage('ingesting')
@@ -149,6 +140,7 @@ export function CaseProvider({ children }: { children: ReactNode }) {
           }),
         speed,
         ctrl.signal,
+        rangeRef.current,
       )
       setBriefing(b)
       setStage('analysed')
@@ -158,38 +150,10 @@ export function CaseProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const fastForward = useCallback(async () => {
+    setCaseName((n) => n || DEMO_CASE_NAME)
     await startIngest(null, true)
     await startAnalysis(Infinity)
   }, [startIngest, startAnalysis])
-
-  const setBrief = useCallback((b: Brief) => setRefine((r) => ({ ...r, brief: b })), [])
-
-  const runRefine = useCallback(async (b?: Brief) => {
-    const brief = b ?? refine.brief
-    setStage('refining')
-    setRefine({ brief, todos: [], lanes: {}, hops: [], report: null, error: null })
-    const onEvent = (e: AgentEvent) =>
-      setRefine((r) => {
-        if (e.type === 'todos') return { ...r, todos: e.todos }
-        if (e.type === 'subagent' && e.status === 'follow_up' && e.to) return { ...r, hops: [...r.hops, { from: e.agent, to: e.to, note: e.note ?? '' }] }
-        if (e.type === 'subagent') {
-          const cur = r.lanes[e.agent] ?? { status: 'idle', current: '', calls: 0 }
-          return {
-            ...r,
-            lanes: { ...r.lanes, [e.agent]: { status: e.status === 'done' ? 'done' : 'running', current: e.tool ?? e.note ?? cur.current, calls: cur.calls + (e.status === 'tool' ? 1 : 0) } },
-          }
-        }
-        return r
-      })
-    try {
-      const report = await analyse(brief, onEvent)
-      setRefine((r) => ({ ...r, report }))
-      setStage('refined')
-    } catch (err) {
-      setRefine((r) => ({ ...r, error: (err as Error).message }))
-      setStage('analysed')
-    }
-  }, [refine.brief])
 
   const ask = useCallback(async (q: string) => {
     const question = q.trim()
@@ -211,9 +175,14 @@ export function CaseProvider({ children }: { children: ReactNode }) {
     setIngestReport(null)
     setRun(emptyRun())
     setBriefing(null)
-    setRefine({ brief: DEMO_BRIEF, todos: [], lanes: {}, hops: [], report: null, error: null })
     setAskTurns([])
   }, [])
+
+  const newCase = useCallback(() => {
+    reset()
+    setCaseName('')
+    setRange([13, 19])
+  }, [reset, setRange])
 
   const value = useMemo<CaseStore>(
     () => ({
@@ -223,22 +192,24 @@ export function CaseProvider({ children }: { children: ReactNode }) {
       ingestReport,
       run,
       briefing,
-      refine,
       finding,
       openedEnvelope,
       askTurns,
       askBusy,
+      caseName,
+      range,
+      setCaseName,
+      setRange,
+      newCase,
       startIngest,
       startAnalysis,
       fastForward,
-      setBrief,
-      runRefine,
       openFinding: setFinding,
       openEnvelope: setOpenedEnvelope,
       ask,
       reset,
     }),
-    [stage, caseInfo, ingestStages, ingestReport, run, briefing, refine, finding, openedEnvelope, askTurns, askBusy, startIngest, startAnalysis, fastForward, setBrief, runRefine, ask, reset],
+    [stage, caseInfo, ingestStages, ingestReport, run, briefing, finding, openedEnvelope, askTurns, askBusy, caseName, range, setRange, newCase, startIngest, startAnalysis, fastForward, ask, reset],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

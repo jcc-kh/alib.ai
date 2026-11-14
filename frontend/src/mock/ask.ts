@@ -1,28 +1,40 @@
 // Ask: free-form questions answered with cited findings. In the real system this is the same
 // orchestrator in Q&A mode (POST /api/ask, SSE). Here questions are routed by keyword.
 
-import type { Answer } from '../api/types'
-import { S2 } from './data'
-import { fmtKm } from '../lib/format'
+import type { Answer, PersonId } from '../api/types'
+import { CHAIN, GAMY, HOSTILE, MEET, MISSING, SYNC, personName } from './data'
+import { LAST, PRESENCE, SPACE } from './derived'
+import { fmtKm, fmtTime } from '../lib/format'
 import { SCENARIOS, cannotTellFinding, route, scenarioFinding, type ScenarioId } from './findings'
 
-const ANSWERS: Record<ScenarioId, (q: string) => string> = {
-  S2: () => `No, not according to the phones. Paul's phone was at Sunset Park and Amy's at Northgate Mall all evening, never closer than ${fmtKm(S2.min_m)}.`,
-  S5: () => "Their phones suggest they do. Paul's and Cara's phones were at Dock Cafe together on 4 days, though no text or call between them exists on any phone.",
-  S4a: () => "Yes. The $5,000 transfer from Paul to Ken at 11:05 on 15 April is on both phones, with no memo.",
-  S4b: () => "Ken's phone sent $4,500 of it to Cara 4 h 35 min later, with the memo \"materials\". Cara's phone shows it arriving. No other onward transfer above $500 exists in the data.",
-  S7: () => "Yes. Starting 20 minutes after the 10:00 audit notice, within one 50-minute window, Paul's, Ken's and Cara's phones each deleted a WhatsApp thread and powered off, coming back on at 13:05, 13:30 and 14:00. Amy's phone did neither.",
-  G1: () => "Yes, once. Ken's phone had no location data from 14:00 to 16:30 on 15 April, but in that window it sent a message at 15:10 and the $4,500 transfer to Cara at 15:40. Other gaps in the data are explained by the phone being off, or show no activity, so they are not raised.",
-  S1: () => "Three texts. Paul's phone sent them to Amy at 18:32 on 14 April, asking her to come to Sunset Park. They are not on Amy's phone, which deleted the thread on 17 April at 20:15.",
+const ph = (p: PersonId) => PRESENCE.phones.find((x) => x.person === p)!
+const kenMin = () => Math.min(...ph('ken').slots.map((s) => s.distance_m ?? Infinity))
+const ANSWERS: Record<ScenarioId, () => string> = {
+  PRESENCE: () =>
+    `Only Ravi's phone was at Pier 9 between 21:00 and 23:30. Paul's phone was ${fmtKm(ph('paul').closest_m!)} away at ${fmtTime(ph('paul').closest_t!)} and then off; Amy's had no location data for ${ph('amy').counts.no_data} of the ${ph('amy').slots.length} slots; Ken's and Cara's stayed more than 3 km away throughout.`,
+  GPAUL: () =>
+    `Paul's phone was last located ${fmtKm(ph('paul').closest_m!)} from Pier 9 at ${fmtTime(ph('paul').closest_t!)}, then powered off from 21:16 to 23:38 and came back on at home. A phone that is off leaves no location record, so where it was in between can't be told from the phones.`,
+  GAMY: () => `Yes. Amy's phone had no location data from ${fmtTime(GAMY.start)} to ${fmtTime(GAMY.end)}, while it called Ravi's phone at ${fmtTime(GAMY.activity[0].t)} and ${fmtTime(GAMY.activity[1].t)}. Its fixes either side are at her home, 14 km from Pier 9.`,
+  LAST: () =>
+    `Ravi's phone texted Paul at 18:05 ("Pier 9, 9:30 tonight. Come alone."), took a 64-second call from Paul at 20:58, and last sent anything at ${fmtTime(LAST.last_active.t)}: a text to Amy saying he was at the warehouse. After that it only received a text and two calls from Amy.`,
+  MISSING: () => `${MISSING.missing_count} texts. They are on Ravi's phone, from "We need to talk about the house" at 19:40 to "Answer your phone" at 22:15, and missing from Amy's, which deleted the thread at ${fmtTime(MISSING.deletion_events[0].t)} on 17 April.`,
+  SYNC: () =>
+    `Starting ${SYNC.trigger!.minutes_before_window} minutes after the ${fmtTime(SYNC.trigger!.t)} news alert, within ${SYNC.window.minutes} minutes, Paul's, Amy's and Cara's phones each deleted a thread: Paul's and Amy's with Ravi, and Paul's and Cara's with each other. Paul's and Cara's phones then powered off. Ken's phone deleted nothing; his account posted "karma." at 09:50.`,
+  CHAIN: () => `Paul's phone sent Cara $${CHAIN.links[0].amount.toLocaleString()} marked "${CHAIN.links[0].memo}" at 11:05 on 15 April, and Cara's phone sent $${CHAIN.links[1].amount.toLocaleString()} back ${CHAIN.gap_label} later with the memo "thx". No other transfer above $500 involves either of them.`,
+  MEET: () => `Their phones suggest they do. Paul's and Cara's phones were at Dock Cafe together on ${MEET.occasions.length} days, though no call or text between them exists on any phone, and both deleted a WhatsApp thread with each other on 17 April.`,
+  HOSTILE: () => `Ken's Snapline account posted ${HOSTILE.flagged} items about Ravi scored ${HOSTILE.threshold}+ for hostility, starting the evening Ravi's text ended his job. His phone, though, was at least ${fmtKm(kenMin())} from Pier 9 in every slot of the window, with no gaps.`,
+  SPACE: () =>
+    `Pier 9 is inside the routine areas of ${SPACE.spaces.filter((s) => s.scene_inside && s.person !== 'ravi').map((s) => `${personName(s.person)}'s`).join(' and ')} phones, which stayed there on 2+ days. It is outside Paul's and Amy's; Paul's phone stayed there on one day before the 16th.`,
 }
 
 export const SUGGESTED_QUESTIONS = [
-  'Did anyone react to the audit announcement?',
+  'Who was near the scene in the time-of-death window?',
+  'Who did Ravi contact on his last evening?',
+  "Was Amy's location off that night?",
+  'Who reacted to the news?',
   'Do Paul and Cara know each other?',
-  'Where did the missing money end up?',
-  'What did Paul text Amy on 14 April?',
-  "Was any phone's location off while it was in use?",
-  'Did Paul meet Cara in March?',
+  'Did anyone post threats about Ravi?',
+  'Did Paul and Ravi argue last year?',
 ]
 
 export function answerQuestion(q: string): { steps: string[]; answer: Answer } {
@@ -30,10 +42,10 @@ export function answerQuestion(q: string): { steps: string[]; answer: Answer } {
   if (!sid) {
     const f = cannotTellFinding('q1', q)
     return {
-      steps: ['Parsed the question and resolved people and dates', 'get_coverage() → 13–19 April 2026 on all 4 phones', 'No check can settle a question outside coverage → cannot tell'],
+      steps: ['Parsed the question and resolved people and dates', 'get_coverage() → 13–19 April 2026 on all 5 phones', 'No check can settle a question outside coverage → cannot tell'],
       answer: {
         question: q,
-        text: "I can't tell from these phones. They only hold data from 13 to 19 April 2026, so I won't guess. Bank or carrier records for that period could settle it.",
+        text: "I can't tell from these phones. They only hold data from 13 to 19 April 2026, so I won't guess. Older carrier or bank records could settle it.",
         verdict: 'cannot_tell',
         findings: [f],
         steps: [],
@@ -42,17 +54,10 @@ export function answerQuestion(q: string): { steps: string[]; answer: Answer } {
     }
   }
   const sc = SCENARIOS[sid]
-  const f = scenarioFinding(sid, { id: 'q1', section: 'answers', brief_item: q })
+  const f = scenarioFinding(sid, 'q1')
   const steps = ['Parsed the question and resolved people and dates', `Routed to ${sc.agent}`, ...sc.tools.map((t) => `${t.split('(')[0]}(…) → ${sc.evidence.length} evidence rows`), 'Answer checked by validate_report()']
   return {
     steps,
-    answer: {
-      question: q,
-      text: ANSWERS[sid](q),
-      verdict: f.verdict,
-      findings: [f],
-      steps,
-      suggestions: SUGGESTED_QUESTIONS.filter((s) => route(s) !== sid).slice(0, 3),
-    },
+    answer: { question: q, text: ANSWERS[sid](), verdict: f.verdict, findings: [f], steps, suggestions: SUGGESTED_QUESTIONS.filter((s) => route(s) !== sid).slice(0, 3) },
   }
 }

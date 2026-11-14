@@ -118,6 +118,57 @@ export function verifyFinding(f: Finding, rows: EvidenceByPhone): VerifyResult[]
         { label: 'Gap type', claimed: o.gap_type, recomputed: type, ok: type === o.gap_type, how: 'power_off covers it → powered_off; else activity → location_off; else unexplained' },
       ]
     }
+    case 'presence': {
+      // Recompute each cited fix's distance to the scene and re-bucket it.
+      return o.phones.map((p) => {
+        const cited = (rows[p.person] ?? []).filter((r) => r.table === 'locations' && r.timestamp >= o.window.start && r.timestamp <= o.window.end)
+        const ds = cited.map((r) => haversine(num(r, 'lat'), num(r, 'lon'), o.scene.lat, o.scene.lon))
+        const scene = ds.filter((d) => d <= o.thresholds.scene_m).length
+        const noData = p.slots.length - cited.length
+        return {
+          label: `${p.person}: at scene / no data`,
+          claimed: `${p.counts.scene} / ${p.counts.no_data}`,
+          recomputed: `${scene} / ${noData}`,
+          ok: scene === p.counts.scene && noData === p.counts.no_data,
+          how: `Haversine from each cited fix to ${o.scene.name}, ≤ ${o.thresholds.scene_m} m counts as at the scene; slots with no cited fix are no data`,
+        }
+      })
+    }
+    case 'space': {
+      return o.spaces.map((s) => {
+        const d = haversine(s.anchor.lat, s.anchor.lon, o.scene.lat, o.scene.lon)
+        const atScene = (rows[s.person] ?? []).filter((r) => r.table === 'locations' && haversine(num(r, 'lat'), num(r, 'lon'), o.scene.lat, o.scene.lon) <= 150)
+        const days = new Set(atScene.map((r) => r.timestamp.slice(0, 10))).size
+        return {
+          label: `${s.person}: scene inside routine area`,
+          claimed: `${s.scene_inside ? 'yes' : 'no'} · ${s.scene_visits.length} day(s) at scene`,
+          recomputed: `${d <= s.radius_m ? 'yes' : 'no'} · ${days} day(s) at scene`,
+          ok: (d <= s.radius_m) === s.scene_inside && days === s.scene_visits.length,
+          how: `Anchor-to-scene distance ${fmtKm(d)} vs radius ${fmtKm(s.radius_m)}; distinct dates of cited fixes within 150 m of the scene`,
+        }
+      })
+    }
+    case 'hostility': {
+      const items = (rows[o.actor] ?? []).filter((r) => r.table === 'social_interactions' && r.fields.target)
+      const flagged = items.filter((r) => Number(r.fields.hostility) >= o.threshold)
+      return [
+        { label: 'Items about the target', claimed: String(o.items.length), recomputed: String(items.length), ok: items.length === o.items.length, how: 'Cited social rows by the account that name or reply to the target' },
+        { label: `Scored ≥ ${o.threshold}`, claimed: String(o.flagged), recomputed: String(flagged.length), ok: flagged.length === o.flagged, how: `hostility field on each row (${o.model}) compared with the threshold` },
+        { label: 'First flagged item after the context event', claimed: 'yes', recomputed: o.context && flagged.every((r) => r.timestamp > o.context!.t) ? 'yes' : 'no', ok: !!o.context && flagged.every((r) => r.timestamp > o.context!.t), how: 'Every flagged timestamp is later than the context message' },
+      ]
+    }
+    case 'last_contacts': {
+      const mine = (rows[o.person] ?? []).filter((r) => r.table === 'messages' || r.table === 'calls')
+      const outs = mine.filter((r) => r.fields.direction === 'out').sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+      const last = outs[outs.length - 1]
+      const deleted = o.items.filter((i) => i.on_counterpart === 'deleted')
+      const stillThere = deleted.filter((i) => (rows[i.counterpart as string] ?? []).some((r) => r.timestamp === i.t && r.table === i.table))
+      return [
+        { label: 'Rows in the window', claimed: String(o.items.length), recomputed: String(mine.length), ok: mine.length === o.items.length, how: "Cited messages and calls on the victim's phone" },
+        { label: 'Last outgoing activity', claimed: o.last_active.t.slice(11, 16), recomputed: last?.timestamp.slice(11, 16) ?? '—', ok: last?.timestamp === o.last_active.t, how: 'Latest cited row with direction = out' },
+        { label: 'Rows marked deleted on the other phone', claimed: String(deleted.length), recomputed: `${deleted.length - stillThere.length} absent`, ok: stillThere.length === 0, how: 'None of them appear among the cited rows from the other phone' },
+      ]
+    }
     case 'coverage': {
       return o.devices.map((d) => {
         const r = rows[d.owner] ?? []

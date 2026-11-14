@@ -36,6 +36,8 @@ export function caseMinutes(iso: string) {
 }
 
 export function fmtKm(m: number) {
+  // Under 1 km, metres rounded to 10 m read better than "1.0 km" for 951 m.
+  if (m < 1000) return `${Math.round(m / 10) * 10} m`
   return `${(m / 1000).toFixed(1)} km`
 }
 

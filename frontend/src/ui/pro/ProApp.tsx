@@ -5,45 +5,42 @@ import FindingDrawer from '../../components/FindingDrawer'
 import IngestStep from './steps/IngestStep'
 import AnalyseStep from './steps/AnalyseStep'
 import ReviewStep from './steps/ReviewStep'
-import RefineStep from './steps/RefineStep'
 import AskStep from './steps/AskStep'
-import TimelineView from './steps/TimelineView'
-import SignalsView from './steps/SignalsView'
-import { ActivityView, DistanceView, PlacesView } from './steps/ChartViews'
 import EnvelopeDrawer from './EnvelopeDrawer'
 import AskPanel from './AskPanel'
+import CasesView from './CasesView'
+import ConnectionsView from './inquiries/ConnectionsView'
+import RadiusView from './inquiries/RadiusView'
+import WindowView from './inquiries/WindowView'
+import ChangesView from './inquiries/ChangesView'
+import MotiveView from './inquiries/MotiveView'
+import { INQUIRIES } from './inquiries/meta'
+import type { InquiryId } from '../../api'
 
-export type View = 'ingest' | 'analyse' | 'review' | 'refine' | 'ask' | 'timeline' | 'activity' | 'distance' | 'places' | 'signals'
+export type View = 'cases' | 'ingest' | 'analyse' | 'review' | 'ask' | InquiryId
 
 const STEPS: { id: View; label: string; needs: Stage }[] = [
   { id: 'ingest', label: 'Ingest', needs: 'empty' },
   { id: 'analyse', label: 'Analyse', needs: 'ingested' },
-  { id: 'review', label: 'Review', needs: 'analysed' },
-  { id: 'refine', label: 'Refine with brief', needs: 'analysed' },
+  { id: 'review', label: 'Briefing', needs: 'analysed' },
   { id: 'ask', label: 'Ask', needs: 'analysed' },
 ]
-const MORE: { id: View; label: string }[] = [
-  { id: 'activity', label: 'Activity' },
-  { id: 'timeline', label: 'Location timeline' },
-  { id: 'places', label: 'Places' },
-  { id: 'distance', label: 'Distance between phones' },
-  { id: 'signals', label: 'Signals' },
-]
+const MORE: { id: View; label: string }[] = INQUIRIES.map((q) => ({ id: q.id, label: q.question }))
 
 function stepDone(id: View, stage: Stage) {
   if (id === 'ingest') return atLeast(stage, 'ingested')
   if (id === 'analyse') return atLeast(stage, 'analysed')
   if (id === 'review') return atLeast(stage, 'analysed')
-  if (id === 'refine') return stage === 'refined'
   return false
 }
 
-export default function ProApp({ view, go, theme, toggleTheme, switchSkin }: { view: string; go: (v: View) => void; theme: 'light' | 'dark'; toggleTheme: () => void; switchSkin: () => void }) {
+export default function ProApp({ view, go, theme, toggleTheme }: { view: string; go: (v: View) => void; theme: 'light' | 'dark'; toggleTheme: () => void }) {
   const c = useCase()
   const [askOpen, setAskOpen] = useState(false)
   const ff = useRef(false)
-  const v: View = (STEPS.concat(MORE as never).find((s) => s.id === view)?.id as View) ?? 'ingest'
+  const v: View = (STEPS.concat(MORE as never).find((s) => s.id === view)?.id as View) ?? 'cases'
   const allowed = (id: View) => {
+    if (id === 'cases') return true
     const s = STEPS.find((x) => x.id === id)
     return s ? atLeast(c.stage, s.needs) : atLeast(c.stage, 'analysed')
   }
@@ -60,20 +57,26 @@ export default function ProApp({ view, go, theme, toggleTheme, switchSkin }: { v
   }, [v, c.stage])
 
   const title = [...STEPS, ...MORE].find((s) => s.id === v)?.label
+  const name = c.caseName || 'Untitled case'
+
+  if (v === 'cases') return <CasesView open={go} theme={theme} toggleTheme={toggleTheme} />
 
   return (
     <div className="flex h-full bg-page text-ink">
       {/* Rail */}
       <aside className="flex w-[232px] shrink-0 flex-col border-r border-line bg-surface">
-        <div className="flex h-12 items-center gap-2 border-b border-line px-4">
+        <button onClick={() => go('cases')} title="All cases" className="flex h-12 items-center gap-2 border-b border-line px-4 text-left hover:bg-sunken">
           <span className="grid h-6 w-6 place-items-center rounded bg-ink text-[11px] font-bold text-surface">A</span>
           <span className="text-[14px] font-semibold">Alib.ai</span>
-          <span className="ml-auto rounded border border-line px-1.5 text-[10px] text-ink-3">mock</span>
-        </div>
+          <span className="ml-auto text-[11px] text-ink-3">← Cases</span>
+        </button>
         <div className="border-b border-line px-4 py-3">
           <div className="text-[11px] text-ink-3">Case</div>
-          <div className="text-[13px] font-medium leading-snug">Harbor Supply Co. missing funds</div>
-          <div className="mt-1 text-[11px] text-ink-3">13–19 Apr 2026 · 4 phones · synthetic</div>
+          <div className="text-[13px] font-medium leading-snug">{name}</div>
+          <div className="tnum mt-1 text-[11px] text-ink-3">
+            {c.range[0] === c.range[1] ? `${c.range[0]} Apr 2026` : `${c.range[0]}–${c.range[1]} Apr 2026`}
+            {c.ingestReport ? ` · ${c.ingestReport.devices.length} phones` : ' · no data yet'}
+          </div>
         </div>
         <nav className="flex-1 overflow-y-auto px-2 py-3">
           <div className="px-2 pb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-ink-3">Workflow</div>
@@ -97,36 +100,28 @@ export default function ProApp({ view, go, theme, toggleTheme, switchSkin }: { v
                     {s.label}
                     {!ok && <span className="ml-auto text-[10px] text-ink-3">locked</span>}
                     {s.id === 'analyse' && c.stage === 'analysing' && <span className="pulse-dot ml-auto h-1.5 w-1.5 rounded-full bg-accent" />}
-                    {s.id === 'refine' && c.stage === 'refining' && <span className="pulse-dot ml-auto h-1.5 w-1.5 rounded-full bg-accent" />}
                   </button>
                 </li>
               )
             })}
           </ol>
-          <div className="px-2 pb-1.5 pt-5 text-[10.5px] font-semibold uppercase tracking-wider text-ink-3">Views</div>
-          {MORE.map((m) => (
-            <button
-              key={m.id}
-              disabled={!allowed(m.id)}
-              onClick={() => go(m.id)}
-              className={`flex w-full items-center rounded-md px-2 py-1.5 text-left text-[13px] transition disabled:cursor-not-allowed disabled:text-ink-3/60 ${v === m.id ? 'bg-sunken font-medium' : 'text-ink-2 hover:bg-sunken'}`}
-            >
-              {m.label}
-            </button>
-          ))}
+          <div className="px-2 pb-1.5 pt-5 text-[10.5px] font-semibold uppercase tracking-wider text-ink-3">Lines of inquiry</div>
+          {INQUIRIES.map((q) => {
+            const n = c.briefing?.incidents.filter((i) => i.inquiry === q.id).length ?? 0
+            return (
+              <button
+                key={q.id}
+                disabled={!allowed(q.id)}
+                onClick={() => go(q.id)}
+                className={`flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-[12.5px] leading-snug transition disabled:cursor-not-allowed disabled:text-ink-3/60 ${v === q.id ? 'bg-sunken font-medium text-ink' : 'text-ink-2 hover:bg-sunken'}`}
+              >
+                <span className="min-w-0 flex-1">{q.question}</span>
+                {n > 0 && <span className="tnum mt-px rounded bg-sunken px-1 text-[10.5px] text-ink-3">{n}</span>}
+              </button>
+            )
+          })}
         </nav>
         <div className="space-y-1 border-t border-line p-3 text-[12px]">
-          {c.stage === 'empty' && (
-            <button
-              onClick={async () => {
-                await c.fastForward()
-                go('review')
-              }}
-              className="w-full rounded-md px-2 py-1.5 text-left text-ink-2 hover:bg-sunken"
-            >
-              Load completed demo case
-            </button>
-          )}
           <button
             onClick={() => {
               c.reset()
@@ -136,9 +131,6 @@ export default function ProApp({ view, go, theme, toggleTheme, switchSkin }: { v
           >
             Reset case
           </button>
-          <button onClick={switchSkin} className="w-full rounded-md px-2 py-1.5 text-left text-ink-3 hover:bg-sunken">
-            Switch to case-file view
-          </button>
         </div>
       </aside>
 
@@ -146,7 +138,7 @@ export default function ProApp({ view, go, theme, toggleTheme, switchSkin }: { v
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line bg-surface px-4">
           <div className="text-[13px] text-ink-3">
-            Harbor Supply Co. <span className="px-1">/</span>
+            {name} <span className="px-1">/</span>
             <span className="text-ink">{title}</span>
           </div>
           <Search onPick={(f) => c.openFinding(f)} />
@@ -164,14 +156,13 @@ export default function ProApp({ view, go, theme, toggleTheme, switchSkin }: { v
         <main className="min-h-0 flex-1 overflow-y-auto">
           {v === 'ingest' && <IngestStep next={() => go('analyse')} />}
           {v === 'analyse' && <AnalyseStep next={() => go('review')} />}
-          {v === 'review' && <ReviewStep next={() => go('refine')} open={go} />}
-          {v === 'refine' && <RefineStep next={() => go('ask')} />}
+          {v === 'review' && <ReviewStep open={go} />}
           {v === 'ask' && <AskStep />}
-          {v === 'timeline' && <TimelineView />}
-          {v === 'activity' && <ActivityView />}
-          {v === 'places' && <PlacesView />}
-          {v === 'distance' && <DistanceView />}
-          {v === 'signals' && <SignalsView />}
+          {v === 'connections' && <ConnectionsView />}
+          {v === 'radius' && <RadiusView />}
+          {v === 'window' && <WindowView />}
+          {v === 'changes' && <ChangesView />}
+          {v === 'motive' && <MotiveView />}
         </main>
       </div>
 
@@ -186,10 +177,10 @@ function Search({ onPick }: { onPick: (f: import('../../api').Finding) => void }
   const c = useCase()
   const [q, setQ] = useState('')
   const findings = useMemo(() => {
-    const all = [...(c.briefing?.incidents.flatMap((i) => i.findings) ?? []), ...(c.refine.report?.findings ?? [])]
+    const all = c.briefing?.incidents.flatMap((i) => i.findings) ?? []
     const seen = new Set<string>()
     return all.filter((f) => (seen.has(f.statement) ? false : (seen.add(f.statement), true)))
-  }, [c.briefing, c.refine.report])
+  }, [c.briefing])
   const ql = q.toLowerCase().trim()
   const hits = ql
     ? findings.filter((f) => f.statement.toLowerCase().includes(ql) || f.evidence_ids.some((id) => id.includes(ql)) || f.people.some((p) => p.includes(ql))).slice(0, 6)

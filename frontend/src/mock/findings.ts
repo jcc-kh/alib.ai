@@ -1,306 +1,329 @@
 // One place that defines every planted-scenario finding, including how it was derived.
-// The report, the proactive briefing and Ask all build their findings from here, so the same
+// The briefing, the insight pages and Ask all build their findings from here, so the same
 // statement always carries the same evidence, number traces and validator results.
 
-import type { CheckName, CheckOutput, Corroboration, DerivationStep, Finding, NumberTrace, PersonId, Section, SubagentName, ValidatorCheck, Verdict } from '../api/types'
-import { COVERAGE_IDS, G1, NUMBERS, PEOPLE, S1, S2, S4, S4_FIRST, S5, S7, coverageFor } from './data'
+import type { CheckName, CheckOutput, Corroboration, DerivationStep, Finding, NumberTrace, PersonId, SubagentName, ValidatorCheck } from '../api/types'
+import { ALL_PHONES, CHAIN, COVERAGE_IDS, GAMY, GPAUL, HOSTILE, MEET, MISSING, NUMBERS, PEOPLE, ROWS, SYNC, coverageFor, haversine, personName } from './data'
+import { LAST, PRESENCE, SPACE } from './derived'
 import { fmtDateTime, fmtKm, fmtTime } from '../lib/format'
 
-export type ScenarioId = 'S1' | 'S2' | 'S4a' | 'S4b' | 'S5' | 'S7' | 'G1'
+export type ScenarioId = 'LAST' | 'GPAUL' | 'GAMY' | 'MISSING' | 'SYNC' | 'CHAIN' | 'MEET' | 'HOSTILE' | 'PRESENCE' | 'SPACE'
 
-/** Sweep signal ids and the triage incident each scenario belongs to (see mock/signals.ts). */
+/** Sweep signal ids and the insight each scenario belongs to (see mock/signals.ts). */
 export const SIGNAL_OF: Record<ScenarioId, string[]> = {
-  S7: ['sig_01'],
-  S4a: ['sig_05'],
-  S4b: ['sig_05'],
-  G1: ['sig_06'],
-  S5: ['sig_07'],
-  S1: ['sig_08'],
-  S2: ['sig_10'],
+  LAST: ['sig_01'],
+  GPAUL: ['sig_02'],
+  PRESENCE: ['sig_03'],
+  SYNC: ['sig_04'],
+  MISSING: ['sig_07'],
+  GAMY: ['sig_08'],
+  CHAIN: ['sig_09'],
+  MEET: ['sig_10'],
+  HOSTILE: ['sig_11'],
+  SPACE: ['sig_12'],
 }
-export const INCIDENT_OF: Record<ScenarioId, string> = { S7: 'INC-1', S4a: 'INC-2', S4b: 'INC-2', G1: 'INC-2', S1: 'INC-3', S2: 'INC-3', S5: 'INC-4' }
+export const INCIDENT_OF: Record<ScenarioId, string> = { LAST: 'INC-1', GPAUL: 'INC-1', PRESENCE: 'INC-1', SYNC: 'INC-2', MISSING: 'INC-3', GAMY: 'INC-3', CHAIN: 'INC-4', MEET: 'INC-4', HOSTILE: 'INC-5', SPACE: 'INC-6' }
 
 interface ScenarioDef {
-  family: string
   check: CheckName
   agent: SubagentName
   route_reason: string
   tools: string[]
   people: PersonId[]
-  verdictAsBelief: Verdict
   statement: string
   output: CheckOutput
   evidence: string[]
   data: string
   compute: { detail: string; code: string }
-  rule: (asBelief: boolean) => { detail: string; code?: string }
+  rule: { detail: string; code?: string }
   numbers: NumberTrace[]
   corroboration: Corroboration[]
   /** Follow-up hops between subagents, recorded as derivation steps. */
   follow_ups?: DerivationStep[]
 }
 
-const TOTAL_MSGS = PEOPLE.reduce((n, p) => n + p.counts.messages, 0)
-const TOTAL_CALLS = PEOPLE.reduce((n, p) => n + p.counts.calls, 0)
-const words = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five']
+/** Corroboration row: phones not named are 'n/a'. */
+const corr = (fact: string, phones: Partial<Corroboration['phones']>): Corroboration => ({ fact, phones: Object.fromEntries(ALL_PHONES.map((p) => [p, phones[p] ?? 'n/a'])) as Corroboration['phones'] })
+const words = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six']
+const ph = (p: PersonId) => PRESENCE.phones.find((x) => x.person === p)!
+const sp = (p: PersonId) => SPACE.spaces.find((x) => x.person === p)!
+const gapIds = (g: typeof GPAUL) => [g.bounding.before.id, g.bounding.after.id, ...g.activity.map((a) => a.id), ...g.power_event_ids]
+
+// ---------- numbers computed from check output, used in statements ----------
+const summon = LAST.items.find((i) => i.body?.startsWith("I've seen"))!
+const paulCloseD = ph('paul').closest_m!
+const paulCloseT = ph('paul').closest_t!
+const kenMin = Math.min(...ph('ken').slots.map((s) => s.distance_m ?? Infinity))
+const caraMin = Math.min(...ph('cara').slots.map((s) => s.distance_m ?? Infinity))
+const inside = SPACE.spaces.filter((s) => s.scene_inside).map((s) => s.person)
+const outside = SPACE.spaces.filter((s) => !s.scene_inside).map((s) => s.person)
+const names = (ps: PersonId[]) => (ps.length < 2 ? ps.map((p) => `${personName(p)}'s`).join('') : `${ps.slice(0, -1).map((p) => `${personName(p)}'s`).join(', ')} and ${personName(ps[ps.length - 1])}'s`)
+const flaggedItems = HOSTILE.items.filter((i) => i.score >= HOSTILE.threshold)
+const peak = [...flaggedItems].sort((a, b) => b.score - a.score)[0]
+const powerOff = GPAUL.power_event_ids
 
 export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
-  G1: {
-    family: 'G1',
-    check: 'location_gaps',
-    agent: 'location-analyst',
-    route_reason: 'A gap in location data is a question about where a phone was, so the location analyst owns it and asks other subagents what the phone did during it.',
-    tools: ["location_gaps(person='ken', start='2026-04-13', end='2026-04-19', min_gap_min=45)"],
-    people: ['ken', 'cara'],
-    verdictAsBelief: 'confirmed',
-    statement: `Ken's phone had no location data from ${fmtTime(G1.start)} to ${fmtTime(G1.end)} on 15 April, while it sent a message at ${fmtTime(G1.activity[0].t)} and the $4,500 transfer to Cara at ${fmtTime(G1.activity[1].t)}.`,
-    output: G1,
-    evidence: [G1.bounding.before.id, G1.bounding.after.id, ...G1.activity.map((a) => a.id), S4.links[1].row_ids[1]],
-    data: `Read Ken's location rows in order and found ${G1.minutes} minutes with none, between the rows at ${fmtTime(G1.bounding.before.t)} and ${fmtTime(G1.bounding.after.t)}. Then read every message, call, transfer and power event on Ken's phone inside that window.`,
-    compute: {
-      detail: `Gap = (first row after − last row before) − one ${G1.thresholds.interval_min}-minute interval each side. Keep gaps ≥ ${G1.thresholds.min_gap_min} min, then classify.`,
-      code: `gap = [${fmtTime(G1.start)}, ${fmtTime(G1.end)}] → ${G1.minutes} min ≥ ${G1.thresholds.min_gap_min};  power_off covering it: none;  activity inside: ${G1.activity.length} rows  ⇒  gap_type = "location_off"`,
-    },
-    rule: () => ({
-      detail: 'location_off (the phone was in use while reporting no location) is raised by default. Wording rule: report "no location data", never a claim about intent. Phones lose location for innocent reasons; a gap during clear use is the one case worth raising.',
-      code: 'raise if gap_type == "location_off" or overlaps(another_signal)',
-    }),
+  LAST: {
+    check: 'last_contacts',
+    agent: 'comms-analyst',
+    route_reason: "The victim's own phone is the best record of his last evening, so the comms analyst lists every message and call on it from 17:00 until the battery died, and checks whether each one survives on the other phone.",
+    tools: [`last_contacts(person='ravi', start='2026-04-16T17:00', end='${LAST.window.end.slice(0, 16)}')`],
+    people: ['ravi', 'paul', 'amy'],
+    statement: `At ${fmtTime(summon.t)} on 16 April Ravi's phone texted Paul "I've seen the Novak invoices. Pier 9, 9:30 tonight. Come alone.", and its last outgoing activity was a text to Amy at ${fmtTime(LAST.last_active.t)}.`,
+    output: LAST,
+    evidence: LAST.items.map((i) => i.id),
+    data: `Read every message and call on Ravi's phone from 17:00 on 16 April to ${fmtDateTime(LAST.window.end)}: ${LAST.items.length} rows. For each, looked for the same row on the other phone and for a thread_deleted event there.`,
+    compute: { detail: 'Sort by time; the last activity is the latest row with direction = out. A row missing from the counterpart phone, with a later thread_deleted event there, is marked deleted.', code: `last_active = max(t WHERE direction='out') = ${fmtTime(LAST.last_active.t)};  on Paul's phone: thread_deleted ${fmtTime(SYNC.events[0].t)} 17 Apr` },
+    rule: { detail: 'Reported as found. Content of messages is quoted, never summarised, and the statement does not say what the text means.' },
     numbers: [
-      { text: fmtTime(G1.start), field: 'location_gaps.start', value: fmtDateTime(G1.start) },
-      { text: fmtTime(G1.end), field: 'location_gaps.end', value: fmtDateTime(G1.end) },
-      { text: fmtTime(G1.activity[0].t), field: 'location_gaps.activity[0].t (via comms-analyst)', value: fmtDateTime(G1.activity[0].t) },
-      { text: '$4,500', field: 'money_chains.links[1].amount (via financial-analyst)', value: '4500' },
-      { text: fmtTime(G1.activity[1].t), field: 'location_gaps.activity[1].t', value: fmtDateTime(G1.activity[1].t) },
+      { text: fmtTime(summon.t), field: 'last_contacts.items[0].t', value: fmtDateTime(summon.t) },
+      { text: fmtTime(LAST.last_active.t), field: 'last_contacts.last_active.t', value: fmtDateTime(LAST.last_active.t) },
     ],
     corroboration: [
-      { fact: 'No location rows 14:00–16:30', phones: { paul: 'n/a', amy: 'n/a', ken: 'absent', cara: 'n/a' } },
-      { fact: 'Message sent 15:10', phones: { paul: 'n/a', amy: 'n/a', ken: 'present', cara: 'n/a' } },
-      { fact: '$4,500 Ken → Cara 15:40', phones: { paul: 'n/a', amy: 'n/a', ken: 'present', cara: 'present' } },
+      corr('18:05 text Ravi → Paul', { ravi: 'present', paul: 'deleted' }),
+      corr('20:58 call Paul → Ravi, 64 s', { ravi: 'present', paul: 'present' }),
+      corr('21:47 text Ravi → Amy', { ravi: 'present', amy: 'deleted' }),
     ],
+  },
+
+  GPAUL: {
+    check: 'location_gaps',
+    agent: 'location-analyst',
+    route_reason: 'A gap in location data during the time-of-death window is a question about where a phone was, so the location analyst owns it and asks the comms analyst what led up to it.',
+    tools: ["location_gaps(person='paul', start='2026-04-13', end='2026-04-19', min_gap_min=45)", "presence_window(scene='Pier 9 Warehouse', start='2026-04-16T21:00', end='2026-04-16T23:30')"],
+    people: ['paul', 'ravi'],
+    statement: `Paul's phone was ${fmtKm(paulCloseD)} from Pier 9 at ${fmtTime(paulCloseT)} on 16 April and was then powered off from ${fmtTime(ROWS_T(powerOff[0]))} to ${fmtTime(ROWS_T(powerOff[1]))}, covering most of the time-of-death window.`,
+    output: GPAUL,
+    evidence: [...gapIds(GPAUL), ...ph('paul').slots.filter((s) => s.row_id).map((s) => s.row_id!)],
+    data: `Read Paul's location rows in order and found ${GPAUL.minutes} minutes with none, between the rows at ${fmtTime(GPAUL.bounding.before.t)} and ${fmtTime(GPAUL.bounding.after.t)}. A power_off / power_on pair covers it.`,
+    compute: { detail: `Gap = (first row after − last row before) − one ${GPAUL.thresholds.interval_min}-minute interval each side. Distance to the scene by haversine on the last fix before the gap.`, code: `gap = [${fmtTime(GPAUL.start)}, ${fmtTime(GPAUL.end)}] → ${GPAUL.minutes} min;  d(last fix, Pier 9) = ${paulCloseD} m;  power_off covers it ⇒ gap_type = "powered_off"` },
+    rule: { detail: 'powered_off gaps are normally not raised (phones are switched off overnight), but this one overlaps the time-of-death window and follows a fix within 1 km of the scene, so it is raised.', code: 'raise if gap_type == "location_off" or overlaps(window | another_signal)' },
+    numbers: [
+      { text: fmtKm(paulCloseD), field: 'presence_window.phones[paul].closest_m', value: `${paulCloseD} m` },
+      { text: fmtTime(paulCloseT), field: 'presence_window.phones[paul].closest_t', value: fmtDateTime(paulCloseT) },
+      { text: fmtTime(ROWS_T(powerOff[0])), field: 'location_gaps.power_event_ids[0] (power_off)', value: fmtDateTime(ROWS_T(powerOff[0])) },
+      { text: fmtTime(ROWS_T(powerOff[1])), field: 'location_gaps.power_event_ids[1] (power_on)', value: fmtDateTime(ROWS_T(powerOff[1])) },
+    ],
+    corroboration: [corr(`Fix ${fmtKm(paulCloseD)} from Pier 9, 21:10`, { paul: 'present' }), corr('Powered off 21:16–23:38', { paul: 'present' }), corr('Call to Ravi at 20:58', { paul: 'present', ravi: 'present' })],
     follow_ups: [
       {
         kind: 'follow_up',
         actor: 'model',
-        title: 'Follow-up: location-analyst → financial-analyst',
-        detail: 'The location analyst wrote the gap to findings/location.json with follow_up "money moved during the gap?". The orchestrator dispatched it to the financial analyst, which found the $4,500 transfer at 15:40, link 2 of money-chain signal sig_05.',
-        code: "get_events(person='ken', table='transactions', start='2026-04-15T14:00-04:00', end='2026-04-15T16:30-04:00')",
-      },
-      {
-        kind: 'follow_up',
-        actor: 'model',
-        title: 'Follow-up: orchestrator → comms-analyst',
-        detail: 'To check whether the phone was in use for anything else, the orchestrator asked the comms analyst for messages and calls in the same window. One outgoing SMS at 15:10.',
-        code: "search_messages(person='ken', start='2026-04-15T14:00-04:00', end='2026-04-15T16:30-04:00')",
+        title: 'Follow-up: location-analyst → comms-analyst',
+        detail: "The location analyst asked what contact Paul's phone had before it went dark. The comms analyst found the 20:58 call to Ravi on both phones, and on Ravi's phone (not Paul's) the 18:05 text naming Pier 9 and 9:30.",
+        code: "search_messages(person='ravi', counterpart='paul', start='2026-04-16T17:00', end='2026-04-16T21:16')",
       },
     ],
   },
 
-  S2: {
-    family: 'S2',
-    check: 'distance_between',
+  PRESENCE: {
+    check: 'presence_window',
     agent: 'location-analyst',
-    route_reason: 'The item claims two people were together at a stated time, which is a question about where two phones were.',
-    tools: ["distance_between(person_a='paul', person_b='amy', start='2026-04-14T18:00-04:00', end='2026-04-14T21:00-04:00')"],
-    people: ['paul', 'amy'],
-    verdictAsBelief: 'inconsistent',
-    statement: `Paul's and Amy's phones were between ${fmtKm(S2.min_m)} and ${fmtKm(S2.max_m)} apart from 18:00 to 21:00 on 14 April, with Paul's phone at Sunset Park and Amy's at Northgate Mall.`,
-    output: S2,
-    evidence: S2.slots.flatMap((s) => [s.a.id, s.b.id]),
-    data: `Read ${S2.slots.length} location rows from each phone (one per 10-minute slot, 18:00–21:00) and paired them by timestamp.`,
-    compute: {
-      detail: 'Great-circle (haversine) distance for every slot pair, then min, median and max.',
-      code: 'd = 2R·asin(√(sin²(Δφ/2) + cos φ₁·cos φ₂·sin²(Δλ/2)))   R = 6,371 km',
-    },
-    rule: () => ({
-      detail: `Label rule: "together" if ≤ ${S2.thresholds.together_m} m in ≥ ${S2.thresholds.together_share * 100}% of slots; "apart" if never closer than ${S2.thresholds.apart_m / 1000} km. Closest slot was ${fmtKm(S2.min_m)} → apart. The belief says together → inconsistent.`,
-      code: `min_m = ${S2.min_m} ≥ apart_m = ${S2.thresholds.apart_m}  ⇒  label = "apart"`,
-    }),
+    route_reason: 'The time-of-death window and the scene are case inputs, so the location analyst places every phone in every 10-minute slot of that window.',
+    tools: [`presence_window(scene='Pier 9 Warehouse', start='2026-04-16T21:00', end='2026-04-16T23:30', scene_m=${PRESENCE.thresholds.scene_m}, near_m=${PRESENCE.thresholds.near_m})`],
+    people: ALL_PHONES,
+    statement: `Between 21:00 and 23:30 on 16 April only Ravi's phone was at Pier 9; Ken's and Cara's phones stayed at least ${fmtKm(kenMin < caraMin ? kenMin : caraMin)} away in every slot, and Paul's and Amy's phones had no location data in ${ph('paul').counts.no_data} and ${ph('amy').counts.no_data} of the ${ph('paul').slots.length} slots.`,
+    output: PRESENCE,
+    evidence: PRESENCE.phones.flatMap((p) => p.slots.filter((s) => s.row_id).map((s) => s.row_id!)),
+    data: `Read the location row at each 10-minute slot from 21:00 to 23:30 on all ${ALL_PHONES.length} phones (${PRESENCE.phones[0].slots.length} slots each). Where there is none, looked up the gap that covers it.`,
+    compute: { detail: `Haversine distance from each fix to Pier 9. At the scene ≤ ${PRESENCE.thresholds.scene_m} m; near ≤ ${fmtKm(PRESENCE.thresholds.near_m)}; otherwise away. No row → no data (with the gap type).`, code: PRESENCE.phones.map((p) => `${p.person}: ${p.counts.scene} scene · ${p.counts.near} near · ${p.counts.away} away · ${p.counts.no_data} no data`).join('\n') },
+    rule: { detail: 'No data is never read as presence or absence. A phone with no location data in the window is reported as exactly that, with the reason (powered off, location off).' },
     numbers: [
-      { text: fmtKm(S2.min_m), field: 'distance_between.min_m', value: `${S2.min_m} m` },
-      { text: fmtKm(S2.max_m), field: 'distance_between.max_m', value: `${S2.max_m} m` },
-      { text: '18:00 to 21:00', field: 'distance_between.start / end', value: `${fmtTime(S2.start)}–${fmtTime(S2.end)}` },
+      { text: fmtKm(Math.min(kenMin, caraMin)), field: 'presence_window.phones[cara].min(distance_m)', value: `${Math.min(kenMin, caraMin)} m` },
+      { text: String(ph('paul').counts.no_data), field: 'presence_window.phones[paul].counts.no_data', value: String(ph('paul').counts.no_data) },
+      { text: String(ph('amy').counts.no_data), field: 'presence_window.phones[amy].counts.no_data', value: String(ph('amy').counts.no_data) },
+      { text: String(ph('paul').slots.length), field: 'presence_window.slots.length', value: String(ph('paul').slots.length) },
     ],
-    corroboration: [
-      { fact: "Paul's phone at Sunset Park, 18:00–21:00", phones: { paul: 'present', amy: 'n/a', ken: 'n/a', cara: 'n/a' } },
-      { fact: "Amy's phone at Northgate Mall, 18:00–21:00", phones: { paul: 'n/a', amy: 'present', ken: 'n/a', cara: 'n/a' } },
-    ],
+    corroboration: PRESENCE.phones.map((p) => corr(`${personName(p.person)}: ${p.counts.scene} at scene, ${p.counts.no_data} no data`, { [p.person]: p.counts.no_data === p.slots.length ? 'absent' : 'present' })),
   },
 
-  S5: {
-    family: 'S5',
-    check: 'silent_meetings',
-    agent: 'relationship-mapper',
-    route_reason: 'The item is about whether two people know each other, so the relationship mapper checks every contact channel and the location analyst checks for meetings.',
-    tools: ["contact_graph(people=['paul', 'cara'])", "silent_meetings(start='2026-04-13', end='2026-04-19')"],
-    people: ['paul', 'cara'],
-    verdictAsBelief: 'inconsistent',
-    statement: `Paul's and Cara's phones were within ${S5.thresholds.within_m} m of each other at Dock Cafe on ${S5.occasions.length} separate days, and no message or call between them exists on any phone.`,
-    output: S5,
-    evidence: S5.occasions.flatMap((o) => o.row_ids),
-    data: `Paired every 10-minute location slot across all 6 phone pairs. Searched ${TOTAL_MSGS.toLocaleString()} message rows and ${TOTAL_CALLS} call rows on all 4 phones for any row between ${NUMBERS.paul} and ${NUMBERS.cara}.`,
-    compute: {
-      detail: 'Group consecutive slots where the two phones are within range into episodes; an episode lasts (last − first) + 10 min.',
-      code: `episode if haversine(paul, cara) ≤ ${S5.thresholds.within_m} m for consecutive slots; contacts = COUNT(messages ∪ calls WHERE {from,to} = {paul, cara})`,
-    },
-    rule: () => ({
-      detail: `Rule: ≥ ${S5.thresholds.min_occasions} episodes of ≥ ${S5.thresholds.min_minutes} min with 0 contact rows. Found ${S5.occasions.length} episodes and ${S5.contact_rows_found} contact rows. The belief says they don't know each other → inconsistent.`,
-      code: `episodes = ${S5.occasions.length} ≥ ${S5.thresholds.min_occasions}  ∧  contacts = ${S5.contact_rows_found}`,
-    }),
-    numbers: [
-      { text: `${S5.thresholds.within_m} m`, field: 'silent_meetings.thresholds.within_m', value: `${S5.thresholds.within_m}` },
-      { text: `${S5.occasions.length} separate days`, field: 'silent_meetings.occasions.length', value: String(S5.occasions.length) },
-    ],
-    corroboration: [
-      ...S5.occasions.map((o) => ({ fact: `Both phones at Dock Cafe, ${o.date} ${fmtTime(o.start)}`, phones: { paul: 'present', amy: 'n/a', ken: 'n/a', cara: 'present' } as Corroboration['phones'] })),
-      { fact: 'Any message or call between them', phones: { paul: 'absent', amy: 'absent', ken: 'absent', cara: 'absent' } },
-    ],
-  },
-
-  S4a: {
-    family: 'S4',
-    check: 'money_chains',
-    agent: 'financial-analyst',
-    route_reason: 'The item names a money transfer between two people, so it goes to the financial analyst.',
-    tools: ["get_events(person='paul', table='transactions', start='2026-04-15', end='2026-04-15')", "money_chains(start='2026-04-13', end='2026-04-19')"],
-    people: ['paul', 'ken'],
-    verdictAsBelief: 'confirmed',
-    statement: `Paul's and Ken's phones both show a $${S4.links[0].amount.toLocaleString()} Swiftpay transfer from Paul to Ken on 15 April at 11:05, with no memo.`,
-    output: S4_FIRST,
-    evidence: S4.links[0].row_ids,
-    data: "Read Paul's transactions for 15 April and matched the outgoing $5,000 against Ken's incoming transactions.",
-    compute: { detail: 'Match a transfer across the two phones on amount, currency, counterpart number and timestamp (±2 s).', code: 'paul.out(5000 USD → +1 555 010 0303, 11:05:00) ≡ ken.in(5000 USD ← +1 555 010 0101, 11:05:00)' },
-    rule: () => ({ detail: 'Confirmed: the same transfer is on both phones, and it matches the brief item.' }),
-    numbers: [
-      { text: '$5,000', field: 'money_chains.links[0].amount', value: '5000' },
-      { text: '11:05', field: 'money_chains.links[0].t', value: fmtDateTime(S4.links[0].t) },
-    ],
-    corroboration: [{ fact: '$5,000 Paul → Ken, 15 Apr 11:05', phones: { paul: 'present', amy: 'n/a', ken: 'present', cara: 'n/a' } }],
-  },
-
-  S4b: {
-    family: 'S4',
-    check: 'money_chains',
-    agent: 'financial-analyst',
-    route_reason: 'The item asks where money went, so it goes to the financial analyst to follow onward transfers.',
-    tools: ["money_chains(start='2026-04-13', end='2026-04-19')"],
-    people: ['paul', 'ken', 'cara'],
-    verdictAsBelief: 'confirmed',
-    statement: `Ken's phone shows a $${S4.links[1].amount.toLocaleString()} transfer to Cara at 15:40 on 15 April, ${S4.gap_label} after it received $${S4.links[0].amount.toLocaleString()} from Paul, and Cara's phone shows it arriving.`,
-    output: S4,
-    evidence: S4.links.flatMap((l) => l.row_ids),
-    data: 'Read every transaction row on all 4 phones and de-duplicated the copies of each transfer that appear on both phones.',
-    compute: { detail: 'For every A→B transfer ≥ $500, look for a B→C transfer within the window and the amount band.', code: `gap = t(ken→cara) − t(paul→ken) = ${S4.gap_minutes} min;  ratio = 4500 / 5000 = ${S4.ratio}` },
-    rule: () => ({
-      detail: `Rule: second transfer within ${S4.thresholds.window_h} h and ${S4.thresholds.ratio_min * 100}–${S4.thresholds.ratio_max * 100}% of the first. ${S4.gap_minutes} min and ${S4.ratio * 100}% → chain.`,
-      code: `${S4.gap_minutes} ≤ ${S4.thresholds.window_h * 60}  ∧  ${S4.thresholds.ratio_min} ≤ ${S4.ratio} ≤ ${S4.thresholds.ratio_max}`,
-    }),
-    numbers: [
-      { text: '$4,500', field: 'money_chains.links[1].amount', value: '4500' },
-      { text: '$5,000', field: 'money_chains.links[0].amount', value: '5000' },
-      { text: S4.gap_label, field: 'money_chains.gap_label', value: `${S4.gap_minutes} min` },
-      { text: '15:40', field: 'money_chains.links[1].t', value: fmtDateTime(S4.links[1].t) },
-    ],
-    corroboration: [
-      { fact: '$5,000 Paul → Ken, 15 Apr 11:05', phones: { paul: 'present', amy: 'n/a', ken: 'present', cara: 'n/a' } },
-      { fact: '$4,500 Ken → Cara, 15 Apr 15:40', phones: { paul: 'n/a', amy: 'n/a', ken: 'present', cara: 'present' } },
-    ],
-  },
-
-  S7: {
-    family: 'S7',
+  SYNC: {
     check: 'synchronised_behaviour',
     agent: 'device-forensics',
-    route_reason: 'The item asks about reactions to an event, so device forensics looks for coordinated deletions and power-offs and then searches for a trigger.',
-    tools: ["synchronised_behaviour(start='2026-04-13', end='2026-04-19')", "search_messages(query='audit')"],
-    people: ['paul', 'ken', 'cara'],
-    verdictAsBelief: 'confirmed',
-    statement: `Paul's, Ken's and Cara's phones each deleted a thread and powered off within one ${S7.window.minutes}-minute window that began ${S7.trigger!.minutes_before_window} minutes after Paul's phone received the audit announcement.`,
-    output: S7,
-    evidence: [S7.trigger!.id, ...S7.events.map((e) => e.id)],
-    data: 'Read every thread_deleted, power_off and power_on event on all 4 phones, plus messages received in the 2 hours before any cluster.',
-    compute: { detail: 'Slide a 60-minute window over the events and keep windows where at least 3 distinct phones each have a deletion or power-off.', code: `window = [${fmtTime(S7.window.start)}, ${fmtTime(S7.window.end)}] → ${S7.window.minutes} min, phones = {paul, ken, cara}` },
-    rule: () => ({
-      detail: `Rule: ≥ ${S7.thresholds.min_phones} phones within ${S7.thresholds.window_min} min. The trigger candidate is the latest inbound message before the window that matches "audit": ${fmtTime(S7.trigger!.t)} on Paul's phone, ${S7.trigger!.minutes_before_window} min before.`,
-      code: `3 ≥ ${S7.thresholds.min_phones}  ∧  ${S7.window.minutes} ≤ ${S7.thresholds.window_min}`,
-    }),
+    route_reason: 'Coordinated deletions and power-offs across phones are device events, so device forensics owns them and then searches for a trigger.',
+    tools: ["synchronised_behaviour(start='2026-04-13', end='2026-04-19', window_min=60, min_phones=3)", "search_messages(before=window.start, limit=1, inbound=true)"],
+    people: SYNC.phones,
+    statement: `Paul's, Amy's and Cara's phones each deleted a thread within ${SYNC.window.minutes} minutes, starting ${SYNC.trigger!.minutes_before_window} minutes after a ${fmtTime(SYNC.trigger!.t)} news alert about a death at Pier 9, and Paul's and Cara's phones then powered off.`,
+    output: SYNC,
+    evidence: [SYNC.trigger!.id, ...SYNC.events.map((e) => e.id)],
+    data: `Read every thread_deleted, power_off and power_on event on all ${ALL_PHONES.length} phones, plus messages received in the 2 hours before any cluster.`,
+    compute: { detail: 'Slide a 60-minute window over the events and keep windows where at least 3 distinct phones each have a deletion or power-off.', code: `window = [${fmtTime(SYNC.window.start)}, ${fmtTime(SYNC.window.end)}] → ${SYNC.window.minutes} min, phones = {${SYNC.phones.join(', ')}}` },
+    rule: { detail: `Rule: ≥ ${SYNC.thresholds.min_phones} phones within ${SYNC.thresholds.window_min} min. The trigger candidate is the latest inbound message before the window: the ${fmtTime(SYNC.trigger!.t)} news alert, ${SYNC.trigger!.minutes_before_window} min before.`, code: `${SYNC.phones.length} ≥ ${SYNC.thresholds.min_phones}  ∧  ${SYNC.window.minutes} ≤ ${SYNC.thresholds.window_min}` },
     numbers: [
-      { text: `${S7.window.minutes}-minute`, field: 'synchronised_behaviour.window.minutes', value: String(S7.window.minutes) },
-      { text: `${S7.trigger!.minutes_before_window} minutes`, field: 'synchronised_behaviour.trigger.minutes_before_window', value: String(S7.trigger!.minutes_before_window) },
+      { text: `${SYNC.window.minutes} minutes`, field: 'synchronised_behaviour.window.minutes', value: String(SYNC.window.minutes) },
+      { text: `${SYNC.trigger!.minutes_before_window} minutes`, field: 'synchronised_behaviour.trigger.minutes_before_window', value: String(SYNC.trigger!.minutes_before_window) },
+      { text: fmtTime(SYNC.trigger!.t), field: 'synchronised_behaviour.trigger.t', value: fmtDateTime(SYNC.trigger!.t) },
     ],
     corroboration: [
-      { fact: 'Audit notice received 10:00', phones: { paul: 'present', amy: 'n/a', ken: 'n/a', cara: 'n/a' } },
-      { fact: 'Thread deleted in window', phones: { paul: 'present', amy: 'absent', ken: 'present', cara: 'present' } },
-      { fact: 'Powered off in window', phones: { paul: 'present', amy: 'absent', ken: 'present', cara: 'present' } },
+      corr('News alert received 09:05', { paul: 'present', amy: 'present', ken: 'present', cara: 'present' }),
+      corr('Thread deleted in window', { paul: 'present', amy: 'present', ken: 'absent', cara: 'present' }),
+      corr('Powered off in window', { paul: 'present', amy: 'absent', ken: 'absent', cara: 'present' }),
     ],
   },
 
-  S1: {
-    family: 'S1',
+  MISSING: {
     check: 'missing_messages',
     agent: 'comms-analyst',
-    route_reason: 'Found by the unprompted sweep, which compares every pair of phones message by message.',
-    tools: ["missing_messages(person_a='paul', person_b='amy', start='2026-04-13', end='2026-04-19')"],
-    people: ['paul', 'amy'],
-    verdictAsBelief: 'confirmed',
-    statement: `${words[S1.missing_count]} messages from Paul to Amy sent at 18:32 on 14 April are on Paul's phone but missing from Amy's phone, which deleted that thread on 17 April at 20:15.`,
-    output: S1,
-    evidence: [...S1.items.flatMap((i) => [i.on_a, i.on_b]).filter((x): x is string => !!x), ...S1.deletion_events.map((e) => e.id)],
-    data: "Read every message and call between Paul's and Amy's numbers on both phones.",
-    compute: { detail: `Match each message on one phone to the other phone on sender, recipient, body and timestamp (±${S1.tolerance_s} s). Calls are matched the same way as anchors.`, code: `unmatched = paul.messages(to=amy) − amy.messages(from=paul)  →  ${S1.missing_count}` },
-    rule: () => ({ detail: `Messages on one phone with no counterpart on the other are reported, together with any thread_deleted event on the phone that lacks them (Amy's phone, ${fmtDateTime(S1.deletion_events[0].t)}). The 2 calls match on both phones, so the gap is in messages only.` }),
+    route_reason: 'Found by the sweep, which compares every pair of phones message by message. The victim’s phone keeps both sides of his conversations.',
+    tools: ["missing_messages(person_a='ravi', person_b='amy', start='2026-04-13', end='2026-04-19')"],
+    people: ['ravi', 'amy'],
+    statement: `${words[MISSING.missing_count]} texts between Ravi and Amy on the evening of 16 April are on Ravi's phone but missing from Amy's phone, which deleted that thread at ${fmtTime(MISSING.deletion_events[0].t)} on 17 April.`,
+    output: MISSING,
+    evidence: [...MISSING.items.flatMap((i) => [i.on_a, i.on_b]).filter((x): x is string => !!x), ...MISSING.deletion_events.map((e) => e.id)],
+    data: "Read every message and call between Ravi's and Amy's numbers on both phones.",
+    compute: { detail: `Match each message on one phone to the other phone on sender, recipient, body and timestamp (±${MISSING.tolerance_s} s). Calls are matched the same way as anchors.`, code: `unmatched = ravi.messages(amy) − amy.messages(ravi)  →  ${MISSING.missing_count}` },
+    rule: { detail: `Messages on one phone with no counterpart on the other are reported, with any thread_deleted event on the phone that lacks them (Amy's phone, ${fmtDateTime(MISSING.deletion_events[0].t)}). The 2 calls match on both phones, so the gap is in messages only.` },
     numbers: [
-      { text: words[S1.missing_count], field: 'missing_messages.missing_count', value: String(S1.missing_count) },
-      { text: '18:32', field: 'missing_messages.items[0].t', value: fmtDateTime(S1.items[0].t) },
-      { text: '20:15', field: 'missing_messages.deletion_events[0].t', value: fmtDateTime(S1.deletion_events[0].t) },
+      { text: words[MISSING.missing_count], field: 'missing_messages.missing_count', value: String(MISSING.missing_count) },
+      { text: fmtTime(MISSING.deletion_events[0].t), field: 'missing_messages.deletion_events[0].t', value: fmtDateTime(MISSING.deletion_events[0].t) },
     ],
-    corroboration: [
-      { fact: '3 texts Paul → Amy, 14 Apr 18:32–18:34', phones: { paul: 'present', amy: 'deleted', ken: 'n/a', cara: 'n/a' } },
-      { fact: 'Calls Paul ↔ Amy, 14–15 Apr', phones: { paul: 'present', amy: 'present', ken: 'n/a', cara: 'n/a' } },
+    corroboration: [corr('5 texts Ravi ↔ Amy, 16 Apr 19:40–22:15', { ravi: 'present', amy: 'deleted' }), corr('2 calls Amy → Ravi, 22:30–22:31', { ravi: 'present', amy: 'present' })],
+  },
+
+  GAMY: {
+    check: 'location_gaps',
+    agent: 'location-analyst',
+    route_reason: 'A gap during the time-of-death window, on a phone that was in use, is the kind of gap worth raising; the location analyst owns it and asks what the phone did meanwhile.',
+    tools: ["location_gaps(person='amy', start='2026-04-13', end='2026-04-19', min_gap_min=45)"],
+    people: ['amy', 'ravi'],
+    statement: `Amy's phone reported no location data from ${fmtTime(GAMY.start)} to ${fmtTime(GAMY.end)} on 16 April, while it called Ravi's phone twice, at ${fmtTime(GAMY.activity[0].t)} and ${fmtTime(GAMY.activity[1].t)}.`,
+    output: GAMY,
+    evidence: gapIds(GAMY),
+    data: `Read Amy's location rows in order and found ${GAMY.minutes} minutes with none, between the rows at ${fmtTime(GAMY.bounding.before.t)} and ${fmtTime(GAMY.bounding.after.t)}. Then read every message, call, transfer and power event on her phone inside that window.`,
+    compute: { detail: `Gap = (first row after − last row before) − one ${GAMY.thresholds.interval_min}-minute interval each side. Keep gaps ≥ ${GAMY.thresholds.min_gap_min} min, then classify.`, code: `gap = [${fmtTime(GAMY.start)}, ${fmtTime(GAMY.end)}] → ${GAMY.minutes} min;  power_off covering it: none;  activity inside: ${GAMY.activity.length} rows  ⇒  gap_type = "location_off"` },
+    rule: { detail: 'location_off (the phone was in use while reporting no location) is raised by default. Wording: "no location data", never a claim about intent. Both bounding fixes are at her home, 14 km from Pier 9; the gap alone cannot say where the phone was.' },
+    numbers: [
+      { text: fmtTime(GAMY.start), field: 'location_gaps.start', value: fmtDateTime(GAMY.start) },
+      { text: fmtTime(GAMY.end), field: 'location_gaps.end', value: fmtDateTime(GAMY.end) },
+      { text: fmtTime(GAMY.activity[0].t), field: 'location_gaps.activity[0].t', value: fmtDateTime(GAMY.activity[0].t) },
+      { text: fmtTime(GAMY.activity[1].t), field: 'location_gaps.activity[1].t', value: fmtDateTime(GAMY.activity[1].t) },
+    ],
+    corroboration: [corr('No location rows 21:40–22:50', { amy: 'absent' }), corr('Calls to Ravi at 22:30 and 22:31', { amy: 'present', ravi: 'present' })],
+    follow_ups: [
+      { kind: 'follow_up', actor: 'model', title: 'Follow-up: location-analyst → comms-analyst', detail: "Asked what Amy's phone did during the gap. The comms analyst found two unanswered calls to Ravi, on both phones. A 22:15 text to Ravi is on Ravi's phone only.", code: "search_messages(person='amy', start='2026-04-16T21:40', end='2026-04-16T22:50')" },
     ],
   },
+
+  CHAIN: {
+    check: 'money_chains',
+    agent: 'financial-analyst',
+    route_reason: 'Transfers between case phones go to the financial analyst, which looks for money that moves on (or comes back) soon after.',
+    tools: ["money_chains(start='2026-04-13', end='2026-04-19', include_round_trips=true)"],
+    people: ['paul', 'cara'],
+    statement: `Paul's phone sent Cara $${CHAIN.links[0].amount.toLocaleString()} marked "${CHAIN.links[0].memo}" at ${fmtTime(CHAIN.links[0].t)} on 15 April, and Cara's phone sent $${CHAIN.links[1].amount.toLocaleString()} back to Paul ${CHAIN.gap_label} later.`,
+    output: CHAIN,
+    evidence: CHAIN.links.flatMap((l) => l.row_ids),
+    data: `Read every transaction row on all ${ALL_PHONES.length} phones and de-duplicated the copies of each transfer that appear on both phones.`,
+    compute: { detail: 'For every A→B transfer ≥ $500, look for a B→C transfer (C may be A) within the window and the amount band.', code: `gap = ${CHAIN.gap_minutes} min;  ratio = ${CHAIN.links[1].amount} / ${CHAIN.links[0].amount} = ${CHAIN.ratio}` },
+    rule: { detail: `Rule: second transfer within ${CHAIN.thresholds.window_h} h and ${CHAIN.thresholds.ratio_min * 100}–${CHAIN.thresholds.ratio_max * 100}% of the first. ${CHAIN.gap_minutes} min and ${CHAIN.ratio * 100}% → chain. Here C = A, so the money came back.`, code: `${CHAIN.gap_minutes} ≤ ${CHAIN.thresholds.window_h * 60}  ∧  ${CHAIN.thresholds.ratio_min} ≤ ${CHAIN.ratio} ≤ ${CHAIN.thresholds.ratio_max}` },
+    numbers: [
+      { text: `$${CHAIN.links[0].amount.toLocaleString()}`, field: 'money_chains.links[0].amount', value: String(CHAIN.links[0].amount) },
+      { text: fmtTime(CHAIN.links[0].t), field: 'money_chains.links[0].t', value: fmtDateTime(CHAIN.links[0].t) },
+      { text: `$${CHAIN.links[1].amount.toLocaleString()}`, field: 'money_chains.links[1].amount', value: String(CHAIN.links[1].amount) },
+      { text: CHAIN.gap_label, field: 'money_chains.gap_label', value: `${CHAIN.gap_minutes} min` },
+    ],
+    corroboration: [corr('$4,800 Paul → Cara, 11:05', { paul: 'present', cara: 'present' }), corr('$4,320 Cara → Paul, 15:40', { paul: 'present', cara: 'present' })],
+  },
+
+  MEET: {
+    check: 'silent_meetings',
+    agent: 'relationship-mapper',
+    route_reason: 'Repeated meetings with no recorded contact are a relationship question, so the relationship mapper checks every contact channel against the location analyst’s co-location episodes.',
+    tools: ["contact_graph(people=['paul', 'cara'])", "silent_meetings(start='2026-04-13', end='2026-04-19')"],
+    people: ['paul', 'cara'],
+    statement: `Paul's and Cara's phones were within ${MEET.thresholds.within_m} m of each other at Dock Cafe on ${MEET.occasions.length} separate days, and no call or text between them exists on any phone.`,
+    output: MEET,
+    evidence: MEET.occasions.flatMap((o) => o.row_ids),
+    data: `Paired every 10-minute location slot across all phone pairs, and searched every message and call on all ${ALL_PHONES.length} phones for any row between ${NUMBERS.paul} and ${NUMBERS.cara}.`,
+    compute: { detail: 'Group consecutive slots where the two phones are within range into episodes; an episode lasts (last − first) + 10 min.', code: `episode if haversine(paul, cara) ≤ ${MEET.thresholds.within_m} m for consecutive slots; contacts = COUNT(messages ∪ calls WHERE {from,to} = {paul, cara})` },
+    rule: { detail: `Rule: ≥ ${MEET.thresholds.min_occasions} episodes of ≥ ${MEET.thresholds.min_minutes} min with 0 contact rows. Found ${MEET.occasions.length} episodes and ${MEET.contact_rows_found} contact rows. Both phones did delete a WhatsApp thread with each other on 17 April.`, code: `episodes = ${MEET.occasions.length} ≥ ${MEET.thresholds.min_occasions}  ∧  contacts = ${MEET.contact_rows_found}` },
+    numbers: [
+      { text: `${MEET.thresholds.within_m} m`, field: 'silent_meetings.thresholds.within_m', value: String(MEET.thresholds.within_m) },
+      { text: `${MEET.occasions.length} separate days`, field: 'silent_meetings.occasions.length', value: String(MEET.occasions.length) },
+    ],
+    corroboration: [...MEET.occasions.map((o) => corr(`Both phones at Dock Cafe, ${o.date} ${fmtTime(o.start)}`, { paul: 'present', cara: 'present' })), corr('Any call or text between them', { ravi: 'absent', paul: 'absent', amy: 'absent', ken: 'absent', cara: 'absent' })],
+  },
+
+  HOSTILE: {
+    check: 'social_hostility',
+    agent: 'social-analyst',
+    route_reason: 'Posts and comments about another person in the case are social-media evidence, so the social analyst scores them with a fixed classifier and asks the location analyst whether the account holder’s phone was near the scene.',
+    tools: [`social_hostility(actor='ken', target='ravi', threshold=${HOSTILE.threshold}, model='${HOSTILE.model}')`],
+    people: ['ken', 'ravi'],
+    statement: `After Ravi's text ending Ken's job on 14 April, Ken's Snapline account posted ${HOSTILE.flagged} items about Ravi that the classifier scored ${HOSTILE.threshold} or higher for hostility, including "${peak.text}" at ${fmtTime(peak.t)} on 16 April.`,
+    output: HOSTILE,
+    evidence: [HOSTILE.context!.id, ...HOSTILE.items.map((i) => i.id)],
+    data: `Read every post, comment and reply by ${PEOPLE.find((p) => p.person_id === 'ken')!.handle} on Snapline, 13–19 April, kept the ${HOSTILE.items.length} that name or reply to Ravi, and scored each one.`,
+    compute: { detail: `Each item's text is scored 0–1 by ${HOSTILE.model}. The model and its version are fixed, so the same text always gets the same score.`, code: HOSTILE.items.map((i) => `${fmtTime(i.t)} ${i.score.toFixed(2)}  "${i.text.slice(0, 40)}${i.text.length > 40 ? '…' : ''}"`).join('\n') },
+    rule: { detail: `Flag items scoring ≥ ${HOSTILE.threshold}. Hostile posts are reported as tension, never as evidence of presence or intent; the presence check is always run alongside.`, code: `flagged = COUNT(score ≥ ${HOSTILE.threshold}) = ${HOSTILE.flagged} of ${HOSTILE.items.length}` },
+    numbers: [
+      { text: String(HOSTILE.flagged), field: 'social_hostility.flagged', value: String(HOSTILE.flagged) },
+      { text: String(HOSTILE.threshold), field: 'social_hostility.threshold', value: String(HOSTILE.threshold) },
+      { text: fmtTime(peak.t), field: 'social_hostility.items[max score].t', value: fmtDateTime(peak.t) },
+    ],
+    corroboration: [corr('Text ending Ken’s job, 14 Apr 16:20', { ken: 'present', ravi: 'present' }), corr(`${HOSTILE.flagged} flagged posts about Ravi`, { ken: 'present' }), corr(`Ken's phone ≥ ${fmtKm(kenMin)} from Pier 9, 21:00–23:30`, { ken: 'present' })],
+    follow_ups: [
+      { kind: 'follow_up', actor: 'model', title: 'Follow-up: social-analyst → location-analyst', detail: `Asked where Ken's phone was in the time-of-death window. presence_window: away in all ${ph('ken').slots.length} slots, never closer than ${fmtKm(kenMin)}, with no gaps. The hostility stays a lead for interview, not a placement.`, code: "presence_window(person='ken', start='2026-04-16T21:00', end='2026-04-16T23:30')" },
+    ],
+  },
+
+  SPACE: {
+    check: 'activity_space',
+    agent: 'location-analyst',
+    route_reason: 'Whether the scene is part of someone’s normal routine changes how a visit there should be read, so the location analyst draws each phone’s routine area.',
+    tools: [`activity_space(min_days=${SPACE.rule.min_days}, buffer_m=${SPACE.rule.buffer_m}, scene='Pier 9 Warehouse')`],
+    people: ALL_PHONES,
+    statement: `Pier 9 lies inside the routine areas of ${names(inside)} phones and outside ${names(outside)}, and Paul's phone stayed at Pier 9 on only ${sp('paul').scene_visits.length} day before the 16th.`,
+    output: SPACE,
+    evidence: ALL_PHONES.flatMap(scenePoints),
+    data: `Read every location row on all ${ALL_PHONES.length} phones (${SPACE.spaces.reduce((n, s) => n + s.fixes, 0).toLocaleString()} rows) and the stays table built from them.`,
+    compute: { detail: `Anchor = home. A routine place is one the phone stayed at on ≥ ${SPACE.rule.min_days} separate days. Radius = distance to the farthest routine place + ${SPACE.rule.buffer_m} m. The scene is inside if its distance from the anchor ≤ radius.`, code: SPACE.spaces.map((s) => `${s.person}: r = ${fmtKm(s.radius_m)}, scene at ${fmtKm(s.scene_distance_m)} → ${s.scene_inside ? 'inside' : 'outside'}`).join('\n') },
+    rule: { detail: 'A routine area is context, not evidence: it says whether a visit to the scene would be ordinary for that phone. Circles are drawn from stays on 2+ days, so a single trip does not widen them.' },
+    numbers: [{ text: String(sp('paul').scene_visits.length), field: 'activity_space.spaces[paul].scene_visits.length', value: String(sp('paul').scene_visits.length) }],
+    corroboration: SPACE.spaces.map((s) => corr(`${personName(s.person)}: scene ${s.scene_inside ? 'inside' : 'outside'} routine area (${fmtKm(s.radius_m)})`, { [s.person]: 'present' })),
+  },
+}
+
+function ROWS_T(id: string) {
+  return ROWS.get(id)!.timestamp
+}
+/** Cite each phone's fixes at the scene (the rows behind scene_visits) rather than every location row. */
+function scenePoints(p: PersonId) {
+  return [...ROWS.values()].filter((r) => r.device_owner === p && r.table === 'locations' && haversine(Number(r.fields.lat), Number(r.fields.lon), SPACE.scene.lat, SPACE.scene.lon) <= PRESENCE.thresholds.scene_m).map((r) => r.id)
 }
 
 function validatorFor(statement: string, evidence: string[], numbers: NumberTrace[]): ValidatorCheck[] {
   return [
     { rule: 'Cites evidence', passed: evidence.length > 0, detail: `${evidence.length} evidence ids, all resolve through /api/evidence` },
-    { rule: 'Neutral wording', passed: !/lied|guilty|lying/i.test(statement), detail: 'No "lied", "lying" or "guilty"' },
+    { rule: 'Neutral wording', passed: !/lied|guilty|lying|suspect|murder/i.test(statement), detail: 'No "lied", "guilty", "suspect" or "murder"' },
     { rule: 'Numbers traced to check output', passed: numbers.every((n) => statement.includes(n.text)), detail: `${numbers.length} numbers, each matched to a check-output field` },
-    { rule: 'One sentence', passed: (statement.match(/[.!?](\s|$)/g) ?? []).length === 1, detail: 'Single sentence, plain language' },
+    { rule: 'One sentence', passed: (statement.replace(/"[^"]*"/g, '""').match(/[.!?](\s|$)/g) ?? []).length === 1, detail: 'Single sentence, plain language' },
   ]
 }
 
-export function scenarioFinding(sid: ScenarioId, opts: { id: string; section: Section; brief_item: string | null; item_id?: string | null; verdict?: Verdict; matched?: boolean }): Finding {
+export function scenarioFinding(sid: ScenarioId, id: string): Finding {
   const sc = SCENARIOS[sid]
-  const asBelief = opts.section === 'confirmed' || opts.section === 'inconsistent'
-  const verdict = opts.verdict ?? (asBelief ? sc.verdictAsBelief : 'confirmed')
-  const rule = sc.rule(asBelief)
   const sigs = SIGNAL_OF[sid]
   const inc = INCIDENT_OF[sid]
   const steps: DerivationStep[] = [
-    { kind: 'signal', actor: 'code', title: `Signal ${sigs.join(', ')} from the sweep`, detail: 'On case load, run_sweep() ran every check over every pair of phones for 13–19 April, before anyone wrote a brief. This hit was saved to the signals table with its evidence ids and strength.' },
-    { kind: 'grouped', actor: 'code', title: `Grouped into ${inc}`, detail: `propose_incidents() grouped signals that share people and overlap in time; the orchestrator accepted the grouping. ${inc} is ranked in the opening briefing.` },
-    ...(opts.brief_item
-      ? [
-          { kind: 'question' as const, actor: 'model' as const, title: 'Brief item', detail: `“${opts.brief_item}” People resolved: ${sc.people.join(', ')}.` },
-          { kind: 'route' as const, actor: 'code' as const, title: `Matched to ${inc}`, detail: `match_brief_item() found ${inc} shares the item's people and dates, so the existing signal was reused and no new check was run.`, code: `match_brief_item("${opts.brief_item.slice(0, 48)}${opts.brief_item.length > 48 ? '…' : ''}") → ${inc} [${sigs.join(', ')}]` },
-        ]
-      : []),
+    { kind: 'signal', actor: 'code', title: `Signal ${sigs.join(', ')} from the sweep`, detail: 'On case load, run_sweep() ran every check over every phone and pair for 13–19 April, with the scene and time-of-death window as inputs. This hit was saved to the signals table with its evidence ids and strength.' },
+    { kind: 'grouped', actor: 'code', title: `Grouped into insight ${inc}`, detail: `propose_incidents() grouped signals that share people and overlap in time; the orchestrator accepted the grouping. Insight ${inc} is ranked in the opening briefing.` },
     { kind: 'route', actor: 'model', title: `Owned by ${sc.agent}`, detail: sc.route_reason },
-    ...sc.tools.map((t) => ({ kind: 'tool' as const, actor: 'code' as const, title: 'Check called', detail: 'Deterministic Python over the case store. No model involved.', code: t })),
+    ...sc.tools.map((t) => ({ kind: 'tool' as const, actor: 'code' as const, title: 'Check called', detail: 'Deterministic code over the case store. No model involved.', code: t })),
     ...(sc.follow_ups ?? []),
     { kind: 'data', actor: 'code', title: 'Data read', detail: `${sc.data} ${sc.evidence.length} rows kept as evidence.` },
     { kind: 'compute', actor: 'code', title: 'Computation', detail: sc.compute.detail, code: sc.compute.code },
-    { kind: 'rule', actor: 'code', title: `Verdict: ${verdict.replace('_', ' ')}`, detail: rule.detail, code: rule.code },
+    { kind: 'rule', actor: 'code', title: 'Rule applied', detail: sc.rule.detail, code: sc.rule.code },
     { kind: 'statement', actor: 'model', title: 'Statement written and validated', detail: 'The subagent phrased one sentence from the check output, then validate_report() checked it (below).' },
   ]
   return {
-    id: opts.id,
-    section: opts.section,
-    item_id: opts.item_id ?? (opts.brief_item ? `item:${opts.id}` : null),
-    brief_item: opts.brief_item,
-    claimant: opts.brief_item ? 'investigator' : null,
+    id,
+    section: 'unprompted',
+    item_id: null,
+    brief_item: null,
+    claimant: null,
     status: 'current',
-    verdict,
+    verdict: 'confirmed',
     statement: sc.statement,
     people: sc.people,
     check: sc.check,
@@ -311,9 +334,10 @@ export function scenarioFinding(sid: ScenarioId, opts: { id: string; section: Se
   }
 }
 
+/** For questions the phones cannot settle (outside coverage). */
 export function cannotTellFinding(id: string, item: string): Finding {
   const out = coverageFor(item)
-  const statement = 'The four phones only hold data from 13 to 19 April 2026, so they cannot settle this item.'
+  const statement = 'The phones only hold data from 13 to 19 April 2026, so they cannot settle this question.'
   const numbers: NumberTrace[] = [
     { text: '13', field: 'get_coverage.start', value: fmtDateTime(out.start) },
     { text: '19 April 2026', field: 'get_coverage.end', value: fmtDateTime(out.end) },
@@ -321,45 +345,45 @@ export function cannotTellFinding(id: string, item: string): Finding {
   return {
     id,
     section: 'answers',
-    item_id: `item:${id}`,
+    item_id: null,
     brief_item: item,
     claimant: 'investigator',
     status: 'current',
     verdict: 'cannot_tell',
     statement,
-    people: ['paul', 'amy', 'ken', 'cara'],
+    people: ALL_PHONES,
     check: 'get_coverage',
     agent: 'device-forensics',
     evidence_ids: COVERAGE_IDS,
     check_output: out,
     derivation: {
       steps: [
-        { kind: 'question', actor: 'model', title: 'Brief item', detail: `“${item}”` },
-        { kind: 'route', actor: 'code', title: 'No matching signal', detail: 'match_brief_item() found no signal or incident for this item, so a targeted check was needed.', code: `match_brief_item("${item.slice(0, 48)}") → []` },
-        { kind: 'route', actor: 'model', title: 'Routed to device-forensics', detail: 'The item refers to a period, so the first step is to check whether the phones cover it.' },
+        { kind: 'question', actor: 'model', title: 'Question', detail: `“${item}”` },
+        { kind: 'route', actor: 'model', title: 'Routed to device-forensics', detail: 'The question refers to a period, so the first step is to check whether the phones cover it.' },
         { kind: 'tool', actor: 'code', title: 'Check called', detail: 'Returns the earliest and latest row on every phone.', code: 'get_coverage()' },
-        { kind: 'rule', actor: 'code', title: 'Verdict: cannot tell', detail: 'The period named in the item lies outside every phone’s coverage, so no check can confirm or contradict it. The agent must answer cannot_tell instead of guessing.' },
+        { kind: 'rule', actor: 'code', title: 'Cannot tell', detail: 'The period lies outside every phone’s coverage, so no check can confirm or contradict it. The agent answers cannot_tell instead of guessing.' },
         { kind: 'statement', actor: 'model', title: 'Statement written and validated', detail: 'Cites the first and last row on each phone as evidence of coverage.' },
       ],
       numbers,
       validator: validatorFor(statement, COVERAGE_IDS, numbers),
-      corroboration: [{ fact: 'Coverage 13–19 April only', phones: { paul: 'present', amy: 'present', ken: 'present', cara: 'present' } }],
+      corroboration: [corr('Coverage 13–19 April only', Object.fromEntries(ALL_PHONES.map((p) => [p, 'present'])))],
     },
   }
 }
 
-/** Which scenario a brief item or question is about. null means the phones can't settle it. */
+/** Which scenario a question is about. null means the phones can't settle it. */
 export function route(text: string): ScenarioId | null {
   const t = text.toLowerCase()
-  if (/\b(march|january|february|2025)\b/.test(t)) return null
-  if (/together|with each other|same place|where was|alibi/.test(t) && t.includes('amy') && t.includes('paul')) return 'S2'
-  if (/know each other|never met|don.t know|strangers|relationship|connected/.test(t) && t.includes('cara')) return 'S5'
-  if (/5,?000/.test(t) || (t.includes('sent ken') && /\$/.test(t))) return 'S4a'
-  if (/money|funds|end up|where did|transfer|4,?500/.test(t)) return 'S4b'
-  if (/location (off|gap|data)|gap|no location|went dark on 15|in use/.test(t)) return 'G1'
-  if (/audit|react|announcement|power|17 april|turn(ed)? off/.test(t)) return 'S7'
-  if (/delet|missing message|texts?|messages?/.test(t) && t.includes('amy')) return 'S1'
+  if (/\b(march|january|february|2025|last year)\b/.test(t)) return null
+  if (/who was (near|at)|near the scene|at the scene|in the window|time of death|where was everyone/.test(t)) return 'PRESENCE'
+  if (/paul/.test(t) && /(off|dark|where|night|gap)/.test(t)) return 'GPAUL'
+  if (/amy/.test(t) && /(location|gap|where|off)/.test(t)) return 'GAMY'
+  if (/(last|final).*(contact|text|message|call)|ravi.*(text|message)|who did ravi/.test(t)) return 'LAST'
+  if (/delet|missing|argu/.test(t) && /amy/.test(t)) return 'MISSING'
+  if (/news|react|wipe|deleted|power(ed)? off|after the body/.test(t)) return 'SYNC'
+  if (/money|invoice|paid|transfer|\$/.test(t)) return 'CHAIN'
+  if (/cara/.test(t) && /(paul|know|meet|met)/.test(t)) return 'MEET'
+  if (/ken|hostile|threat|post|social|grudge|motive/.test(t)) return 'HOSTILE'
+  if (/routine|area|radius|usual|regular/.test(t)) return 'SPACE'
   return null
 }
-
-export const SWEEP_ORDER: ScenarioId[] = ['S1', 'S2', 'S5', 'S4b', 'G1', 'S7']

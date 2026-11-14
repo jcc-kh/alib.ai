@@ -4,7 +4,7 @@ import { AskThread } from '../AskPanel'
 
 export default function AskStep() {
   const c = useCase()
-  const findings = c.refine.report?.findings ?? c.briefing?.incidents.flatMap((i) => i.findings) ?? []
+  const findings = c.briefing?.incidents.flatMap((i) => i.findings) ?? []
   return (
     <div className="grid h-full grid-cols-12 gap-3 p-4">
       <Panel title="Questions" className="col-span-8 h-[calc(100vh-5.5rem)]" pad={false}>

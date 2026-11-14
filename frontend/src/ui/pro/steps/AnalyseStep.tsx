@@ -4,15 +4,17 @@ import { useCase } from '../../../state/caseStore'
 import { Btn, Kpi, Mono, Panel, Empty } from '../kit'
 
 export const AGENT_META: Record<SubagentName, { role: string; owns: string }> = {
-  orchestrator: { role: 'Orchestrator', owns: 'run_sweep · triage · follow-ups' },
+  orchestrator: { role: 'Orchestrator', owns: 'run_sweep · triage · follow-ups · assemble_report' },
   'relationship-mapper': { role: 'Relationship mapper', owns: 'identity_match · contact_graph' },
-  'location-analyst': { role: 'Location analyst', owns: 'location_timeline · location_gaps · distance_between · silent_meetings' },
-  'comms-analyst': { role: 'Comms analyst', owns: 'missing_messages · search_messages' },
+  'location-analyst': { role: 'Location analyst', owns: 'presence_window · activity_space · location_gaps · silent_meetings' },
+  'comms-analyst': { role: 'Comms analyst', owns: 'last_contacts · missing_messages · search_messages' },
   'financial-analyst': { role: 'Financial analyst', owns: 'money_chains · get_events' },
   'device-forensics': { role: 'Device forensics', owns: 'deletions · power_events · synchronised_behaviour' },
-  'report-writer': { role: 'Report writer', owns: 'headlines · validate_report' },
+  'social-analyst': { role: 'Social analyst', owns: 'social_profile · social_hostility' },
 }
-const TRACE_ORDER: SubagentName[] = ['orchestrator', 'relationship-mapper', 'location-analyst', 'comms-analyst', 'financial-analyst', 'device-forensics', 'report-writer']
+const TRACE_ORDER: SubagentName[] = ['orchestrator', 'relationship-mapper', 'location-analyst', 'comms-analyst', 'financial-analyst', 'device-forensics', 'social-analyst']
+const TRIAGE_CHECKS = ['propose_incidents', 'anchor_moments', 'rank_incidents']
+const WRITE_CHECKS = ['assemble_report', 'validate_report']
 
 export default function AnalyseStep({ next }: { next: () => void }) {
   const c = useCase()
@@ -77,7 +79,7 @@ export default function AnalyseStep({ next }: { next: () => void }) {
         </Panel>
       </div>
 
-      <Panel title="Trace" sub="one bar per tool call">
+      <Panel title="What each agent did, over time" sub="hover a bar for the exact call and result">
         {r.calls.length ? <Trace clock={clock} /> : <Empty>{idle ? 'Run the analysis to see every call on a timeline.' : 'Starting…'}</Empty>}
       </Panel>
     </div>
@@ -107,29 +109,30 @@ function PhaseBar({ phase }: { phase: string }) {
   )
 }
 
-// ---- Agent network: bundle → dispatch → people map → 4 domain agents → triage → write-up → conclusion ----
-type NodeKey = 'bundle' | 'dispatch' | 'relationship-mapper' | 'location-analyst' | 'comms-analyst' | 'financial-analyst' | 'device-forensics' | 'triage' | 'report-writer'
+// ---- Agent network: bundle → dispatch → people map → 5 domain agents → triage → write-up → main findings ----
+type NodeKey = 'bundle' | 'dispatch' | 'relationship-mapper' | 'location-analyst' | 'comms-analyst' | 'financial-analyst' | 'device-forensics' | 'social-analyst' | 'triage' | 'writeup'
 type NodeStatus = 'idle' | 'running' | 'done'
 const NW = 700
-const NH = 420
+const NH = 445
 const NODES: { k: NodeKey; x: number; y: number; label: string; agent?: SubagentName }[] = [
   { k: 'bundle', x: 34, y: 210, label: 'Case bundle' },
   { k: 'dispatch', x: 130, y: 210, label: 'Orchestrator', agent: 'orchestrator' },
   { k: 'relationship-mapper', x: 240, y: 210, label: 'People map', agent: 'relationship-mapper' },
-  { k: 'location-analyst', x: 370, y: 60, label: 'Location', agent: 'location-analyst' },
-  { k: 'comms-analyst', x: 370, y: 160, label: 'Messages', agent: 'comms-analyst' },
-  { k: 'financial-analyst', x: 370, y: 260, label: 'Money', agent: 'financial-analyst' },
-  { k: 'device-forensics', x: 370, y: 360, label: 'Device', agent: 'device-forensics' },
+  { k: 'location-analyst', x: 370, y: 42, label: 'Location', agent: 'location-analyst' },
+  { k: 'comms-analyst', x: 370, y: 126, label: 'Messages', agent: 'comms-analyst' },
+  { k: 'financial-analyst', x: 370, y: 210, label: 'Money', agent: 'financial-analyst' },
+  { k: 'device-forensics', x: 370, y: 294, label: 'Device', agent: 'device-forensics' },
+  { k: 'social-analyst', x: 370, y: 378, label: 'Social', agent: 'social-analyst' },
   { k: 'triage', x: 500, y: 210, label: 'Triage', agent: 'orchestrator' },
-  { k: 'report-writer', x: 610, y: 210, label: 'Write-up', agent: 'report-writer' },
+  { k: 'writeup', x: 610, y: 210, label: 'Write-up', agent: 'orchestrator' },
 ]
-const DOMAIN: NodeKey[] = ['location-analyst', 'comms-analyst', 'financial-analyst', 'device-forensics']
+const DOMAIN: NodeKey[] = ['location-analyst', 'comms-analyst', 'financial-analyst', 'device-forensics', 'social-analyst']
 const EDGES: [NodeKey, NodeKey][] = [
   ['bundle', 'dispatch'],
   ['dispatch', 'relationship-mapper'],
   ...DOMAIN.map((d) => ['relationship-mapper', d] as [NodeKey, NodeKey]),
   ...DOMAIN.map((d) => [d, 'triage'] as [NodeKey, NodeKey]),
-  ['triage', 'report-writer'],
+  ['triage', 'writeup'],
 ]
 const NODE = Object.fromEntries(NODES.map((n) => [n.k, n])) as Record<NodeKey, (typeof NODES)[number]>
 const R = 17
@@ -150,9 +153,12 @@ function AgentNetwork({ clock, onReview }: { clock: number; onReview: () => void
   const r = c.run
   const orch = r.calls.filter((x) => x.agent === 'orchestrator')
   const dispatchEnd = orch[0] ? orch[0].start_ms + orch[0].ms : Infinity
-  const triageCalls = orch.slice(1)
+  const triageCalls = orch.filter((x) => TRIAGE_CHECKS.includes(x.check))
+  const writeCalls = orch.filter((x) => WRITE_CHECKS.includes(x.check))
   const triageStart = triageCalls[0]?.start_ms ?? Infinity
-  const triageEnd = triageCalls.length ? triageCalls[triageCalls.length - 1].start_ms + triageCalls[triageCalls.length - 1].ms : Infinity
+  const triageEnd = triageCalls.length === TRIAGE_CHECKS.length ? triageCalls[triageCalls.length - 1].start_ms + triageCalls[triageCalls.length - 1].ms : Infinity
+  const writeStart = writeCalls[0]?.start_ms ?? Infinity
+  const writeEnd = writeCalls.length === WRITE_CHECKS.length ? writeCalls[writeCalls.length - 1].start_ms + writeCalls[writeCalls.length - 1].ms : Infinity
   const finished = c.stage !== 'analysing' && c.stage !== 'ingested' && !!c.briefing
 
   const status = (k: NodeKey): NodeStatus => {
@@ -160,11 +166,12 @@ function AgentNetwork({ clock, onReview }: { clock: number; onReview: () => void
     if (finished) return 'done'
     if (k === 'dispatch') return clock >= dispatchEnd ? 'done' : r.agents.orchestrator.status === 'running' ? 'running' : 'idle'
     if (k === 'triage') return clock >= triageEnd ? 'done' : clock >= triageStart ? 'running' : 'idle'
+    if (k === 'writeup') return clock >= writeEnd ? 'done' : clock >= writeStart ? 'running' : 'idle'
     const a = k as SubagentName
     return r.envelopes[a] ? 'done' : r.agents[a].status === 'running' ? 'running' : 'idle'
   }
   const st = Object.fromEntries(NODES.map((n) => [n.k, status(n.k)])) as Record<NodeKey, NodeStatus>
-  const calls = (k: NodeKey) => (k === 'dispatch' ? orch.slice(0, 1) : k === 'triage' ? triageCalls : NODE[k].agent ? r.calls.filter((x) => x.agent === NODE[k].agent) : [])
+  const calls = (k: NodeKey) => (k === 'dispatch' ? orch.slice(0, 1) : k === 'triage' ? triageCalls : k === 'writeup' ? writeCalls : NODE[k].agent ? r.calls.filter((x) => x.agent === NODE[k].agent) : [])
   const current = (k: NodeKey) => [...calls(k)].reverse().find((x) => x.start_ms <= clock && clock < x.start_ms + x.ms)
   const envOf = (k: NodeKey) => (NODE[k].agent ? r.envelopes[NODE[k].agent!] : undefined)
   const done = Object.keys(r.envelopes).length
@@ -172,7 +179,7 @@ function AgentNetwork({ clock, onReview }: { clock: number; onReview: () => void
 
   return (
     <div className="flex items-stretch gap-3">
-      <svg viewBox={`0 0 ${NW} ${NH}`} className="min-w-0 flex-1" style={{ maxHeight: 420 }}>
+      <svg viewBox={`0 0 ${NW} ${NH}`} className="min-w-0 flex-1" style={{ maxHeight: 445 }}>
         {/* edges */}
         {EDGES.map(([u, v], i) => {
           const a = NODE[u]
@@ -192,7 +199,7 @@ function AgentNetwork({ clock, onReview }: { clock: number; onReview: () => void
           )
         })}
         {/* out edge to the conclusion */}
-        <path d={`M${NODE['report-writer'].x},210 L${NW},210`} stroke={finished ? 'var(--ink)' : 'var(--line)'} strokeWidth={finished ? 2 : 1.2} strokeDasharray={finished ? undefined : '3 4'} />
+        <path d={`M${NODE.writeup.x},210 L${NW},210`} stroke={finished ? 'var(--ink)' : 'var(--line)'} strokeWidth={finished ? 2 : 1.2} strokeDasharray={finished ? undefined : '3 4'} />
         {/* follow-ups between agents */}
         {r.hops.map((h, i) => {
           const a = NODE[nodeOf(h.from)]
@@ -259,9 +266,9 @@ function AgentNetwork({ clock, onReview }: { clock: number; onReview: () => void
         })}
       </svg>
 
-      {/* conclusion */}
+      {/* main findings */}
       <div className={`flex w-[220px] shrink-0 flex-col rounded-md border px-3 py-2.5 ${finished ? 'rise border-ink bg-surface' : 'border-dashed border-line-strong'}`}>
-        <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-2">Conclusion</div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-2">Main findings</div>
         {!finished || !b ? (
           <div className="mt-auto mb-auto text-center text-[12px] text-ink-3">
             <div className="tnum text-[22px] font-semibold text-ink-2">{done} / 7</div>
@@ -270,7 +277,7 @@ function AgentNetwork({ clock, onReview }: { clock: number; onReview: () => void
         ) : (
           <>
             <div className="tnum mt-1 text-[12px] text-ink-2">
-              {b.incidents.length} incidents · {b.anchors.length} anchor · {b.dismissed.length} set aside
+              {b.incidents.length} insights · {b.anchors.length} anchor · {b.dismissed.length} set aside
             </div>
             <ol className="mt-2 space-y-1.5">
               {b.incidents.map((i) => (
@@ -333,20 +340,108 @@ function RunLog({ clock }: { clock: number }) {
   )
 }
 
+const AGENT_SHORT: Record<SubagentName, string> = {
+  orchestrator: 'Orchestrator',
+  'relationship-mapper': 'People map',
+  'location-analyst': 'Location',
+  'comms-analyst': 'Messages',
+  'financial-analyst': 'Money',
+  'device-forensics': 'Device',
+  'social-analyst': 'Social',
+}
+const PLAIN: Record<string, string> = {
+  run_sweep: 'hand out work',
+  presence_window: 'place every phone in the window',
+  activity_space: 'draw routine areas',
+  last_contacts: "victim's last contacts",
+  social_profile: 'read social profiles',
+  social_hostility: 'score posts for hostility',
+  assemble_report: 'assemble the report',
+  identity_match: 'match numbers to people',
+  contact_graph: 'who contacts whom',
+  location_timeline: 'build location timelines',
+  location_gaps: 'find location gaps',
+  distance_between: 'distance per pair',
+  silent_meetings: 'meetings with no contact',
+  missing_messages: 'compare message threads',
+  search_messages: 'search messages',
+  deletions: 'find deletions',
+  power_events: 'power on/off',
+  synchronised_behaviour: 'phones acting together',
+  money_chains: 'trace money',
+  get_events: 'look up events',
+  propose_incidents: 'group into insights',
+  anchor_moments: 'find anchor moments',
+  rank_incidents: 'rank insights',
+  write_headlines: 'write headlines',
+  validate_report: 'check every number',
+}
+
+const SHORT: Record<string, string> = {
+  run_sweep: 'dispatch',
+  presence_window: 'presence',
+  activity_space: 'routine areas',
+  last_contacts: 'last contacts',
+  social_profile: 'profiles',
+  social_hostility: 'hostility',
+  assemble_report: 'assemble',
+  identity_match: 'identities',
+  contact_graph: 'contacts',
+  location_timeline: 'timelines',
+  location_gaps: 'gaps',
+  distance_between: 'distances',
+  silent_meetings: 'meetings',
+  missing_messages: 'missing texts',
+  search_messages: 'search',
+  deletions: 'deletions',
+  power_events: 'power',
+  synchronised_behaviour: 'in sync',
+  money_chains: 'money trail',
+  get_events: 'look-up',
+  propose_incidents: 'group',
+  anchor_moments: 'anchors',
+  rank_incidents: 'rank',
+  write_headlines: 'headlines',
+  validate_report: 'verify',
+}
+
+type Group = { agent: SubagentName; check: string; start: number; end: number; calls: ToolCall[]; follow: boolean }
+
 function Trace({ clock }: { clock: number }) {
   const c = useCase()
-  const calls = c.run.calls
-  const total = Math.max(clock, ...calls.map((x) => x.start_ms + x.ms), 1000)
+  const calls = c.run.calls.filter((x) => x.start_ms <= clock)
+  const total = Math.max(clock, ...c.run.calls.map((x) => x.start_ms + x.ms), 1000)
   const W = 1180
-  const L = 150
-  const row = 26
-  const H = TRACE_ORDER.length * row + 26
+  const L = 120
+  const TOP = 28
+  const row = 32
+  const H = TOP + TRACE_ORDER.length * row + 22
   const x = (ms: number) => L + (ms / total) * (W - L - 10)
-  const y = (a: SubagentName) => TRACE_ORDER.indexOf(a) * row + 6
-  const ticks: number[] = []
-  const step = total > 12000 ? 2000 : 1000
-  for (let t = 0; t <= total; t += step) ticks.push(t)
-  const [hover, setHover] = useState<ToolCall | null>(null)
+  const y = (a: SubagentName) => TOP + TRACE_ORDER.indexOf(a) * row + 6
+  const [hover, setHover] = useState<Group | null>(null)
+
+  // Merge back-to-back runs of the same check into one bar ("build location timelines ×4").
+  const groups: Group[] = []
+  for (const cl of [...calls].sort((a, b) => a.start_ms - b.start_ms)) {
+    const end = Math.min(clock, cl.start_ms + cl.ms)
+    const g = [...groups].reverse().find((g) => g.agent === cl.agent)
+    if (g && g.check === cl.check && !!cl.follow_up_from === g.follow && cl.start_ms - g.end < 60) {
+      g.end = end
+      g.calls.push(cl)
+    } else groups.push({ agent: cl.agent, check: cl.check, start: cl.start_ms, end, calls: [cl], follow: !!cl.follow_up_from })
+  }
+
+  // Phases: sweep until triage starts, triage until the write-up starts, then the write-up.
+  const orch = c.run.calls.filter((x) => x.agent === 'orchestrator')
+  const triStart = orch.find((x) => TRIAGE_CHECKS.includes(x.check))?.start_ms
+  const rw = c.run.calls.find((x) => WRITE_CHECKS.includes(x.check))?.start_ms
+  const phases = [
+    { label: '1 · Sweep: every check on every pair of phones', a: 0, b: triStart ?? total },
+    ...(triStart !== undefined ? [{ label: '2 · Triage', a: triStart, b: rw ?? total }] : []),
+    ...(rw !== undefined ? [{ label: '3 · Write-up', a: rw, b: total }] : []),
+  ]
+  const hops = c.run.hops.filter((h) => h.at_ms <= clock)
+
   return (
     <div className="relative">
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
@@ -355,75 +450,94 @@ function Trace({ clock }: { clock: number }) {
             <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)" />
           </marker>
         </defs>
-        {ticks.map((t) => (
-          <g key={t}>
-            <line x1={x(t)} x2={x(t)} y1={0} y2={H - 18} stroke="var(--line)" />
-            <text x={x(t)} y={H - 4} fontSize={10.5} textAnchor="middle" fill="var(--ink-3)">
-              {t / 1000}s
+        {phases.map((p, i) => (
+          <g key={p.label}>
+            <rect x={x(p.a)} y={0} width={Math.max(0, x(p.b) - x(p.a) - 2)} height={H - 22} fill={i % 2 ? 'var(--sunken)' : 'transparent'} />
+            <text x={x(p.a) + 6} y={16} fontSize={11.5} fontWeight={600} fill="var(--ink-2)">
+              {p.label}
             </text>
           </g>
         ))}
         {TRACE_ORDER.map((a) => (
           <g key={a}>
-            <text x={0} y={y(a) + 13} fontSize={11.5} fill="var(--ink-2)" style={{ fontFamily: 'var(--mono-font)' }}>
-              {a}
+            <line x1={L} x2={W - 10} y1={y(a) + 10} y2={y(a) + 10} stroke="var(--line)" />
+            <text x={0} y={y(a) + 14} fontSize={12} fill="var(--ink)">
+              {AGENT_SHORT[a]}
             </text>
           </g>
         ))}
-        {calls.map((cl) => {
-          const end = Math.min(clock, cl.start_ms + cl.ms)
-          if (cl.start_ms > clock) return null
-          const running = end < cl.start_ms + cl.ms
+        {groups.map((g, k) => {
+          const w = Math.max(3, x(g.end) - x(g.start) - 2)
+          const full = `${SHORT[g.check] ?? g.check}${g.calls.length > 1 ? ` ×${g.calls.length}` : ''}`
+          const label = full.length * 6 + 10 < w ? full : (SHORT[g.check] ?? g.check).length * 6 + 10 < w ? SHORT[g.check] ?? g.check : ''
+          const fits = !!label
           return (
-            <rect
-              key={cl.id}
-              x={x(cl.start_ms)}
-              y={y(cl.agent) + 2}
-              width={Math.max(2, x(end) - x(cl.start_ms) - 1.5)}
-              height={14}
-              rx={3}
-              fill={cl.follow_up_from ? 'var(--accent)' : 'var(--ink-2)'}
-              opacity={running ? 0.55 : hover?.id === cl.id ? 1 : 0.8}
-              onMouseEnter={() => setHover(cl)}
-              onMouseLeave={() => setHover(null)}
-              className="cursor-default"
-            />
+            <g key={k} onMouseEnter={() => setHover(g)} onMouseLeave={() => setHover(null)} className="cursor-default">
+              <rect x={x(g.start)} y={y(g.agent)} width={w} height={20} rx={4} fill={g.follow ? 'var(--accent)' : 'var(--ink-2)'} opacity={hover === g ? 1 : 0.85} />
+              {fits && (
+                <text x={x(g.start) + 6} y={y(g.agent) + 14} fontSize={11} fill="var(--surface)">
+                  {label}
+                </text>
+              )}
+            </g>
           )
         })}
-        {c.run.hops
-          .filter((h) => h.at_ms <= clock)
-          .map((h, i) => (
-            <path
-              key={i}
-              d={`M${x(h.at_ms)},${y(h.from) + 9} C${x(h.at_ms) + 30},${y(h.from) + 9} ${x(h.at_ms) + 10},${y(h.to) + 9} ${x(h.at_ms) + 40},${y(h.to) + 9}`}
-              fill="none"
-              stroke="var(--accent)"
-              strokeWidth={1.5}
-              markerEnd="url(#tr-arrow)"
-            />
-          ))}
+        {hops.map((h, i) => {
+          const hx = x(h.at_ms)
+          const y1 = y(h.from) + 10
+          const y2 = y(h.to) + 10
+          return (
+            <g key={i}>
+              <path d={`M${hx},${y1} C${hx + 30},${y1} ${hx + 10},${y2} ${hx + 36},${y2}`} fill="none" stroke="var(--accent)" strokeWidth={1.6} markerEnd="url(#tr-arrow)" />
+              <circle cx={hx} cy={y1} r={8} fill="var(--accent)" />
+              <text x={hx} y={y1 + 4} textAnchor="middle" fontSize={10.5} fontWeight={700} fill="var(--surface)">
+                {i + 1}
+              </text>
+            </g>
+          )
+        })}
+        {[0, 0.25, 0.5, 0.75, 1].map((f) => (
+          <text key={f} x={x(total * f)} y={H - 5} fontSize={10.5} textAnchor={f === 1 ? 'end' : 'middle'} fill="var(--ink-3)">
+            {((total * f) / 1000).toFixed(1)} s
+          </text>
+        ))}
         {c.stage === 'analysing' && <line x1={x(clock)} x2={x(clock)} y1={0} y2={H - 18} stroke="var(--ink)" strokeDasharray="3 3" />}
       </svg>
       {hover && (
-        <div className="pointer-events-none absolute right-2 top-2 max-w-md rounded-md border border-line bg-surface px-3 py-2 text-[12px] shadow-lg">
-          <Mono className="text-ink">
-            {hover.check}({hover.args})
-          </Mono>
-          <div className="text-ink-2">{hover.result}</div>
-          <div className="tnum text-[11px] text-ink-3">
-            {hover.agent} · {hover.rows.toLocaleString()} rows · {hover.ms} ms · t+{(hover.start_ms / 1000).toFixed(2)} s{hover.follow_up_from ? ` · follow-up from ${hover.follow_up_from}` : ''}
+        <div className="pointer-events-none absolute right-2 top-8 max-w-md rounded-md border border-line bg-surface px-3 py-2 text-[12px] shadow-lg">
+          <div className="font-medium text-ink">
+            {AGENT_SHORT[hover.agent]}: {PLAIN[hover.check] ?? hover.check}
           </div>
+          {hover.calls.map((cl) => (
+            <div key={cl.id} className="mt-1">
+              <Mono className="text-ink-2">
+                {cl.check}({cl.args})
+              </Mono>
+              <div className="tnum text-ink-3">
+                → {cl.result} · {cl.rows.toLocaleString()} rows · {cl.ms} ms
+              </div>
+            </div>
+          ))}
         </div>
+      )}
+      {hops.length > 0 && (
+        <ol className="mt-3 space-y-1 text-[12px]">
+          {hops.map((h, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-accent text-[10px] font-bold text-surface">{i + 1}</span>
+              <span className="text-ink">
+                {AGENT_SHORT[h.from]} asked {AGENT_SHORT[h.to]}: <span className="text-ink-2">{h.note}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
       )}
       <div className="mt-2 flex gap-5 text-[11px] text-ink-2">
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-5 rounded-sm bg-ink-2" /> tool call
+          <span className="h-2.5 w-5 rounded-sm bg-ink-2" /> a check run on the phone data (longer = slower)
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-5 rounded-sm bg-accent" /> call made on a follow-up
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="w-5 border-t-2 border-accent" /> follow-up between subagents
+          <span className="h-2.5 w-5 rounded-sm bg-accent" /> a check run because another agent asked
         </span>
       </div>
     </div>

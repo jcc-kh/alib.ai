@@ -59,6 +59,7 @@
   --p-amy: #eb6834;
   --p-ken: #1baf7a;
   --p-cara: #eda100;
+  --p-ravi: #3d3c38;
   --ui-font: system-ui, -apple-system, "Segoe UI", sans-serif;
   --display-font: var(--ui-font);
   --mono-font: ui-monospace, "SF Mono", Menlo, monospace;
@@ -85,6 +86,7 @@
   --p-amy: #d95926;
   --p-ken: #199e70;
   --p-cara: #c98500;
+  --p-ravi: #d9d7d0;
 }
 
 /* Noir: components render on paper (dossiers, index cards); the desk itself uses .noir-desk. */

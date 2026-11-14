@@ -18,6 +18,8 @@ This document covers the target design for the backend build. For a link-by-link
 > - **Evaluation across seeds:** precision and recall per check over 10–20 generated cases, one seed held out (§12).
 > - **Ingestion is out of scope for this build.** The case store is assumed loaded, normalised and resolved (§3).
 
+> **Pivot after revision 3 (mock only so far): insight discovery.** The product now leads with what the phones show rather than with testing claims. The demo case is a death (*Death at Pier 9*): five phones including the victim's, a scene and a time-of-death window as case inputs. Four checks and one subagent are added (§6.4, §7.1): `presence_window`, `activity_space`, `last_contacts`, `social_hostility`, and a `social-analyst`. Insights are filed under five **lines of inquiry** (§11). The mock no longer has hypothesis testing; stages ③–⑤ below (parse, confirm, refine against a brief and statements) are still the revision-3 design and need a team decision on whether to keep them.
+
 ---
 
 ## 1. Operating rule
@@ -181,6 +183,20 @@ Wording rule: a gap is always "**no location data**", never proof of intent.
 
 Every check has a unit test against `answer_key.json`: it must return the planted case and no decoy.
 
+### 6.4 Incident checks (new with the pivot)
+
+These take the **case facts** as input: `incident(victim_person_id, scene_place_id, tod_start, tod_end, found_at)`, entered by the investigator (the time-of-death window comes from the medical examiner).
+
+| Check | Owner | Logic | Defaults |
+|---|---|---|---|
+| `presence_window(scene, start, end)` | location | For every phone and every slot in the window: the location row at that slot and its haversine distance to the scene → `scene` / `near` / `away`, or `no_data` with the covering gap's `gap_type`. Also the closest fix from 30 min before the window. **No data is never read as presence or absence.** | slot 10 min; scene ≤150 m; near ≤2 km |
+| `activity_space(min_days, buffer_m, scene)` | location | Per phone: anchor = home (longest night-time stay); routine places = stays on ≥`min_days` separate days; radius = distance to the farthest routine place + buffer. Returns whether the scene is inside, days with fixes at the scene, and the share of the circle overlapping the victim's. Context, not evidence: a single trip does not widen a circle. | 2 days; 500 m |
+| `last_contacts(person, start, end)` | comms | Every message and call on the victim's phone in the range; for each, whether the same row exists on the counterpart's phone or a later `thread_deleted` there removed it; the last outgoing activity. | from 17:00 on the day of death |
+| `social_profile(person)` | social | Posts, comments, replies, likes and follows by the person's resolved handles. | none |
+| `social_hostility(threshold, targets)` | social | Items that name or reply to a case person, scored 0–1 by a fixed local classifier (model and version recorded in the output, so the same text always gets the same score). Flags items ≥ threshold. **Reported as tension, never as placement**; the social analyst always asks the location analyst for `presence_window` on the same person. | 0.7; targets = case people |
+
+`contact_graph()` gains two channels: `hostile` (flagged social items) and `colocation` (from `silent_meetings`), and each edge carries its interaction count and first/last time, so the front end can filter the graph by a time window.
+
 ---
 
 ## 7. Agents (`backend/agents/`, LangChain deepagents)
@@ -193,7 +209,7 @@ agent = create_deep_agent(
     tools=[confirm_items, match_brief_item, propose_incidents, anchor_moments,
            rank_incidents, get_coverage, get_reliability],
     subagents=[relationship_mapper, location_analyst, comms_analyst,
-               financial_analyst, device_forensics],
+               financial_analyst, device_forensics, social_analyst],
     system_prompt=ORCHESTRATOR_PROMPT,
     interrupt_on={"confirm_items": True},
     checkpointer=checkpointer,
@@ -210,10 +226,11 @@ Each is a dict with `name`, `description`, `system_prompt`, `tools`, `model` (a 
 | Subagent | Checks it may run |
 |---|---|
 | `relationship-mapper` | `identity_match`, `unresolved_identifiers`, `contact_graph` (its people map is read first by the others) |
-| `location-analyst` | `location_timeline`, `location_gaps`, `distance_between`, `silent_meetings`, `group_meetings`* |
-| `comms-analyst` | `missing_messages`, `call_log_mismatch`*, `contact_went_quiet`*, `search_messages` |
-| `financial-analyst` | `money_chains`, `transfer_after_meeting`* |
+| `location-analyst` | `presence_window`, `activity_space`, `location_timeline`, `location_gaps`, `distance_between`, `silent_meetings`, `group_meetings`* |
+| `comms-analyst` | `last_contacts`, `missing_messages`, `call_log_mismatch`*, `contact_went_quiet`*, `search_messages` |
+| `financial-analyst` | `money_chains` (A→B→C, including round trips where C = A), `transfer_after_meeting`* |
 | `device-forensics` | `deletions`, `power_events`, `synchronised_behaviour` |
+| `social-analyst` | `social_profile`, `social_hostility` |
 
 \* optional or stretch.
 
@@ -332,6 +349,7 @@ The Verify tab's "I checked this" / "I dispute this" are stored as `reviews` (`n
 | `POST /api/analyse/{run_id}/confirm` (`{items[]}`) | Resumes the interrupted run with confirmed or edited items; the SSE stream continues |
 | `POST /api/reviews` (`Review`) | Records it; a dispute triggers §9 and streams `rerun` then an updated `report` |
 | `GET /api/reviews?target=` | `Review[]` |
+| `GET /api/timeline?people=&start=&end=` | `stays` segments per person (stay, travel, gap with `gap_type`) for the location timeline |
 | `POST /api/ask` | SSE: `step`, then `answer` |
 | `GET /api/evidence?ids=` | Rows + provenance grouped by phone; 404 lists unknown ids |
 | `GET /api/graph` | Contact graph |
@@ -348,43 +366,29 @@ The Verify tab's "I checked this" / "I dispute this" are stored as `reviews` (`n
 
 ## 11. Front end (`frontend/`)
 
-The front end is built on mocks (React, Vite, TypeScript, Tailwind v4, react-leaflet). It is not a constraint on backend design.
+The front end is built on mocks (React, Vite, TypeScript, Tailwind v4, react-leaflet, Recharts). It is not a constraint on backend design. One dashboard (`src/ui/pro`, route `#/pro/<view>`) over one case store (`src/state/caseStore.tsx`); the Noir case-file UI and the hypothesis-testing screen were removed.
 
-There are two UIs over one case store (`src/state/caseStore.tsx`), with one guided flow: **Ingest → Analyse → Review → Refine → Ask**. Each step unlocks the next, and earlier steps stay viewable.
+**Flow:** Cases → Ingest (name, bundle, date range) → Analyse (agent network, run log, per-agent timeline, envelopes) → **Briefing** → **lines of inquiry** → Ask.
 
-| UI | Route | Design |
+**Briefing:** victim and case facts; the four persons of interest with portraits and each phone's status in the time-of-death window; the ranked insights, each tagged with its line of inquiry; the alibi grid at a glance; the scorecard against the answer key; dismissed signals.
+
+**Lines of inquiry** (`src/ui/pro/inquiries/`, one page each; every page leads with its question, the method it borrows and the insights filed under it):
+
+| Inquiry | Method borrowed | Visuals |
 |---|---|---|
-| **Pro** (`src/ui/pro`) | `#/pro/<step>` | Analyst dashboard with a left rail stepper, top bar search and a 12-column panel grid. Light/dark themes come from semantic tokens; charts follow the validated dataviz palette (people = categorical slots 1–4; status colours reserved, always with an icon and label). |
-| **Noir** (`src/ui/noir`) | `#/noir/<room>` | Case-file / escape-room skin. Five locked rooms: evidence locker, back room (agents at desks, sealed manila envelopes), evidence board (corkboard and string), your theory (notepad → stamped notes), interrogation (typewritten Q&A). |
+| Who is connected, and how? | Link chart (i2 Analyst's Notebook, Cellebrite Pathfinder) synced to a timeline | `RelationshipGraph` (portraits as nodes, one styled line per channel, width = interactions), channel filters, a per-day strip that sets the graph's window, a panel listing every interaction behind a link |
+| Whose routine area includes the scene? | Activity space / anchor points (geographic profiling) | `RadiusMap` (routine circles, anchors, the scene), per-phone cards (radius, scene inside, overlap with the victim), distance to the scene through the evening |
+| Where was every phone in the time-of-death window? | Alibi grid; suspect-journey map | `PresenceGrid` (phone × 10-min slot), journeys through the window on the map, the location lanes for that night, the victim's last contacts |
+| What broke from routine? | Pattern of life; synchronised behaviour | That night against the median of other nights, the post-news deletions, the week's activity with gaps shaded, every gap with why it was or wasn't raised |
+| Who had a grievance? | Social media review for leakage and grievance | Every post on a timeline coloured by hostility score, the flagged items, each account's highest score next to its phone's status in the window |
 
-**Shared by both UIs:**
-- **FindingDetail:** Evidence · How we know · Verify · Sources.
-- **Evidence views:** keyed by `check_output.kind`, including `gap`.
-- **LocationLanes:** the stays/travel/gaps lanes.
-- **lib/verify.ts and lib/aggregates.ts.**
+**Shared:** FindingDetail (Evidence · How we know · Verify · Sources) with evidence views keyed by `check_output.kind` (now including `presence`, `space`, `hostility`, `last_contacts`); `lib/verify.ts` recomputes every new check from the cited rows; `lib/aggregates.ts` computes every chart series from rows.
 
-**Pro screens:**
+**Portraits** are GAN-generated faces of people who do not exist (public domain, Wikimedia Commons; `public/portraits/CREDITS.md`). Real people's photos must not be used for case persons.
 
-| Screen | Panels |
-|---|---|
-| Ingest | KPIs, rows by table, coverage with gaps, devices, ingest log |
-| Analyse | Agent board with envelopes, streaming run log, tool-call trace with follow-up arrows |
-| Review | KPI strip, incident table, anchor window, hourly activity, location timeline, time at places, pair distance, heatmaps, contact matrix, money Sankey, dismissed |
-| Refine | Brief, progress, agents, results by verdict, next steps |
-| Ask | Thread and the case's findings |
-| Views | Location timeline (with map), Signals table |
-
-**Data realism:** `src/mock/background.ts` generates a seeded week for every phone. It includes:
-- diurnal messaging in conversation bursts
-- log-normal call durations
-- location fixes every 10 minutes from the stays table
-- everyday card spend
-
-Every count and chart is computed from these rows. No activity falls inside power-offs or planted gaps.
+**Data realism:** `src/mock/background.ts` generates a seeded week for every phone (diurnal messaging in bursts, log-normal call durations, 10-minute location fixes from the stays table, card spend, ordinary social posts). No activity falls inside gaps, nothing is generated on the victim's phone after his last evening, and every count and chart is computed from the rows.
 
 The swap point between the mock and the real backend is [`frontend/src/api/index.ts`](frontend/src/api/index.ts).
-
-New UI the contract implies: an item-confirmation step before analysis, a statements input, a per-person claims section in the report, reliability badges on findings and timeline windows, and "changed" markers after a dispute.
 
 ---
 
@@ -394,7 +398,7 @@ New UI the contract implies: an item-confirmation step before analysis, a statem
 
 ### 12.1 Generator (`data/generate.py`)
 
-Seeded; writes the case straight into the case-store tables (via the thin loader) plus `answer_key.json`. Scenarios S1, S2, S4, S5, S7, gap plant G1 and its decoy, and the optional-check plants are unchanged from revision 2. New plants and noise, each listed in the answer key with row ids:
+Seeded; writes the case straight into the case-store tables (via the thin loader) plus `answer_key.json`. The mock's demo case (*Death at Pier 9*, `frontend/src/mock/data.ts` and `answerKey.ts`) is the reference: 10 plants (victim's last contacts, a powered-off phone near the scene in the window, presence in the window, deleted texts, a location-off gap while in use, post-news synchronised deletions, a round-trip payment, silent meetings, hostile posts, the scene inside routine areas) and 5 decoys (overnight power-off, an unexplained gap, one co-location, a small payment, a below-threshold post). The generator should reproduce these plants across seeds; the revision-2 plants remain valid as a second scenario. New plants and noise, each listed in the answer key with row ids:
 
 | Kind | Plant | Expected |
 |---|---|---|

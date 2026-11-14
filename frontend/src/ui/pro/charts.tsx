@@ -1,20 +1,19 @@
 // Pro dashboard charts. Every series is computed from the evidence rows (lib/aggregates.ts).
-// Colours: people = categorical slots 1–4 (validated); magnitude = one-hue opacity ramp; status reserved.
-import { useMemo, useState } from 'react'
-import { Brush, CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Sankey, Tooltip, XAxis, YAxis } from 'recharts'
-import { CircleMarker, Tooltip as LTooltip } from 'react-leaflet'
+// Colours: people = categorical slots (validated) with the victim in neutral ink; status colours reserved
+// (serious = at the scene / hostile, amber = near); identity always also carries a name or portrait.
+import { Fragment, useMemo, useState } from 'react'
+import { CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { PersonId } from '../../api'
-import { CASE_PEOPLE, activityHeatmap, contactMatrix, dwellByPlace, hourlyActivity, moneyFlows, pairDistanceSeries } from '../../lib/aggregates'
-import { NUMBERS, PEOPLE, PLACES, ROWS, S7, KEN_NIGHT, personColor, personName } from '../../mock/data'
-import { SEGMENTS } from '../../mock/segments'
-import { caseMinutes, fmtTime } from '../../lib/format'
-import PlainMap from '../../components/evidence/PlainMap'
+import { CASE_PEOPLE, NIGHT_HOURS, dwellByPlace, hourlyActivity, nightProfile, socialByDay, socialItems } from '../../lib/aggregates'
+import { ALL_GAPS, HOSTILE, PEOPLE, ROWS, SCENE, SYNC, TOD, haversine, personColor, personName } from '../../mock/data'
+import { caseMinutes, fmtDate, fmtKm, fmtTime } from '../../lib/format'
+import Portrait from '../../components/Portrait'
 import { chart } from './kit'
 
 const DAY = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const hourLabel = (h: number) => `${DAY[Math.floor(h / 24)]} ${13 + Math.floor(h / 24)} Apr ${String(h % 24).padStart(2, '0')}:00`
 
-function Legend({ people, hidden, toggle }: { people: PersonId[]; hidden?: Set<PersonId>; toggle?: (p: PersonId) => void }) {
+export function Legend({ people, hidden, toggle }: { people: PersonId[]; hidden?: Set<PersonId>; toggle?: (p: PersonId) => void }) {
   return (
     <div className="flex flex-wrap items-center gap-3 text-[11px]">
       {people.map((p) => (
@@ -27,393 +26,226 @@ function Legend({ people, hidden, toggle }: { people: PersonId[]; hidden?: Set<P
   )
 }
 
-/** Hourly messages + calls per phone, with power-off periods shaded and the anchor annotated. */
-export function ActivityChart({ height = 230 }: { height?: number }) {
+// ---------------------------------------------------------------------------------------------
+// Distance to the scene, 10-minute slots across the evening of the 16th (log scale)
+// ---------------------------------------------------------------------------------------------
+const EVE_START = caseMinutes('2026-04-16T18:00:00-04:00')
+const EVE_END = caseMinutes('2026-04-17T01:50:00-04:00')
+export function DistanceToScene({ height = 280 }: { height?: number }) {
   const [hidden, setHidden] = useState<Set<PersonId>>(new Set())
   const data = useMemo(() => {
-    const series = Object.fromEntries(CASE_PEOPLE.map((p) => [p, hourlyActivity(p)]))
-    return Array.from({ length: 168 }, (_, h) => ({ h, ...Object.fromEntries(CASE_PEOPLE.map((p) => [p, series[p][h]])) }))
+    const byKey = new Map<string, number>()
+    for (const r of ROWS.values()) {
+      if (r.table !== 'locations') continue
+      const m = caseMinutes(r.timestamp)
+      if (m < EVE_START || m > EVE_END) continue
+      byKey.set(`${r.device_owner}|${m}`, Math.max(5, Math.round(haversine(Number(r.fields.lat), Number(r.fields.lon), SCENE.lat, SCENE.lon))))
+    }
+    const out: Record<string, number | null>[] = []
+    for (let m = EVE_START; m <= EVE_END; m += 10) out.push({ m, ...Object.fromEntries(CASE_PEOPLE.map((p) => [p, byKey.get(`${p}|${m}`) ?? null])) })
+    return out
   }, [])
-  const off = [
-    ...S7.events.filter((e) => e.event_type === 'power_off').map((e) => {
-      const on = S7.events.find((x) => x.device_owner === e.device_owner && x.event_type === 'power_on')!
-      return { p: e.device_owner, a: caseMinutes(e.t) / 60, b: caseMinutes(on.t) / 60 }
-    }),
-    { p: 'ken', a: caseMinutes(KEN_NIGHT.bounding.before.t) / 60, b: caseMinutes(KEN_NIGHT.bounding.after.t) / 60 },
-  ]
   const toggle = (p: PersonId) => setHidden((s) => (s.has(p) ? new Set([...s].filter((x) => x !== p)) : new Set([...s, p])))
-  const total = data.reduce((n, d) => n + CASE_PEOPLE.reduce((k, p) => k + (d as unknown as Record<string, number>)[p], 0), 0)
+  const tick = (m: number) => `${String(Math.floor((m % 1440) / 60)).padStart(2, '0')}:00`
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
         <Legend people={CASE_PEOPLE} hidden={hidden} toggle={toggle} />
-        <span className="text-[11px] text-ink-3">messages + calls · n = {total.toLocaleString()} · shaded = powered off</span>
+        <span className="text-[11px] text-ink-3">distance to {SCENE.name}, every 10 min · breaks = no location data</span>
       </div>
       <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={data} margin={{ top: 14, right: 12, left: -18, bottom: 0 }}>
+        <LineChart data={data} margin={{ top: 14, right: 12, left: -4, bottom: 0 }}>
+          <CartesianGrid vertical={false} stroke={chart.grid.stroke} />
+          <ReferenceArea x1={caseMinutes(TOD.start)} x2={caseMinutes(TOD.end)} fill="var(--serious)" fillOpacity={0.08} stroke="none" label={{ value: 'Time-of-death window', position: 'insideTop', fill: 'var(--ink-2)', fontSize: 11 }} />
+          <XAxis dataKey="m" type="number" domain={[EVE_START, EVE_END]} ticks={Array.from({ length: 8 }, (_, i) => EVE_START + i * 60)} tickFormatter={tick} {...chart.axis} />
+          <YAxis scale="log" domain={[5, 30000]} ticks={[10, 150, 2000, 20000]} tickFormatter={(v) => (v >= 1000 ? `${v / 1000} km` : `${v} m`)} allowDataOverflow {...chart.axis} width={52} />
+          <ReferenceLine y={150} stroke="var(--serious)" strokeDasharray="4 3" label={{ value: 'at the scene (150 m)', position: 'insideBottomLeft', fill: 'var(--ink-2)', fontSize: 10.5 }} />
+          <ReferenceLine y={2000} stroke="var(--ink-3)" strokeDasharray="2 4" label={{ value: 'near (2 km)', position: 'insideTopLeft', fill: 'var(--ink-3)', fontSize: 10.5 }} />
+          <Tooltip {...chart.tooltip} labelFormatter={(m) => `16–17 Apr ${tick(Number(m)).slice(0, 2)}:${String(Number(m) % 60).padStart(2, '0')}`} formatter={(v, n) => [fmtKm(Number(v)), personName(n as PersonId)]} />
+          {CASE_PEOPLE.filter((p) => !hidden.has(p)).map((p) => (
+            <Line key={p} type="linear" dataKey={p} stroke={personColor(p)} strokeWidth={p === 'ravi' ? 2.4 : 1.8} dot={false} connectNulls={false} isAnimationActive={false} />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------------------------
+// Pattern of life: that night against a normal night, per phone (small multiples)
+// ---------------------------------------------------------------------------------------------
+export function NightProfiles({ night = 16 }: { night?: number }) {
+  const data = useMemo(() => CASE_PEOPLE.map((p) => ({ p, rows: nightProfile(p, night) })), [night])
+  const max = Math.max(1, ...data.flatMap((d) => d.rows.flatMap((r) => [r.night, r.max])))
+  const todHours = [21, 22, 23]
+  return (
+    <div className="space-y-2">
+      {data.map(({ p, rows }) => {
+        const nightTotal = rows.filter((r) => todHours.includes(r.hour)).reduce((a, r) => a + r.night, 0)
+        const medTotal = rows.filter((r) => todHours.includes(r.hour)).reduce((a, r) => a + r.median, 0)
+        return (
+          <div key={p} className="grid grid-cols-[8.5rem_1fr_9rem] items-end gap-3">
+            <Portrait id={p} size={24} label />
+            <div className="grid grid-cols-8 items-end gap-1" style={{ height: 46 }}>
+              {rows.map((r) => (
+                <div key={r.hour} className="relative h-full" title={`${String(r.hour).padStart(2, '0')}:00 · that night ${r.night} · usual ${r.median}`}>
+                  {todHours.includes(r.hour) && <div className="absolute inset-0 rounded-sm bg-serious/10" />}
+                  <div className="absolute bottom-0 left-[18%] right-[18%] rounded-t-[3px]" style={{ height: `${(r.night / max) * 100}%`, background: personColor(p) }} />
+                  <div className="absolute left-0 right-0 border-t-2 border-dashed border-ink" style={{ bottom: `${(r.median / max) * 100}%` }} />
+                </div>
+              ))}
+            </div>
+            <div className="tnum text-[11.5px] text-ink-2">
+              21–24h: <span className="text-ink">{nightTotal}</span> vs usual {medTotal}
+              {nightTotal === 0 && medTotal > 0 && <span className="ml-1 text-serious">▼ silent</span>}
+            </div>
+          </div>
+        )
+      })}
+      <div className="grid grid-cols-[8.5rem_1fr_9rem] gap-3 text-[10.5px] text-ink-3">
+        <span />
+        <div className="grid grid-cols-8 gap-1">
+          {NIGHT_HOURS.map((h) => (
+            <span key={h} className="text-center">
+              {String(h % 24).padStart(2, '0')}
+            </span>
+          ))}
+        </div>
+        <span>
+          bars = 16 Apr · <span className="border-b-2 border-dashed border-ink">dashes</span> = median of other nights
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------------------------
+// The week: hourly activity per phone, with location gaps shaded and the key moments marked
+// ---------------------------------------------------------------------------------------------
+export function ActivityChart({ height = 240 }: { height?: number }) {
+  const [hidden, setHidden] = useState<Set<PersonId>>(new Set(['amy', 'ken']))
+  const data = useMemo(() => {
+    const series = Object.fromEntries(CASE_PEOPLE.map((p) => [p, hourlyActivity(p, ['messages', 'calls', 'social_interactions'])]))
+    return Array.from({ length: 168 }, (_, h) => ({ h, ...Object.fromEntries(CASE_PEOPLE.map((p) => [p, series[p][h]])) }))
+  }, [])
+  const toggle = (p: PersonId) => setHidden((s) => (s.has(p) ? new Set([...s].filter((x) => x !== p)) : new Set([...s, p])))
+  const gaps = ALL_GAPS.filter((g) => g.raised && !hidden.has(g.person))
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between">
+        <Legend people={CASE_PEOPLE} hidden={hidden} toggle={toggle} />
+        <span className="text-[11px] text-ink-3">messages + calls + posts per hour · shaded = raised location gaps · click a name to show it</span>
+      </div>
+      <ResponsiveContainer width="100%" height={height}>
+        <LineChart data={data} margin={{ top: 16, right: 12, left: -18, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke={chart.grid.stroke} />
           <XAxis dataKey="h" type="number" domain={[0, 168]} ticks={[0, 24, 48, 72, 96, 120, 144, 168]} tickFormatter={(h) => (h < 168 ? `${DAY[h / 24]} ${13 + h / 24}` : '')} {...chart.axis} />
           <YAxis allowDecimals={false} {...chart.axis} width={44} />
-          {off.map((o, i) => (
-            <ReferenceArea key={i} x1={o.a} x2={o.b} fill="var(--off)" fillOpacity={0.25} stroke="none" ifOverflow="hidden" />
+          {gaps.map((g, i) => (
+            <ReferenceArea key={i} x1={caseMinutes(g.start) / 60} x2={caseMinutes(g.end) / 60} fill={personColor(g.person)} fillOpacity={0.18} stroke="none" ifOverflow="hidden" />
           ))}
-          <ReferenceArea x1={caseMinutes(S7.window.start) / 60} x2={caseMinutes(S7.window.end) / 60} fill="var(--serious)" fillOpacity={0.12} stroke="none" />
-          <ReferenceLine x={caseMinutes(S7.trigger!.t) / 60} stroke="var(--serious)" strokeDasharray="3 3" label={{ value: 'Audit notice 17 Apr 10:00', position: 'top', fill: 'var(--ink-2)', fontSize: 11 }} />
+          <ReferenceArea x1={caseMinutes(TOD.start) / 60} x2={caseMinutes(TOD.end) / 60} fill="var(--serious)" fillOpacity={0.1} stroke="none" />
+          <ReferenceLine x={caseMinutes(TOD.start) / 60} stroke="var(--serious)" strokeDasharray="3 3" label={{ value: 'Time of death 21:00–23:30', position: 'top', fill: 'var(--ink-2)', fontSize: 11 }} />
+          <ReferenceLine x={caseMinutes(SYNC.trigger!.t) / 60} stroke="var(--ink-3)" strokeDasharray="2 3" label={{ value: 'News 17 Apr 09:05', position: 'insideTopRight', fill: 'var(--ink-3)', fontSize: 10.5 }} />
           <Tooltip {...chart.tooltip} labelFormatter={(h) => hourLabel(Number(h))} formatter={(v, n) => [v as number, personName(n as PersonId)]} />
           {CASE_PEOPLE.filter((p) => !hidden.has(p)).map((p) => (
             <Line key={p} type="monotone" dataKey={p} stroke={personColor(p)} strokeWidth={1.6} dot={false} isAnimationActive={false} />
           ))}
-          <Brush dataKey="h" height={18} travellerWidth={8} stroke="var(--line-strong)" fill="var(--sunken)" tickFormatter={(h) => hourLabel(Number(h))} />
         </LineChart>
       </ResponsiveContainer>
     </div>
   )
 }
 
-/** Day × hour heatmap per phone; one-hue opacity ramp so zero recedes into the surface in both themes. */
-export function Heatmaps() {
-  const maps = useMemo(() => CASE_PEOPLE.map((p) => ({ p, m: activityHeatmap(p) })), [])
-  const max = Math.max(...maps.flatMap((x) => x.m.flat()))
-  const cell = 11
+// ---------------------------------------------------------------------------------------------
+// Social: every post over the week, one row per person, coloured by hostility score
+// ---------------------------------------------------------------------------------------------
+export function HostilityTimeline({ onPick }: { onPick?: (id: string) => void }) {
+  const items = useMemo(() => socialItems(), [])
+  const byDay = useMemo(() => socialByDay(), [])
+  const W = 900
+  const L = 140
+  const row = 46
+  const H = CASE_PEOPLE.length * row + 26
+  const x = (iso: string) => L + (caseMinutes(iso) / (7 * 1440)) * (W - L - 10)
+  const [hover, setHover] = useState<(typeof items)[number] | null>(null)
   return (
-    <div>
-      <div className="grid grid-cols-2 gap-x-5 gap-y-3">
-        {maps.map(({ p, m }) => (
-          <div key={p}>
-            <div className="mb-1 flex items-center gap-1.5 text-[11px] text-ink-2">
-              <span className="h-2 w-2 rounded-sm" style={{ background: personColor(p) }} />
-              {personName(p)} <span className="text-ink-3">· {m.flat().reduce((a, b) => a + b, 0)} events</span>
-            </div>
-            <svg viewBox={`0 0 ${24 * cell + 26} ${7 * cell + 14}`} className="w-full">
-              {m.map((row, d) => (
-                <g key={d}>
-                  <text x={0} y={d * cell + 9} fontSize={8} fill="var(--ink-3)">
-                    {DAY[d]}
-                  </text>
-                  {row.map((v, h) => (
-                    <rect key={h} x={26 + h * cell} y={d * cell} width={cell - 1.5} height={cell - 1.5} rx={1.5} fill={v ? 'var(--ink)' : 'var(--sunken)'} fillOpacity={v ? 0.15 + 0.85 * (v / max) : 1}>
-                      <title>{`${personName(p)} · ${DAY[d]} ${13 + d} Apr ${String(h).padStart(2, '0')}:00 · ${v} messages + calls`}</title>
-                    </rect>
-                  ))}
-                </g>
-              ))}
-              {[0, 6, 12, 18].map((h) => (
-                <text key={h} x={26 + h * cell} y={7 * cell + 10} fontSize={8} fill="var(--ink-3)">
-                  {String(h).padStart(2, '0')}
-                </text>
-              ))}
-            </svg>
-          </div>
-        ))}
-      </div>
-      <div className="mt-2 flex items-center gap-2 text-[11px] text-ink-3">
-        <span>0</span>
-        <span className="h-2 w-28 rounded-sm" style={{ background: 'linear-gradient(90deg, color-mix(in srgb, var(--ink) 15%, transparent), var(--ink))' }} />
-        <span>{max} per hour</span>
-        <span className="ml-auto">grey = no activity (night, or phone off)</span>
-      </div>
-    </div>
-  )
-}
-
-/** Contacts between the four case phones by channel, plus volume with everyone else. */
-export function ContactMatrix() {
-  const { pairs, others, key } = useMemo(() => contactMatrix(), [])
-  return (
-    <div>
-      <table className="w-full border-separate border-spacing-1 text-[11.5px]">
-        <thead>
-          <tr>
-            <th />
-            {CASE_PEOPLE.map((p) => (
-              <th key={p} className="pb-1 text-center font-medium text-ink-2">
-                {personName(p)}
-              </th>
-            ))}
-            <th className="pb-1 text-center font-medium text-ink-3">Others</th>
-          </tr>
-        </thead>
-        <tbody>
-          {CASE_PEOPLE.map((a) => (
-            <tr key={a}>
-              <th className="pr-1 text-left font-medium text-ink-2">
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-sm" style={{ background: personColor(a) }} />
-                  {personName(a)}
-                </span>
-              </th>
-              {CASE_PEOPLE.map((b) => {
-                if (a === b) return <td key={b} className="rounded bg-sunken/60" />
-                const c = pairs[key(a, b)]
-                const empty = !c || (!c.messages && !c.calls && !c.transfers)
-                return (
-                  <td key={b} className={`h-14 rounded border px-1.5 align-top ${empty ? 'border-dashed border-line text-ink-3' : 'border-line'}`}>
-                    {empty ? (
-                      <div className="pt-4 text-center">0 contact</div>
-                    ) : (
-                      <div className="tnum space-y-px pt-0.5 leading-tight">
-                        <div className="text-ink">{c.messages} msg</div>
-                        <div className="text-ink">{c.calls} calls</div>
-                        {c.transfers > 0 && <div className="text-ink-2">{c.transfers} transfer</div>}
-                        {c.deleted && <div className="font-medium text-serious">⊘ thread deleted</div>}
-                      </div>
-                    )}
-                    {empty && c?.deleted && <div className="text-center font-medium text-serious">⊘ deleted</div>}
-                  </td>
-                )
-              })}
-              <td className="tnum rounded border border-line px-1.5 text-center text-ink-2">
-                {others[a].messages.toLocaleString()} msg
-                <br />
-                {others[a].calls} calls
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="mt-1.5 text-[11px] text-ink-3">De-duplicated across both phones. Paul–Cara: 0 messages, 0 calls on any phone. Deleted threads leave no rows to count.</p>
-    </div>
-  )
-}
-
-/** Money between case phones and everyday card spend, as a Sankey. */
-export function MoneyFlow() {
-  const links = useMemo(() => moneyFlows(), [])
-  const names = ['paul', 'amy', 'ken', 'cara', 'Card spend']
-  const nodes = names.map((n) => ({ name: n }))
-  const data = { nodes, links: links.map((l) => ({ source: names.indexOf(l.source), target: names.indexOf(l.target), value: l.value, label: l.label })) }
-  const color = (n: string) => (n === 'Card spend' ? 'var(--ink-3)' : personColor(n as PersonId))
-  const nodeName = (n: string) => (n === 'Card spend' ? 'Card spend (merchants)' : personName(n as PersonId))
-  return (
-    <div>
-      <ResponsiveContainer width="100%" height={240}>
-        <Sankey
-          data={data}
-          nodePadding={26}
-          nodeWidth={10}
-          margin={{ top: 8, right: 190, bottom: 8, left: 8 }}
-          link={(props: any) => {
-            const { sourceX, targetX, sourceY, targetY, sourceControlX, targetControlX, linkWidth, payload, index } = props
-            return (
-              <path
-                key={`link-${index}`}
-                d={`M${sourceX},${sourceY} C${sourceControlX},${sourceY} ${targetControlX},${targetY} ${targetX},${targetY}`}
-                fill="none"
-                stroke={color(payload.source.name)}
-                strokeOpacity={0.35}
-                strokeWidth={Math.max(1.5, linkWidth)}
-              >
-                <title>{`${nodeName(payload.source.name)} → ${nodeName(payload.target.name)}: $${payload.value.toLocaleString()} (${payload.label})`}</title>
-              </path>
-            )
-          }}
-          node={(props: any) => {
-            const { x, y, width, height, payload, index } = props
-            return (
-              <g key={`node-${index}`}>
-                <rect x={x} y={y} width={width} height={Math.max(2, height)} rx={2} fill={color(payload.name)} />
-                <text x={x + width + 6} y={y + Math.max(2, height) / 2 + 4} fontSize={11.5} fill="var(--ink)">
-                  {nodeName(payload.name)} <tspan fill="var(--ink-3)">${Math.round(payload.value).toLocaleString()}</tspan>
-                </text>
-              </g>
-            )
-          }}
-        >
-          <Tooltip {...chart.tooltip} />
-        </Sankey>
-      </ResponsiveContainer>
-      <div className="tnum mt-1 grid grid-cols-3 gap-2 text-[11px] text-ink-2">
-        {links
-          .filter((l) => l.target !== 'Card spend')
-          .map((l) => (
-            <div key={`${l.source}${l.target}`} className="rounded border border-line px-2 py-1">
-              {personName(l.source as PersonId)} → {personName(l.target as PersonId)} <span className="text-ink">${l.value.toLocaleString()}</span> · “{l.label}”
-            </div>
-          ))}
-      </div>
-    </div>
-  )
-}
-
-export const PAIRS: [PersonId, PersonId][] = [
-  ['paul', 'cara'],
-  ['paul', 'amy'],
-  ['amy', 'ken'],
-  ['paul', 'ken'],
-  ['ken', 'cara'],
-  ['amy', 'cara'],
-]
-
-/** Distance between two phones at each shared 10-minute slot (log scale). */
-export function PairDistance({ fixed, height = 210 }: { fixed?: [PersonId, PersonId]; height?: number }) {
-  const [picked, setPair] = useState<[PersonId, PersonId]>(['paul', 'cara'])
-  const pair = fixed ?? picked
-  const data = useMemo(() => pairDistanceSeries(pair[0], pair[1]).map((d) => ({ ...d, h: d.m / 60, dd: Math.max(5, d.d) })), [pair])
-  const close = data.filter((d) => d.d <= 100).length
-  return (
-    <div>
-      <div className="mb-2 flex flex-wrap items-center gap-1">
-        {!fixed && PAIRS.map((p) => {
-          const on = p[0] === pair[0] && p[1] === pair[1]
-          return (
-            <button key={p.join()} onClick={() => setPair(p)} className={`rounded-md border px-2 py-0.5 text-[11px] ${on ? 'border-ink text-ink' : 'border-line text-ink-2 hover:bg-sunken'}`}>
-              {personName(p[0])}–{personName(p[1])}
-            </button>
-          )
-        })}
-        <span className="tnum ml-auto text-[11px] text-ink-3">
-          {data.length} shared slots · {close} within 100 m
-        </span>
-      </div>
-      <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={data} margin={{ top: 6, right: 12, left: -6, bottom: 0 }}>
-          <CartesianGrid vertical={false} stroke={chart.grid.stroke} />
-          <XAxis dataKey="h" type="number" domain={[0, 168]} ticks={[0, 24, 48, 72, 96, 120, 144, 168]} tickFormatter={(h) => (h < 168 ? `${DAY[h / 24]} ${13 + h / 24}` : '')} {...chart.axis} />
-          <YAxis dataKey="dd" scale="log" domain={[5, 40000]} ticks={[10, 100, 1000, 10000]} tickFormatter={(v) => (v >= 1000 ? `${v / 1000} km` : `${v} m`)} {...chart.axis} width={54} />
-          <ReferenceLine y={100} stroke="var(--serious)" strokeDasharray="4 3" label={{ value: '100 m · together', position: 'insideTopLeft', fill: 'var(--ink-2)', fontSize: 10.5 }} />
-          <ReferenceLine y={1000} stroke="var(--ink-3)" strokeDasharray="2 4" label={{ value: '1 km', position: 'insideTopLeft', fill: 'var(--ink-3)', fontSize: 10.5 }} />
-          <Tooltip {...chart.tooltip} labelFormatter={(h) => hourLabel(Math.floor(Number(h)))} formatter={(v) => [`${Number(v) >= 1000 ? (Number(v) / 1000).toFixed(1) + ' km' : v + ' m'}`, 'distance']} />
-          <Line
-            type="linear"
-            dataKey="dd"
-            stroke="var(--ink-2)"
-            strokeWidth={1.2}
-            isAnimationActive={false}
-            dot={(p: any) => (p.payload.d <= 100 ? <circle key={p.index} cx={p.cx} cy={p.cy} r={3.5} fill="var(--serious)" stroke="var(--surface)" strokeWidth={1.5} /> : <g key={p.index} />)}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  )
-}
-
-/** Places sized by dwell time (stays table), optionally within a selected window. */
-export function DwellMap({ window }: { window?: [number, number] | null }) {
-  const dwell = useMemo(() => dwellByPlace(window ?? undefined), [window])
-  const entries = Object.entries(dwell).map(([place, by]) => ({ place, by, total: Object.values(by).reduce((a, b) => a + b, 0) }))
-  const max = Math.max(...entries.map((e) => e.total), 1)
-  return (
-    <div>
-      <PlainMap places={PLACES} bounds={PLACES.map((p) => [p.lat, p.lon] as [number, number])} height={250} labelTol={0.004} labelNear={entries.filter((e) => e.total > 0).map((e) => { const p = PLACES.find((x) => x.name === e.place)!; return [p.lat, p.lon] as [number, number] })}>
-        {entries.map((e) => {
-          const p = PLACES.find((x) => x.name === e.place)
-          if (!p || !e.total) return null
-          const top = (Object.entries(e.by) as [PersonId, number][]).sort((a, b) => b[1] - a[1])[0][0]
-          return (
-            <CircleMarker key={e.place} center={[p.lat, p.lon]} radius={5 + 18 * Math.sqrt(e.total / max)} pathOptions={{ color: personColor(top), fillColor: personColor(top), fillOpacity: 0.3, weight: 1.2 }}>
-              <LTooltip>
-                <div className="text-[12px]">
-                  <b>{e.place}</b>
-                  {(Object.entries(e.by) as [PersonId, number][])
-                    .filter(([, v]) => v > 0)
-                    .map(([pp, v]) => (
-                      <div key={pp}>
-                        {personName(pp)}: {(v / 60).toFixed(1)} h
-                      </div>
-                    ))}
-                </div>
-              </LTooltip>
-            </CircleMarker>
-          )
-        })}
-      </PlainMap>
-      <div className="mt-1.5 text-[11px] text-ink-3">Circle area = hours spent (stays). Colour = phone with the most time there. {window ? `Window: ${fmtTime(isoOf(window[0]))}–${fmtTime(isoOf(window[1]))}.` : 'Whole week.'}</div>
-    </div>
-  )
-}
-const isoOf = (m: number) => {
-  const d = 13 + Math.floor(m / 1440)
-  const r = Math.round(m % 1440)
-  return `2026-04-${d}T${String(Math.floor(r / 60)).padStart(2, '0')}:${String(r % 60).padStart(2, '0')}:00-04:00`
-}
-
-/** Anchor window close-up: 30-minute activity bins per phone, 08:00–16:00 on 17 Apr, with events. */
-export function AnchorWindow() {
-  const t0 = caseMinutes('2026-04-17T08:00:00-04:00')
-  const t1 = caseMinutes('2026-04-17T16:00:00-04:00')
-  const bins = (t1 - t0) / 30
-  const data = CASE_PEOPLE.map((p) => {
-    const b = new Array(bins).fill(0)
-    for (const r of ROWS.values()) {
-      if (r.device_owner !== p || (r.table !== 'messages' && r.table !== 'calls')) continue
-      const m = caseMinutes(r.timestamp)
-      if (m >= t0 && m < t1) b[Math.floor((m - t0) / 30)]++
-    }
-    return { p, b }
-  })
-  const max = Math.max(...data.flatMap((d) => d.b), 1)
-  const W = 440
-  const L = 44
-  const rowH = 34
-  const x = (m: number) => L + ((m - t0) / (t1 - t0)) * (W - L - 6)
-  const ev = S7.events
-  return (
-    <div>
-      <svg viewBox={`0 0 ${W} ${CASE_PEOPLE.length * rowH + 20}`} className="w-full">
-        <rect x={x(caseMinutes(S7.window.start))} y={0} width={x(caseMinutes(S7.window.end)) - x(caseMinutes(S7.window.start))} height={CASE_PEOPLE.length * rowH} fill="var(--serious)" opacity={0.1} />
-        {[8, 10, 12, 14, 16].map((h) => {
-          const m = t0 + (h - 8) * 60
-          return (
-            <g key={h}>
-              <line x1={x(m)} x2={x(m)} y1={0} y2={CASE_PEOPLE.length * rowH} stroke="var(--line)" />
-              <text x={x(m)} y={CASE_PEOPLE.length * rowH + 13} fontSize={10} textAnchor="middle" fill="var(--ink-3)">
-                {h}:00
+    <div className="relative">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+        {Array.from({ length: 8 }, (_, d) => (
+          <Fragment key={d}>
+            <line x1={L + (d / 7) * (W - L - 10)} x2={L + (d / 7) * (W - L - 10)} y1={0} y2={H - 20} stroke="var(--line)" />
+            {d < 7 && (
+              <text x={L + (d / 7) * (W - L - 10) + 4} y={H - 6} fontSize={10.5} fill="var(--ink-3)">
+                {DAY[d]} {13 + d}
               </text>
-            </g>
-          )
-        })}
-        {data.map(({ p, b }, i) => {
-          const base = (i + 1) * rowH - 6
-          const off = ev.find((e) => e.device_owner === p && e.event_type === 'power_off')
-          const on = ev.find((e) => e.device_owner === p && e.event_type === 'power_on')
+            )}
+          </Fragment>
+        ))}
+        <rect x={x(TOD.start)} width={Math.max(3, x(TOD.end) - x(TOD.start))} y={0} height={H - 20} fill="var(--serious)" opacity={0.15} />
+        {CASE_PEOPLE.map((p, i) => {
+          const y = i * row + 22
+          const total = byDay.find((b) => b.person === p)!.days.reduce((a, d) => a + d.posts, 0)
           return (
             <g key={p}>
-              <text x={0} y={base - 8} fontSize={11} fill="var(--ink-2)">
+              <line x1={L} x2={W - 10} y1={y} y2={y} stroke="var(--line)" strokeDasharray="2 3" />
+              <text x={0} y={y + 4} fontSize={12.5} fill="var(--ink)">
                 {personName(p)}
               </text>
-              {b.map((v, k) => (
-                <rect key={k} x={x(t0 + k * 30) + 1} y={base - (v / max) * 22} width={x(t0 + 30) - x(t0) - 2} height={(v / max) * 22} rx={1.5} fill={personColor(p)}>
-                  <title>{`${personName(p)} ${fmtTime(isoOf(t0 + k * 30))}–${fmtTime(isoOf(t0 + k * 30 + 30))}: ${v} messages + calls`}</title>
-                </rect>
-              ))}
-              <line x1={L} x2={W - 6} y1={base} y2={base} stroke="var(--line-strong)" />
-              {off && on && <rect x={x(caseMinutes(off.t))} y={base - 3} width={x(caseMinutes(on.t)) - x(caseMinutes(off.t))} height={6} rx={2} fill="var(--off)" />}
-              {ev
-                .filter((e) => e.device_owner === p && e.event_type === 'thread_deleted')
-                .map((e) => (
-                  <rect key={e.id} x={x(caseMinutes(e.t)) - 4} y={base - 28} width={8} height={8} transform={`rotate(45 ${x(caseMinutes(e.t))} ${base - 24})`} fill="var(--serious)" stroke="var(--surface)" strokeWidth={1.2}>
-                    <title>{`${fmtTime(e.t)} thread deleted (${e.detail})`}</title>
-                  </rect>
-                ))}
-              {p === 'paul' && (
-                <g>
-                  <line x1={x(caseMinutes(S7.trigger!.t))} x2={x(caseMinutes(S7.trigger!.t))} y1={base - 30} y2={base} stroke="var(--ink)" strokeDasharray="2 2" />
-                  <text x={x(caseMinutes(S7.trigger!.t)) - 3} y={base - 30} fontSize={9.5} textAnchor="end" fill="var(--ink)">
-                    audit notice 10:00
-                  </text>
-                </g>
-              )}
+              <text x={0} y={y + 18} fontSize={10.5} fill="var(--ink-3)">
+                {PEOPLE.find((x) => x.person_id === p)!.handle} · {total} posts
+              </text>
+              {items
+                .filter((it) => it.person === p)
+                .map((it) => {
+                  const hot = it.score >= HOSTILE.threshold
+                  return (
+                    <circle
+                      key={it.id}
+                      cx={x(it.t)}
+                      cy={y}
+                      r={hot ? 7 : 3 + it.score * 6}
+                      fill={hot ? 'var(--serious)' : it.score >= 0.4 ? 'var(--amber)' : 'var(--ink-3)'}
+                      opacity={hot ? 0.95 : 0.55}
+                      stroke="var(--surface)"
+                      strokeWidth={1.5}
+                      className="cursor-pointer"
+                      onMouseEnter={() => setHover(it)}
+                      onMouseLeave={() => setHover(null)}
+                      onClick={() => onPick?.(it.id)}
+                    />
+                  )
+                })}
             </g>
           )
         })}
       </svg>
+      {hover && (
+        <div className="pointer-events-none absolute right-2 top-2 max-w-sm rounded-md border border-line bg-surface px-3 py-2 text-[12px] shadow-lg">
+          <div className="text-ink-3">
+            {personName(hover.person)} · {fmtDate(hover.t)} {fmtTime(hover.t)} · {hover.kind}
+          </div>
+          <div className="text-ink">“{hover.text}”</div>
+          <div className="tnum mt-0.5" style={{ color: hover.score >= HOSTILE.threshold ? 'var(--serious)' : 'var(--ink-3)' }}>
+            hostility {hover.score.toFixed(2)} {hover.target ? `· about ${hover.target}` : ''}
+          </div>
+        </div>
+      )}
       <div className="mt-1 flex flex-wrap gap-4 text-[11px] text-ink-2">
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rotate-45 bg-serious" /> thread deleted
+          <span className="h-3 w-3 rounded-full bg-serious" /> scored ≥ {HOSTILE.threshold} (flagged)
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-1.5 w-4 rounded-sm bg-off" /> powered off
+          <span className="h-2.5 w-2.5 rounded-full bg-amber opacity-60" /> 0.4–0.7
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-4 rounded-sm bg-serious/15" /> 50-min window
+          <span className="h-2 w-2 rounded-full bg-ink-3 opacity-60" /> below 0.4
         </span>
-        <span>bars = messages + calls per 30 min</span>
+        <span className="text-ink-3">· shaded = time-of-death window · scores by {HOSTILE.model}</span>
       </div>
     </div>
   )
 }
-
-export { PEOPLE, NUMBERS, SEGMENTS }
 
 /** Hours at each place per phone (stays table), stacked; filtered by an optional window. */
 export function PlaceTime({ window }: { window?: [number, number] | null }) {

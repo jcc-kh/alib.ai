@@ -3,50 +3,55 @@
 // In the real system this is computed from location rows at ingest.
 
 import type { GapOutput, PersonId, Segment } from '../api/types'
-import { AMY_GAP, G1, KEN_NIGHT, PLACES, S7_GAPS, ts } from './data'
+import { ALL_GAPS, ALL_PHONES, GPAUL, GAMY, HOME, PLACES, RAVI_END, SYNC_GAPS, VICTIM, ts } from './data'
 
 type Stay = [number, number, string] // [startMin, endMin, place] in minutes since local midnight
-
-const HOME: Record<PersonId, string> = { paul: 'Tan residence', amy: 'Lim residence', ken: 'Ong residence', cara: 'Diaz residence' }
-const TRAVEL = 20
+const H = (h: number, m = 0) => h * 60 + m
 
 function day(person: PersonId, d: number): Stay[] {
   const home = HOME[person]
   const weekend = d >= 18
+  if (person === 'ravi') {
+    if (d === 16) return [[0, H(8), home], [H(8, 25), H(12), 'Harbor Supply Co.'], [H(12, 30), H(16), 'Pier 9 Warehouse'], [H(16, 25), H(18), 'Harbor Supply Co.'], [H(18, 20), H(21), home], [H(21, 25), 1440, 'Pier 9 Warehouse']]
+    if (d === 14) return [[0, H(8), home], [H(8, 25), H(12), 'Harbor Supply Co.'], [H(12, 30), H(17), 'Pier 9 Warehouse'], [H(17, 25), 1440, home]]
+    if (d >= 17) return [[0, 1440, 'Pier 9 Warehouse']]
+    return [[0, H(8), home], [H(8, 25), H(12), 'Harbor Supply Co.'], [H(12, 30), H(16), 'Pier 9 Warehouse'], [H(16, 25), H(18, 30), 'Harbor Supply Co.'], [H(18, 50), 1440, home]]
+  }
   if (person === 'paul') {
-    if (d === 13) return [[0, 470, home], [490, 540, 'Dock Cafe'], [555, 1050, 'Harbor Supply Co.'], [1070, 1440, home]]
-    if (d === 14) return [[0, 460, home], [480, 1050, 'Harbor Supply Co.'], [1080, 1260, 'Sunset Park'], [1290, 1440, home]]
-    if (d === 15) return [[0, 450, home], [470, 510, 'Dock Cafe'], [530, 1050, 'Harbor Supply Co.'], [1070, 1440, home]]
-    if (d === 16) return [[0, 460, home], [480, 735, 'Harbor Supply Co.'], [750, 800, 'Dock Cafe'], [815, 1050, 'Harbor Supply Co.'], [1070, 1440, home]]
-    if (d === 17) return [[0, 460, home], [480, 1050, 'Harbor Supply Co.'], [1070, 1440, home]]
-    if (d === 18) return [[0, 520, home], [540, 600, 'Dock Cafe'], [620, 1440, home]]
-    return [[0, 580, home], [600, 690, 'Riverside Gym'], [710, 1440, home]]
+    if (d === 13) return [[0, H(7, 50), home], [H(8, 10), H(8, 50), 'Dock Cafe'], [H(9, 5), H(17, 30), 'Harbor Supply Co.'], [H(17, 50), 1440, home]]
+    if (d === 14) return [[0, H(7, 40), home], [H(8), H(13, 40), 'Harbor Supply Co.'], [H(14), H(16), 'Pier 9 Warehouse'], [H(16, 20), H(17, 30), 'Harbor Supply Co.'], [H(17, 50), 1440, home]]
+    if (d === 15) return [[0, H(7, 30), home], [H(7, 50), H(8, 20), 'Dock Cafe'], [H(8, 35), H(17, 30), 'Harbor Supply Co.'], [H(17, 50), 1440, home]]
+    if (d === 16) return [[0, H(7, 40), home], [H(8), H(12, 15), 'Harbor Supply Co.'], [H(12, 30), H(13, 10), 'Dock Cafe'], [H(13, 25), H(17, 30), 'Harbor Supply Co.'], [H(17, 50), H(20, 45), home], [H(21, 10), H(21, 20), 'Harbor Rd lot'], [H(23, 30), 1440, home]]
+    if (d === 17) return [[0, H(7, 40), home], [H(8), H(17, 30), 'Harbor Supply Co.'], [H(17, 50), 1440, home]]
+    if (d === 18) return [[0, H(8, 40), home], [H(9), H(9, 50), 'Dock Cafe'], [H(10, 10), 1440, home]]
+    return [[0, H(10), home], [H(10, 20), H(11, 30), 'Sunset Park'], [H(11, 50), 1440, home]]
   }
   if (person === 'amy') {
-    if (weekend) return d === 18 ? [[0, 580, home], [600, 690, 'Riverside Gym'], [710, 1440, home]] : [[0, 1440, home]]
-    if (d === 14) return [[0, 530, home], [550, 1260, 'Northgate Mall'], [1280, 1440, home]]
-    if (d === 16) return [[0, 530, home], [550, 1030, 'Northgate Mall'], [1050, 1080, 'FreshMart'], [1100, 1440, home]]
-    return [[0, 530, home], [550, 1050, 'Northgate Mall'], [1070, 1440, home]]
+    if (weekend) return d === 18 ? [[0, H(10), home], [H(10, 20), H(12), 'Northgate Mall'], [H(12, 20), 1440, home]] : [[0, 1440, home]]
+    if (d === 15) return [[0, H(8, 50), home], [H(9, 10), H(17), 'Northgate Mall'], [H(17, 20), H(18), 'FreshMart'], [H(18, 20), 1440, home]]
+    if (d === 16) return [[0, H(8, 50), home], [H(9, 10), H(17, 30), 'Northgate Mall'], [H(17, 50), 1440, home]]
+    return [[0, H(8, 50), home], [H(9, 10), H(17, 30), 'Northgate Mall'], [H(17, 50), 1440, home]]
   }
   if (person === 'ken') {
-    if (d === 16) return [[0, 520, home], [540, 720, 'Riverside Gym'], [740, 1030, home], [1050, 1080, 'FreshMart'], [1100, 1440, home]]
-    if (weekend) return [[0, 1440, home]]
-    return [[0, 520, home], [540, 720, 'Riverside Gym'], [740, 1440, home]]
+    if (d === 13) return [[0, H(7), home], [H(7, 25), H(16, 30), 'Pier 9 Warehouse'], [H(16, 55), H(18, 30), 'Riverside Gym'], [H(18, 50), 1440, home]]
+    if (d === 14) return [[0, H(7), home], [H(7, 25), H(16, 20), 'Pier 9 Warehouse'], [H(16, 45), 1440, home]]
+    if (d === 15) return [[0, H(10), home], [H(10, 20), H(12), 'Riverside Gym'], [H(12, 20), H(17), home], [H(17, 20), H(18), 'FreshMart'], [H(18, 20), 1440, home]]
+    if (d === 16) return [[0, H(19, 50), home], [H(20, 10), H(21, 50), 'Riverside Gym'], [H(22, 10), 1440, home]]
+    if (weekend) return [[0, H(10), home], [H(10, 20), H(12), 'Riverside Gym'], [H(12, 20), 1440, home]]
+    return [[0, 1440, home]]
   }
   // cara
-  if (d === 13) return [[0, 470, home], [490, 540, 'Dock Cafe'], [560, 1020, 'Pier 9 Warehouse'], [1040, 1440, home]]
-  if (d === 15) return [[0, 450, home], [470, 510, 'Dock Cafe'], [530, 1020, 'Pier 9 Warehouse'], [1040, 1440, home]]
-  if (d === 16) return [[0, 470, home], [490, 735, 'Pier 9 Warehouse'], [750, 800, 'Dock Cafe'], [815, 1020, 'Pier 9 Warehouse'], [1040, 1440, home]]
-  if (d === 17) return [[0, 470, home], [490, 1020, 'Pier 9 Warehouse'], [1040, 1440, home]]
-  if (d === 18) return [[0, 520, home], [540, 600, 'Dock Cafe'], [620, 1440, home]]
-  if (d === 19) return [[0, 1440, home]]
-  return [[0, 470, home], [490, 1020, 'Pier 9 Warehouse'], [1040, 1440, home]]
+  if (d === 13) return [[0, H(7, 50), home], [H(8, 10), H(8, 50), 'Dock Cafe'], [H(9, 20), H(12), 'Pier 9 Warehouse'], [H(12, 15), 1440, home]]
+  if (d === 15) return [[0, H(7, 30), home], [H(7, 50), H(8, 20), 'Dock Cafe'], [H(8, 40), H(12, 40), home], [H(13), H(15, 10), 'Pier 9 Warehouse'], [H(15, 25), 1440, home]]
+  if (d === 16) return [[0, H(9, 40), home], [H(10), H(11, 30), 'Pier 9 Warehouse'], [H(11, 50), H(12, 15), home], [H(12, 30), H(13, 10), 'Dock Cafe'], [H(13, 30), 1440, home]]
+  if (d === 18) return [[0, H(8, 40), home], [H(9), H(9, 50), 'Dock Cafe'], [H(10, 10), 1440, home]]
+  return [[0, 1440, home]]
 }
 
 const iso = (d: number, m: number) => (m >= 1440 ? ts(d + 1, 0, 0) : ts(d, Math.floor(m / 60), m % 60))
-const abs = (isoT: string) => {
-  const day = Number(isoT.slice(8, 10))
-  return (day - 13) * 1440 + Number(isoT.slice(11, 13)) * 60 + Number(isoT.slice(14, 16))
+export const absMin = (isoT: string) => {
+  const dd = Number(isoT.slice(8, 10))
+  return (dd - 13) * 1440 + Number(isoT.slice(11, 13)) * 60 + Number(isoT.slice(14, 16))
 }
 const fromAbs = (m: number) => iso(13 + Math.floor(m / 1440), m % 1440)
 
@@ -75,11 +80,10 @@ function build(person: PersonId): Raw[] {
     })
   }
   // cut gaps
-  const gaps = [G1, AMY_GAP, KEN_NIGHT, ...S7_GAPS].filter((g) => g.person === person)
   let segs = out
-  for (const g of gaps) {
-    const gs = abs(g.start) - 10
-    const ge = abs(g.end) + 10
+  for (const g of ALL_GAPS.filter((x) => x.person === person)) {
+    const gs = absMin(g.start) - 10
+    const ge = absMin(g.end) + 10
     const next: Raw[] = []
     for (const r of segs) {
       if (r.e <= gs || r.s >= ge) next.push(r)
@@ -91,10 +95,22 @@ function build(person: PersonId): Raw[] {
     next.push({ kind: 'gap', s: gs, e: ge, gap: g })
     segs = next.sort((a, b) => a.s - b.s)
   }
+  // The victim's phone has no data after its battery ran out.
+  if (person === VICTIM) {
+    const end = absMin(RAVI_END)
+    segs = segs.filter((r) => r.s < end).map((r) => ({ ...r, e: Math.min(r.e, end) }))
+  }
   return segs.filter((r) => r.e > r.s)
 }
 
-export const SEGMENTS: Segment[] = (['paul', 'amy', 'ken', 'cara'] as PersonId[]).flatMap((person) =>
+const FINDING_OF_GAP = new Map<GapOutput, string>([
+  [GPAUL, 'INC-1:f2'],
+  [GAMY, 'INC-3:f2'],
+  [SYNC_GAPS[0], 'INC-2:f1'],
+  [SYNC_GAPS[1], 'INC-2:f1'],
+])
+
+export const SEGMENTS: Segment[] = ALL_PHONES.flatMap((person) =>
   build(person).map((r, i) => ({
     segment_id: `${person}:seg:${String(i + 1).padStart(3, '0')}`,
     person,
@@ -106,16 +122,16 @@ export const SEGMENTS: Segment[] = (['paul', 'amy', 'ken', 'cara'] as PersonId[]
     to: r.to,
     gap_type: r.gap?.gap_type,
     raised: r.gap?.raised,
-    finding_id: r.gap === G1 ? 'INC-2:f2' : r.gap && S7_GAPS.includes(r.gap) ? 'INC-1:f1' : undefined,
+    finding_id: r.gap ? FINDING_OF_GAP.get(r.gap) : undefined,
   })),
 )
 
 /** Gap outputs by segment, for the timeline's side panel. */
 export const GAP_OF = new Map<string, GapOutput>()
-for (const person of ['paul', 'amy', 'ken', 'cara'] as PersonId[]) {
-  const gaps = [G1, AMY_GAP, KEN_NIGHT, ...S7_GAPS].filter((g) => g.person === person)
+for (const person of ALL_PHONES) {
+  const gaps = ALL_GAPS.filter((x) => x.person === person)
   for (const seg of SEGMENTS.filter((x) => x.person === person && x.kind === 'gap')) {
-    const g = gaps.find((x) => Math.abs(abs(x.start) - 10 - abs(seg.start)) < 1)
+    const g = gaps.find((x) => Math.abs(absMin(x.start) - 10 - absMin(seg.start)) < 1)
     if (g) GAP_OF.set(seg.segment_id, g)
   }
 }

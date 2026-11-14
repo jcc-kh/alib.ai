@@ -21,7 +21,7 @@ export default function MeetingsList({ out, places }: { out: MeetingsOutput; pla
         <div className="flex flex-col justify-center rounded-xl border border-line p-5">
           <div className="font-serif text-6xl text-fg">{out.contact_rows_found}</div>
           <div className="mt-2 text-sm text-muted">
-            messages or calls between {personName(out.person_a)} and {personName(out.person_b)} on any of the four phones.
+            messages or calls between {personName(out.person_a)} and {personName(out.person_b)} on any phone in the case.
           </div>
           <div className="mt-3 text-xs text-faint">Checked: {out.channels_checked.join(', ')}</div>
         </div>

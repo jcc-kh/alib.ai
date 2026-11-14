@@ -1,8 +1,8 @@
 # Alib.ai
 
-*Alibi + AI = **Alib.ai**: it checks whether everyone's story holds up across their phones.*
+*Alibi + AI = **Alib.ai**: it helps forensic investigators dissect messy phone data and see the patterns in it.*
 
-**Compare phones from the same case. See what's confirmed, what doesn't add up, and what can't be known, with every claim one click from its evidence.**
+**Load every phone in a case. Alib.ai sweeps them all and lays out who is connected, whose routine covers the scene, where every phone was when it mattered, what broke from routine, and who had a grievance. Every insight is one click from the rows behind it.**
 
 > Status: **clickable mock-up.** The UI runs on canned synthetic data with a simulated agent run. The real backend (ingest, checks, LangChain deepagents) is designed in [ARCHITECTURE.md](ARCHITECTURE.md) and plugs in behind the same API. Built for HackPrinceton (Arlequin Track 1, LangChain deepagents, Amazon).
 
@@ -10,9 +10,19 @@
 
 ## Why
 
-Investigators often hold data from several phones in one case. Reading them by hand takes days, and some facts only show up when you compare phones. One example: a message that is still on Paul's phone but has been deleted from Amy's.
+Investigators often hold data from several phones in one case. Reading them by hand takes days, and some facts only show up when you compare phones. One example: a text that is still on the victim's phone but has been deleted from the phone it was sent to.
 
-Alib.ai does that comparison. The investigator writes a short **brief** in three parts: what they believe, what confuses them, and what they don't know. They can also add **statements** made by people in the case ("I was at home all evening"). An AI agent splits the brief and statements into separate claims, the investigator confirms them, and the agent checks each one against every phone. The report shows, for each person, which of their claims the phones support or contradict. Every finding cites the exact data rows behind it.
+Alib.ai does that comparison and organises what it finds around the questions investigators already ask, using the visual methods police use on digital evidence:
+
+| Question | Method it borrows | Main visual |
+|---|---|---|
+| Who is connected, and how? | Link chart (i2 Analyst's Notebook, Cellebrite Pathfinder), synced to a timeline | Portraits as nodes; calls, texts, money, deleted threads, meetings and hostile posts as links |
+| Whose routine area includes the scene? | Activity space / anchor points from geographic profiling | Map with each phone's routine radius, the scene, and overlap with the victim's area |
+| Where was every phone in the time-of-death window? | Alibi grid and suspect-journey map | Phone × 10-minute grid, plus each phone's track through the window |
+| What broke from routine? | Pattern-of-life comparison, synchronised behaviour | That night against a normal night; the post-news deletions; location gaps |
+| Who had a grievance? | Social media review for leakage and grievance | Every post, scored for hostility by a fixed classifier |
+
+Every insight cites the exact data rows behind it, and every number can be recomputed in the browser from those rows.
 
 ## How it works
 
@@ -24,12 +34,13 @@ On case load:
 2. **Sweep (code only).** Every check runs across every pair of people and the whole date range. Each hit is saved as a *signal*, with the rows that support it.
 3. **Triage (agents).** Signals are grouped into incidents, and incidents are ranked by how many checks agree and how many phones are involved. Signals with an ordinary explanation are dismissed, with the reason recorded. Moments where three or more phones act together are flagged as anchors. The result is an **opening briefing**, on screen before you type anything.
 
-When you submit a brief or statements:
+After the briefing:
 
-4. **Parse and confirm.** The agent splits them into separate claims, each attributed to whoever made it. **You approve or edit the list before any check runs.**
-5. **Refine (agents).** Each claim is matched to existing signals first. New checks run only for what the sweep didn't cover, and everything is re-ranked by relevance to your questions.
-6. **Assemble (code).** The report is put together in code from the structured findings. The only free text an agent writes is a short next-steps paragraph.
-7. **Review.** If you dispute a data row, it is excluded, every check that cited it reruns, and findings that changed are marked.
+4. **Lines of inquiry.** Each insight is filed under the question it answers (connections, routine areas, the time-of-death window, what changed, motive). Each question has its own page with the visual police use for it.
+5. **Ask.** Free-form questions go to the same orchestrator; answers cite findings or say "can't tell".
+6. **Review.** If you dispute a data row, it is excluded, every check that cited it reruns, and findings that changed are marked.
+
+> The mock no longer includes hypothesis testing (parsing statements into claims and grading each one). [ARCHITECTURE.md](ARCHITECTURE.md) stages ③–⑤ still describe it as designed in revision 3; the team should decide whether to keep it in the backend.
 
 **Agents never compute, and checks never conclude.** Every comparison is a plain Python function that returns the rows it used, and every verdict comes from a rule in code. The agents decide *which* checks answer *which* question and write one plain sentence per finding. A code validator then rejects any sentence that:
 - doesn't cite evidence, or cites a row the investigator disputed
@@ -37,36 +48,41 @@ When you submit a brief or statements:
 - has a verdict different from the one the code rule gave
 - rests on a suspect window without saying so
 
-## The demo case (synthetic)
+## The demo case (synthetic): Death at Pier 9
 
-Money is missing from **Harbor Supply Co.**, a fictional company. An audit is announced on 17 April at 10:00. Four people say they barely know each other:
+**Ravi Mehta**, owner of Harbor Supply Co., is found dead at the company's Pier 9 warehouse on 17 April at 07:40. The medical examiner puts the time of death between **21:00 and 23:30 on 16 April**. Five phones are seized, including Ravi's own, recovered at the scene.
 
 | Person | Role |
 |---|---|
-| Paul Tan | Bookkeeper at Harbor Supply Co. |
-| Amy Lim | Paul's friend |
-| Ken Ong | Paul's friend |
-| Cara Diaz | Supplier to Harbor Supply Co. |
+| Ravi Mehta | Victim. Owner of Harbor Supply Co. |
+| Paul Becker | Bookkeeper at Harbor Supply Co. |
+| Amy Brooks | Ravi's estranged partner |
+| Ken Walsh | Warehouse lead, let go by Ravi on 14 April |
+| Cara Novak | Supplier to Harbor Supply Co. |
 
-The investigator's brief is pre-filled:
-- **Believe:** Paul and Amy were together on the evening of 14 April. Paul and Cara don't know each other.
-- **Confused:** Paul sent Ken $5,000 on 15 April and can't explain why.
-- **Don't know:** Where did the missing money end up? Did anyone react to the audit announcement?
+What the data holds (the answer key is in `frontend/src/mock/answerKey.ts`):
+- At 18:05 Ravi's phone texted Paul: *"I've seen the Novak invoices. Pier 9, 9:30 tonight. Come alone."* Paul's phone came within 950 m of Pier 9 at 21:10 and was then off until 23:38.
+- Amy's texts with Ravi that evening survive only on Ravi's phone; her phone had no location data from 21:40 to 22:50 while it called him twice.
+- Paul paid Cara $4,800 as an "invoice" and $4,320 came back the same afternoon; their phones met four times with no call or text on record.
+- Ken posted hostile comments about Ravi after losing his job, but his phone was at least 9 km from Pier 9 all evening. Motive is a lead, not presence.
+- After a news alert at 09:05 on 17 April, three phones deleted threads within 35 minutes.
+- Five decoys look suspicious but have ordinary explanations; the sweep sets all of them aside.
 
-All people, companies, places and data are invented.
+All people, companies, places and data are invented. The **portraits are GAN-generated faces of people who do not exist**, taken from public-domain files on Wikimedia Commons; see [frontend/public/portraits/CREDITS.md](frontend/public/portraits/CREDITS.md). Do not replace them with photos of real people.
 
 ## The agents
 
-They are built with LangChain **deepagents** (`create_deep_agent`): one orchestrator on a stronger model and five domain subagents on a faster one. Every subagent returns structured `Finding` objects, with the verdict copied from a code rule and each number traced to a check-output field. The orchestrator reads them and can **chain** them: one subagent's result triggers a follow-up task for another. There is no report-writing agent, because the report is assembled in code, and no auditing agent, because `validate_report()` does that job.
+They are built with LangChain **deepagents** (`create_deep_agent`): one orchestrator on a stronger model and six domain subagents on a faster one. Every subagent returns structured `Finding` objects, with the verdict copied from a code rule and each number traced to a check-output field. The orchestrator reads them and can **chain** them: one subagent's result triggers a follow-up task for another. There is no report-writing agent, because the report is assembled in code, and no auditing agent, because `validate_report()` does that job.
 
 | Agent | Owns | Checks |
 |---|---|---|
 | **orchestrator** | Triage on case load; parsing the brief and statements into claims; pausing for the investigator to confirm them; dispatching follow-ups; the next-steps paragraph | `confirm_items`, `propose_incidents`, `anchor_moments`, `rank_incidents`, `match_brief_item`, `get_coverage`, `get_reliability` (code helpers) |
 | **relationship-mapper** | Identity matching across phones; the people map the others use; possible burner numbers | `identity_match`, `unresolved_identifiers`, `contact_graph` |
-| **location-analyst** | Where each phone was | `location_timeline`, `location_gaps`, `distance_between`, `silent_meetings`, `group_meetings`† |
-| **comms-analyst** | Messages and calls | `missing_messages`, `call_log_mismatch`*, `contact_went_quiet`*, `search_messages` |
+| **location-analyst** | Where each phone was | `presence_window`, `activity_space`, `location_timeline`, `location_gaps`, `distance_between`, `silent_meetings`, `group_meetings`† |
+| **comms-analyst** | Messages and calls | `last_contacts`, `missing_messages`, `call_log_mismatch`*, `contact_went_quiet`*, `search_messages` |
 | **financial-analyst** | Money | `money_chains`, `transfer_after_meeting`* |
 | **device-forensics** | Deletions and power | `deletions`, `power_events`, `synchronised_behaviour` |
+| **social-analyst** | Social media posts, comments and follows | `social_profile`, `social_hostility` (fixed local classifier; reports tension, never placement) |
 
 Every subagent also gets `get_reliability`, `apply_verdict_rule`, `get_events` and `get_coverage`.
 
@@ -119,62 +135,23 @@ npm run dev
 
 Open http://localhost:5173 in Chrome on a laptop-size screen.
 
-Two UIs run over the same case data. Switch between them from either one.
+The dashboard opens on the case list at http://localhost:5173/#/pro/. Deep links such as `#/pro/review` (briefing), `#/pro/window` or `#/pro/connections` load the completed demo case automatically.
 
-| UI | URL | For |
-|---|---|---|
-| **Pro**: analyst dashboard, light/dark | http://localhost:5173/#/pro/ingest | Day-to-day use |
-| **Noir**: case-file / escape-room | http://localhost:5173/#/noir/locker | Stage demos |
+### Click-path
 
-Deep links such as `#/pro/review` or `#/noir/board` load a completed demo case automatically.
+0. **Cases.** Open **Death at Pier 9** to jump to its briefing, or click **+ Create new case**.
+1. **Ingest.** Name the case, click **Load sample bundle**, then pick the days to analyse. Counts per phone are computed from the rows.
+2. **Analyse.** Watch the sweep and triage live: an agent network (bundle → orchestrator → people map → location, messages, money, device and social agents → triage → write-up → **Main findings**), a run log, and a timeline of what each agent did. Click a finished agent to open its envelope (`findings/*.json`).
+3. **Briefing.** The victim, the time-of-death facts, the four persons of interest with their phones' status in the window, the six insights (each linked to its line of inquiry), the alibi grid at a glance, and the scorecard against the answer key.
+4. **Lines of inquiry** (left rail):
+   - **Who is connected, and how?** Link chart with portraits; filter by channel; click days on the strip to set the time window; click a link for every interaction behind it.
+   - **Whose routine area includes the scene?** Routine-area circles on a map, overlap with the victim's area, and distance to the scene through the evening.
+   - **Where was every phone in the time-of-death window?** Alibi grid, each phone's journey on the map, the location timeline for that night, and the victim's last contacts.
+   - **What broke from routine?** That night against a normal night, the post-news deletions, the week's activity, and every location gap with why it was or wasn't raised.
+   - **Who had a grievance?** Every post on a timeline coloured by hostility score, the flagged posts, and each account's status in the window.
+5. **Ask.** Try `Who was near the scene in the time-of-death window?` or `Did Paul and Ravi argue last year?` (the second returns can't tell).
 
-### Pro click-path (guided: Ingest → Analyse → Review → Refine → Ask)
-1. **Ingest.** Click **Load sample bundle**. You get:
-   - KPI tiles
-   - rows by table per phone
-   - a location coverage chart with gaps hatched by type
-   - the devices table and ingest log
-
-   Click **Run analysis →**.
-2. **Analyse.** Watch the sweep and triage live:
-   - **agent network:** bundle → orchestrator → people map → four domain agents → triage → write-up → **conclusion**. Dots travel along the edges while data moves, and follow-ups show as dashed arcs.
-   - **run log:** a streaming list of every call and result
-   - **trace:** a Gantt of every tool call, with follow-up arrows
-
-   Click a finished node to open its **envelope** (`findings/*.json`). When every agent is done, the conclusion card lists the ranked incidents.
-3. **Review.** The dashboard has:
-   - **KPI strip:** four counts
-   - **Incidents:** short title plus key numbers; click to open the evidence
-   - **Anchor window:** close-up of 17 Apr 08:00–16:00
-   - **Activity chart:** hourly, with power-offs shaded and the audit notice marked
-   - **Location timeline:** click a block to filter "time at places"
-   - **Time at places** and **distance between phones**
-
-   Each chart has **Expand**, which opens its own view.
-
-   Toggle light/dark with ☾ in the top bar.
-4. **Refine with brief.** Run the pre-filled brief. Each item is matched to existing incidents, and the money question shows a live follow-up chain. Results are grouped by verdict, and every row opens the finding drawer (Evidence · How we know · Verify · Sources).
-5. **Ask.** Try `Was any phone's location off while it was in use?` or `Did Paul meet Cara in March?` (the second returns cannot tell).
-6. **Views:**
-   - **Activity:** larger chart plus counts per day.
-   - **Location timeline:** day or week, with a gap table and a map of the window.
-   - **Places:** time at places, by week or by day.
-   - **Distance between phones:** all six pairs.
-   - **Signals:** every sweep hit, sortable.
-
-### Noir click-path (five locked rooms)
-1. **Evidence locker.** Four evidence bags. Click **Log the evidence** and the tags fill in with computed counts.
-2. **Back room.** Seven desks type out their checks. Follow-up notes slide between desks, and a sealed manila envelope lands on each desk when its agent finishes. Break the wax seal to read the typed findings.
-3. **Evidence board.** A corkboard with:
-   - polaroids of the four phones' owners
-   - red string by channel
-   - incident index cards, with the anchor circled in red marker
-   - a ledger strip
-   - set-aside notes
-
-   Click a card to open the dossier.
-4. **Your theory.** Write the brief on the notepad. Each line comes back as a pinned note stamped HOLDS, DOESN'T HOLD, CAN'T TELL or ANSWERED.
-5. **Interrogation.** A typewritten Q&A whose answers carry clickable exhibit tags.
+Every insight opens the finding drawer: Evidence · How we know · Verify (recompute from raw rows) · Sources (file, line, raw JSON). Toggle light/dark with ☾ in the top bar.
 
 ## Status
 
@@ -186,7 +163,8 @@ Deep links such as `#/pro/review` or `#/noir/board` load a completed demo case a
 | API contract (`frontend/src/api/types.ts`) | ✅ Defined |
 | Case Bundle v1 format and example | ✅ Defined |
 | Revision 2: sweep → triage → brief refines; signals, incidents, anchors, dismissals; location timeline and typed gaps; follow-up chaining | ✅ Built in the mock |
-| UI revamp: guided flow, Pro dashboard (light/dark) and Noir case-file UI, live agent board + envelopes, charts from computed rows | ✅ Built in the mock |
+| UI revamp: guided flow, Pro dashboard (light/dark), live agent network + envelopes, charts from computed rows | ✅ Built in the mock |
+| Pivot to insight discovery: murder case (5 phones incl. the victim's), lines of inquiry (link chart, routine-area map, alibi grid, pattern of life, social hostility), 4 new checks, social-analyst, generated portraits | ✅ Built in the mock; Noir UI and hypothesis testing removed |
 | Background data: full week of messages, calls, locations, transactions per phone (seeded), counts computed | ✅ Built in the mock (`src/mock/background.ts`) |
 | Revision 3: integrity pass, statements, item confirmation, disputes that rerun checks, report assembled in code, hardened validator, multi-seed evaluation | ✅ Designed in [ARCHITECTURE.md](ARCHITECTURE.md); not yet in the mock |
 | Synthetic data generator and answer key (gap plant G1 and its decoy, planted clock skew and spoofed GPS, a burner number, innocent noise, statements) | ⏳ Next |
@@ -217,13 +195,17 @@ schema/case-bundle-v1/     ingest format spec + example bundle
 frontend/src/
   api/types.ts             the API contract (shared shapes)
   api/index.ts, mock.ts    swap point: mock today, FastAPI later (incl. analyseCase run stream)
-  mock/                    planted scenarios (data.ts), seeded background week (background.ts),
-                           stays (segments.ts), signals/incidents (signals.ts), run script (run.ts)
+  mock/                    planted case (data.ts), seeded background week (background.ts), stays (segments.ts),
+                           presence / activity space / last contacts / contact graph (derived.ts),
+                           findings (findings.ts), signals/insights (signals.ts), run script (run.ts),
+                           answer key and scorecard (answerKey.ts)
   lib/                     aggregates.ts (chart series), verify.ts (in-browser recompute), format.ts
-  state/caseStore.tsx      one case-flow store shared by both UIs
-  components/              shared finding detail (4 tabs), evidence views, location lanes
-  ui/pro/                  analyst dashboard: shell, steps/*, charts, envelope drawer, Ask panel
-  ui/noir/                 case-file UI: locker, back room, board, theory, interrogation
+  state/caseStore.tsx      the case-flow store
+  components/              finding detail (4 tabs), evidence views, location lanes, portraits,
+                           relationship graph, radius map, presence (alibi) grid
+  ui/pro/                  dashboard: shell, steps/* (ingest, analyse, briefing, ask),
+                           inquiries/* (one page per line of inquiry), charts, envelope drawer, Ask panel
+frontend/public/portraits/ GAN-generated faces (public domain) + CREDITS.md
 ```
 
 These are planned and not yet created: `data/generate.py` (the synthetic generator), `backend/` (case store, integrity pass, checks, agents, report, API and tests) and `eval/` (multi-seed evaluation). See [ARCHITECTURE.md](ARCHITECTURE.md) §13.

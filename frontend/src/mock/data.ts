@@ -1,25 +1,26 @@
-// Synthetic case data for the mock-up. Everything here is fictional.
-// The mock builds the planted-scenario rows plus the check outputs that the real checks
-// (backend/checks/) would return over the same rows. The numbers in the check outputs are
-// computed from the rows, which mirrors the rule that statements use check output, not model arithmetic.
+// Synthetic case data for the mock-up: "Death at Pier 9". Everything here is fictional, and the
+// portraits are GAN-generated faces of people who do not exist (public/portraits/CREDITS.md).
+//
+// The mock builds the planted rows plus the check outputs the real checks (backend/checks/) would
+// return over the same rows. Numbers in check outputs are computed from rows, never typed in, which
+// mirrors the rule that statements use check output, not model arithmetic.
+//
+// The story the plants encode (what an investigator should be able to find):
+//   - Ravi Mehta, owner of Harbor Supply Co., is found dead at the Pier 9 warehouse on 17 Apr at 07:40.
+//     The medical examiner puts the time of death between 21:00 and 23:30 on 16 Apr.
+//   - At 18:05 Ravi's phone texted Paul: "I've seen the Novak invoices. Pier 9, 9:30 tonight."
+//     Paul's phone came within 0.9 km of Pier 9 at 21:10 and was then powered off until 23:38.
+//   - Amy (Ravi's estranged partner) argued with Ravi by text that evening; those texts survive only on
+//     Ravi's phone. Her phone reported no location 21:40–22:50 while it called Ravi twice.
+//   - Paul paid Cara $4,800 as an "invoice" and Cara sent $4,320 back the same afternoon; their phones met
+//     four times at Dock Cafe with no call or text on record.
+//   - Ken, dismissed by Ravi on 14 Apr, posted hostile comments about him, but his phone was far from Pier 9
+//     the whole window. Motive and a shared area are leads, not presence.
+//   - After a news alert at 09:05 on 17 Apr, three phones deleted threads within 35 minutes.
+//   Decoys: Ken's phone off overnight 14→15 Apr, Cara's 50-min gap on 19 Apr, Amy and Ken at FreshMart once,
+//   Paul → Amy $50 "lunch", and Amy's "Done being lied to." post (below the hostility threshold).
 
-import type {
-  ChainOutput,
-  GapOutput,
-  GapType,
-  CoverageOutput,
-  DistanceOutput,
-  EvidenceRow,
-  EvidenceTable,
-  Graph,
-  MeetingsOutput,
-  MissingOutput,
-  Person,
-  PersonId,
-  Place,
-  SyncOutput,
-  TrackPoint,
-} from '../api/types'
+import type { ChainOutput, GapOutput, GapType, CoverageOutput, EvidenceRow, EvidenceTable, HostilityOutput, MeetingsOutput, MissingOutput, Person, PersonId, Place, SyncOutput, TrackPoint } from '../api/types'
 import { fmtDate } from '../lib/format'
 
 // ---------- helpers ----------
@@ -49,39 +50,60 @@ export function haversine(lat1: number, lon1: number, lat2: number, lon2: number
   return 2 * R * Math.asin(Math.sqrt(a))
 }
 
+export const addMin = (iso: string, m: number) => {
+  const d = new Date(new Date(iso).getTime() + m * 60000 - 4 * 3600000)
+  return `${d.toISOString().slice(0, 19)}${TZ}`
+}
+export const minsBetween = (a: string, b: string) => Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000)
+
 // ---------- the case ----------
 
 export const PLACES: Place[] = [
+  { name: 'Pier 9 Warehouse', kind: 'work', lat: 40.938, lon: -71.962 },
+  { name: 'Harbor Rd lot', kind: 'parking', lat: 40.946, lon: -71.966 },
   { name: 'Harbor Supply Co.', kind: 'work', lat: 41.0, lon: -72.0 },
   { name: 'Dock Cafe', kind: 'cafe', lat: 40.9905, lon: -71.9842 },
   { name: 'Sunset Park', kind: 'park', lat: 40.905, lon: -72.04 },
   { name: 'Northgate Mall', kind: 'mall', lat: 41.11, lon: -71.99 },
   { name: 'FreshMart', kind: 'supermarket', lat: 41.03, lon: -72.03 },
   { name: 'Riverside Gym', kind: 'gym', lat: 41.045, lon: -72.052 },
-  { name: 'Pier 9 Warehouse', kind: 'work', lat: 40.938, lon: -71.962 },
-  { name: 'Tan residence', kind: 'home', lat: 40.975, lon: -72.02 },
-  { name: 'Lim residence', kind: 'home', lat: 41.061, lon: -71.996 },
-  { name: 'Ong residence', kind: 'home', lat: 41.021, lon: -71.951 },
-  { name: 'Diaz residence', kind: 'home', lat: 40.961, lon: -71.94 },
+  { name: 'Mehta residence', kind: 'home', lat: 40.972, lon: -71.978 },
+  { name: 'Becker residence', kind: 'home', lat: 40.975, lon: -72.02 },
+  { name: 'Brooks residence', kind: 'home', lat: 41.061, lon: -71.996 },
+  { name: 'Walsh residence', kind: 'home', lat: 41.021, lon: -71.951 },
+  { name: 'Novak residence', kind: 'home', lat: 40.961, lon: -71.94 },
 ]
-const place = (name: string) => PLACES.find((p) => p.name === name)!
+export const place = (name: string) => PLACES.find((p) => p.name === name)!
+export const SCENE = place('Pier 9 Warehouse')
 
 export const NUMBERS: Record<PersonId, string> = {
+  ravi: '+1 555 010 0100',
   paul: '+1 555 010 0101',
   amy: '+1 555 010 0202',
   ken: '+1 555 010 0303',
   cara: '+1 555 010 0404',
 }
-export const COMPANY_NUMBER = '+1 555 010 0900'
+export const NEWS_SENDER = 'Port Calder News'
 
+const blank = { messages: 0, calls: 0, locations: 0, transfers: 0, social: 0 }
 export const PEOPLE: Person[] = [
-  { person_id: 'paul', name: 'Paul Tan', role: 'Bookkeeper at Harbor Supply Co.', phone_number: NUMBERS.paul, device_id: 'paul-iphone', color: 'var(--p-paul)', counts: { messages: 912, calls: 64, locations: 992, transfers: 14, social: 41 } },
-  { person_id: 'amy', name: 'Amy Lim', role: "Paul's friend", phone_number: NUMBERS.amy, device_id: 'amy-pixel', color: 'var(--p-amy)', counts: { messages: 801, calls: 51, locations: 1008, transfers: 9, social: 67 } },
-  { person_id: 'ken', name: 'Ken Ong', role: "Paul's friend", phone_number: NUMBERS.ken, device_id: 'ken-galaxy', color: 'var(--p-ken)', counts: { messages: 655, calls: 47, locations: 944, transfers: 11, social: 22 } },
-  { person_id: 'cara', name: 'Cara Diaz', role: 'Supplier to Harbor Supply Co.', phone_number: NUMBERS.cara, device_id: 'cara-iphone', color: 'var(--p-cara)', counts: { messages: 702, calls: 39, locations: 991, transfers: 17, social: 35 } },
+  { person_id: 'ravi', name: 'Ravi Mehta', role: 'Victim. Owner of Harbor Supply Co.', phone_number: NUMBERS.ravi, device_id: 'ravi-iphone', color: 'var(--p-ravi)', counts: { ...blank }, portrait: '/portraits/ravi.jpg', is_victim: true, handle: '@ravi.mehta' },
+  { person_id: 'paul', name: 'Paul Becker', role: 'Bookkeeper at Harbor Supply Co.', phone_number: NUMBERS.paul, device_id: 'paul-iphone', color: 'var(--p-paul)', counts: { ...blank }, portrait: '/portraits/paul.jpg', handle: '@paulbecker' },
+  { person_id: 'amy', name: 'Amy Brooks', role: "Ravi's estranged partner", phone_number: NUMBERS.amy, device_id: 'amy-pixel', color: 'var(--p-amy)', counts: { ...blank }, portrait: '/portraits/amy.jpg', handle: '@amybrooks' },
+  { person_id: 'ken', name: 'Ken Walsh', role: 'Warehouse lead, dismissed 14 Apr', phone_number: NUMBERS.ken, device_id: 'ken-galaxy', color: 'var(--p-ken)', counts: { ...blank }, portrait: '/portraits/ken.jpg', handle: '@kwalsh_' },
+  { person_id: 'cara', name: 'Cara Novak', role: 'Supplier to Harbor Supply Co.', phone_number: NUMBERS.cara, device_id: 'cara-iphone', color: 'var(--p-cara)', counts: { ...blank }, portrait: '/portraits/cara.jpg', handle: '@cara.novak' },
 ]
+export const VICTIM: PersonId = 'ravi'
+export const ALL_PHONES: PersonId[] = PEOPLE.map((p) => p.person_id)
+/** Everyone except the victim. */
+export const POI: PersonId[] = ALL_PHONES.filter((p) => p !== VICTIM)
 export const personName = (id: PersonId) => PEOPLE.find((p) => p.person_id === id)?.name.split(' ')[0] ?? id
 export const personColor = (id: PersonId) => PEOPLE.find((p) => p.person_id === id)?.color ?? 'var(--ink-3)'
+export const personOf = (id: PersonId) => PEOPLE.find((p) => p.person_id === id)!
+export const HOME: Record<PersonId, string> = { ravi: 'Mehta residence', paul: 'Becker residence', amy: 'Brooks residence', ken: 'Walsh residence', cara: 'Novak residence' }
+
+export const TOD = { start: ts(16, 21, 0), end: ts(16, 23, 30) }
+export const FOUND_AT = ts(17, 7, 40)
 
 // ---------- row store ----------
 
@@ -107,8 +129,9 @@ function nextId(owner: PersonId, table: EvidenceTable) {
 }
 // Provenance: where each row lives in the ingested Case Bundle. Line numbers are derived from the
 // record number so they are stable; the bundle hash is a fixed placeholder in the mock.
-export const BUNDLE = { name: 'harbor-supply-case.zip', sha256: '9f2c4e1ab07d3c58e6f1d2a4b9c07e3315aa8d0c6b2e94f7a1d5c3b8e0f6a2d4', tool: 'synthetic-generator 0.1' }
+export const BUNDLE = { name: 'pier9-case.zip', sha256: '4b8e2d91c07a3f56e1d2c4a9b7f03e8126aa5d0c3b9e47f1a6d5c2b8e0f9a3d7', tool: 'synthetic-generator 0.2' }
 const EXTRACTED_AT: Record<PersonId, string> = {
+  ravi: '2026-04-17T15:20:00-04:00',
   paul: '2026-04-21T09:14:00-04:00',
   amy: '2026-04-21T10:02:00-04:00',
   ken: '2026-04-21T11:30:00-04:00',
@@ -142,7 +165,7 @@ export function addRow(owner: PersonId, table: EvidenceTable, timestamp: string,
   return id
 }
 
-function locRow(owner: PersonId, t: string, placeName: string, jitterM = 25): TrackPoint {
+export function locRow(owner: PersonId, t: string, placeName: string, jitterM = 25): TrackPoint {
   const pl = place(placeName)
   const dLat = ((rng() - 0.5) * 2 * jitterM) / 111320
   const dLon = ((rng() - 0.5) * 2 * jitterM) / (111320 * Math.cos((pl.lat * Math.PI) / 180))
@@ -153,123 +176,152 @@ function locRow(owner: PersonId, t: string, placeName: string, jitterM = 25): Tr
   return { id, t, lat, lon }
 }
 
-function median(xs: number[]) {
-  const s = [...xs].sort((a, b) => a - b)
-  const m = Math.floor(s.length / 2)
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2
+/** A location row at an explicit point (travel fixes for the planted evening). */
+function pointRow(owner: PersonId, t: string, lat: number, lon: number, label: string) {
+  const acc = 8 + Math.floor(rng() * 12)
+  const id = addRow(owner, 'locations', t, `${label} (±${acc} m)`, { lat: +lat.toFixed(6), lon: +lon.toFixed(6), accuracy_m: acc, place_name: label === 'In transit' ? null : label, source: 'gps' })
+  return { id, t, lat: +lat.toFixed(6), lon: +lon.toFixed(6) }
 }
 
-// =====================================================================
-// S2  Shared alibi: 14 Apr 18:00–21:00, Paul's phone at Sunset Park, Amy's at Northgate Mall
-// =====================================================================
-const s2Slots: DistanceOutput['slots'] = []
-for (let i = 0; i <= 18; i++) {
-  const t = ts(14, 18 + Math.floor((i * 10) / 60), (i * 10) % 60)
-  const a = locRow('paul', t, 'Sunset Park', 60)
-  const b = locRow('amy', t, 'Northgate Mall', 80)
-  s2Slots.push({ t, a, b, distance_m: Math.round(haversine(a.lat, a.lon, b.lat, b.lon)) })
+const msg = (owner: PersonId, t: string, dir: 'in' | 'out', other: PersonId | string, body: string, app = 'SMS', label?: string) => {
+  const otherNum = NUMBERS[other] ?? other
+  const name = label ?? (NUMBERS[other] ? personName(other) : other)
+  return addRow(owner, 'messages', t, `${dir === 'out' ? 'To' : 'From'} ${name}: "${body}"`, {
+    thread_id: `${app.toLowerCase()}:${otherNum}`,
+    app,
+    direction: dir,
+    from: dir === 'out' ? NUMBERS[owner] : otherNum,
+    to: dir === 'out' ? otherNum : NUMBERS[owner],
+    body,
+  })
 }
-const s2d = s2Slots.map((s) => s.distance_m)
-export const S2: DistanceOutput = {
-  kind: 'distance',
-  person_a: 'paul',
-  person_b: 'amy',
-  start: ts(14, 18, 0),
-  end: ts(14, 21, 0),
-  slots: s2Slots,
-  min_m: Math.min(...s2d),
-  median_m: Math.round(median(s2d)),
-  max_m: Math.max(...s2d),
-  label: 'apart',
-  thresholds: { together_m: 150, together_share: 0.8, apart_m: 1000 },
-}
+const call = (owner: PersonId, t: string, dir: 'in' | 'out', other: PersonId, dur: number) =>
+  addRow(owner, 'calls', t, `${dir === 'out' ? 'Outgoing call to' : dur ? 'Incoming call from' : 'Missed call from'} ${personName(other)}${dur ? `, ${dur} s` : dir === 'out' ? ', not answered' : ''}`, {
+    direction: dir,
+    from: dir === 'out' ? NUMBERS[owner] : NUMBERS[other],
+    to: dir === 'out' ? NUMBERS[other] : NUMBERS[owner],
+    duration_s: dur,
+    status: dur ? 'answered' : 'missed',
+  })
+/** A call that appears on both phones (calls are not removed when a message thread is deleted). */
+const callBoth = (t: string, from: PersonId, to: PersonId, dur: number) => ({ on_from: call(from, t, 'out', to, dur), on_to: call(to, t, 'in', from, dur) })
 
 // =====================================================================
-// S1  Deleted message: three texts Paul -> Amy at 18:32 on 14 Apr, absent from Amy's phone
+// LAST  The victim's final evening, as recorded on Ravi's phone
 // =====================================================================
-const s1Bodies = [
-  [ts(14, 18, 32, 4), 'Are you free tonight? Need to talk to you about something.'],
-  [ts(14, 18, 32, 51), "Come to Sunset Park, I'm by the boathouse."],
-  [ts(14, 18, 34, 12), 'Please come. Better in person than over text.'],
-] as const
-const s1Items: MissingOutput['items'] = s1Bodies.map(([t, body]) => ({
+export const LAST_IDS: Record<string, string> = {}
+// 18:05 Ravi → Paul. Paul's phone deleted this SMS thread on 17 Apr (see SYNC), so it lives on Ravi's phone only.
+LAST_IDS.summon = msg('ravi', ts(16, 18, 5, 12), 'out', 'paul', "I've seen the Novak invoices. Pier 9, 9:30 tonight. Come alone.")
+LAST_IDS.reply = msg('ravi', ts(16, 18, 11, 40), 'in', 'paul', 'Ok. We can sort this out.')
+// 20:58 Paul → Ravi call, 64 s, on both phones.
+const paulCall = callBoth(ts(16, 20, 58), 'paul', 'ravi', 64)
+LAST_IDS.call = paulCall.on_to
+LAST_IDS.call_paul = paulCall.on_from
+
+// =====================================================================
+// MISSING  Ravi ↔ Amy texts on 16 Apr: on Ravi's phone, gone from Amy's (thread deleted 17 Apr 09:25)
+// =====================================================================
+const amyThread: [string, 'ravi' | 'amy', string][] = [
+  [ts(16, 19, 40, 3), 'amy', 'We need to talk about the house. Tonight.'],
+  [ts(16, 19, 52, 30), 'ravi', 'Not tonight.'],
+  [ts(16, 20, 31, 9), 'amy', "You always say that. I'm done waiting."],
+  [ts(16, 21, 47, 51), 'ravi', "I'm at the warehouse. Tomorrow."],
+  [ts(16, 22, 15, 20), 'amy', 'Answer your phone.'],
+]
+const missingItems: MissingOutput['items'] = amyThread.map(([t, from, body]) => ({
   t,
   channel: 'message' as const,
-  from: 'paul',
-  to: 'amy',
+  from,
+  to: from === 'ravi' ? 'amy' : 'ravi',
   body,
-  on_a: addRow('paul', 'messages', t, `To Amy: "${body}"`, { thread_id: 'sms:amy', app: 'SMS', direction: 'out', from: NUMBERS.paul, to: NUMBERS.amy, body }),
+  on_a: msg('ravi', t, from === 'ravi' ? 'out' : 'in', 'amy', body),
   on_b: null,
 }))
-// Calls are not deleted with a thread, so this call appears on both phones and anchors the alignment.
-{
-  const t = ts(14, 18, 41)
-  s1Items.push({
-    t,
-    channel: 'call',
-    from: 'paul',
-    to: 'amy',
-    body: 'Call, not answered (0 s)',
-    on_a: addRow('paul', 'calls', t, 'Outgoing call to Amy, not answered', { direction: 'out', from: NUMBERS.paul, to: NUMBERS.amy, duration_s: 0, status: 'missed' }),
-    on_b: addRow('amy', 'calls', t, 'Missed call from Paul', { direction: 'in', from: NUMBERS.paul, to: NUMBERS.amy, duration_s: 0, status: 'missed' }),
-  })
-}
-{
-  const t = ts(15, 9, 12)
-  s1Items.push({
-    t,
-    channel: 'call',
-    from: 'amy',
-    to: 'paul',
-    body: 'Call, answered (3 min 24 s)',
-    on_a: addRow('paul', 'calls', t, 'Incoming call from Amy, 204 s', { direction: 'in', from: NUMBERS.amy, to: NUMBERS.paul, duration_s: 204, status: 'answered' }),
-    on_b: addRow('amy', 'calls', t, 'Outgoing call to Paul, 204 s', { direction: 'out', from: NUMBERS.amy, to: NUMBERS.paul, duration_s: 204, status: 'answered' }),
-  })
-}
-const amyDeleteT = ts(17, 20, 15)
-const amyDeleteId = addRow('amy', 'device_events', amyDeleteT, `thread_deleted: SMS thread with ${NUMBERS.paul}`, { event_type: 'thread_deleted', counterpart: NUMBERS.paul, app: 'SMS' })
-export const S1: MissingOutput = {
-  kind: 'missing',
-  person_a: 'paul',
-  person_b: 'amy',
-  items: s1Items,
-  deletion_events: [{ id: amyDeleteId, device_owner: 'amy', t: amyDeleteT, counterpart: 'paul' }],
-  missing_count: s1Items.filter((i) => i.on_a && !i.on_b).length,
-  tolerance_s: 2,
-}
+// Amy's two calls during her location gap: on both phones, unanswered on Ravi's.
+const amyCalls = [ts(16, 22, 30), ts(16, 22, 31)].map((t) => {
+  const on_b = call('amy', t, 'out', 'ravi', 0)
+  const on_a = call('ravi', t, 'in', 'amy', 0)
+  missingItems.push({ t, channel: 'call', from: 'amy', to: 'ravi', body: 'Call, not answered', on_a, on_b })
+  return { t, on_a, on_b }
+})
+LAST_IDS.last_out = missingItems[3].on_a!
+export const AMY_CALL_IDS = amyCalls
 
 // =====================================================================
-// S4  Money chain: Paul -> Ken $5,000 at 11:05, Ken -> Cara $4,500 at 15:40 on 15 Apr
+// SYNC  News alert 17 Apr 09:05, then deletions and power-offs on three phones
+// =====================================================================
+const newsT = ts(17, 9, 5)
+const newsBody = 'Port Calder News: Man found dead at Pier 9 warehouse. Police are appealing for anyone who was in the area last night.'
+const newsIds: Record<PersonId, string> = {}
+for (const p of ['paul', 'amy', 'ken', 'cara'] as PersonId[]) newsIds[p] = msg(p, newsT, 'in', NEWS_SENDER, newsBody, 'Alerts', NEWS_SENDER)
+export const NEWS_IDS = newsIds
+const syncDef: [PersonId, 'thread_deleted' | 'power_off' | 'power_on', string, string][] = [
+  ['paul', 'thread_deleted', ts(17, 9, 20), `SMS thread with ${NUMBERS.ravi} (Ravi)`],
+  ['paul', 'thread_deleted', ts(17, 9, 21), `WhatsApp thread with ${NUMBERS.cara} (Cara)`],
+  ['amy', 'thread_deleted', ts(17, 9, 25), `SMS thread with ${NUMBERS.ravi} (Ravi)`],
+  ['paul', 'power_off', ts(17, 9, 30), 'Device powered off'],
+  ['cara', 'thread_deleted', ts(17, 9, 46), `WhatsApp thread with ${NUMBERS.paul} (Paul)`],
+  ['cara', 'power_off', ts(17, 9, 55), 'Device powered off'],
+  ['paul', 'power_on', ts(17, 12, 40), 'Device powered on'],
+  ['cara', 'power_on', ts(17, 13, 10), 'Device powered on'],
+]
+const syncEvents: SyncOutput['events'] = syncDef.map(([owner, type, t, detail]) => ({
+  id: addRow(owner, 'device_events', t, `${type}: ${detail}`, { event_type: type, detail }),
+  device_owner: owner,
+  event_type: type,
+  t,
+  detail,
+}))
+const firstEv = syncEvents[0].t
+const lastOff = syncEvents.filter((e) => e.event_type !== 'power_on').map((e) => e.t).sort().pop()!
+export const SYNC: SyncOutput = {
+  kind: 'sync',
+  window: { start: firstEv, end: lastOff, minutes: minsBetween(firstEv, lastOff) },
+  view: { start: ts(17, 8, 30), end: ts(17, 13, 30) },
+  trigger: { id: newsIds.paul, device_owner: 'paul', t: newsT, from_label: NEWS_SENDER, body: newsBody, minutes_before_window: minsBetween(newsT, firstEv) },
+  events: syncEvents,
+  phones: ['paul', 'amy', 'cara'],
+  thresholds: { window_min: 60, min_phones: 3 },
+}
+const amyDelete = syncEvents.find((e) => e.device_owner === 'amy')!
+export const MISSING: MissingOutput = {
+  kind: 'missing',
+  person_a: 'ravi',
+  person_b: 'amy',
+  items: missingItems,
+  deletion_events: [{ id: amyDelete.id, device_owner: 'amy', t: amyDelete.t, counterpart: 'ravi' }],
+  missing_count: missingItems.filter((i) => i.on_a && !i.on_b).length,
+  tolerance_s: 2,
+}
+export const PAUL_DELETE_RAVI = syncEvents[0]
+
+// =====================================================================
+// CHAIN  Paul → Cara $4,800 "invoice HSC-2291", Cara → Paul $4,320 4 h 35 min later (15 Apr)
 // =====================================================================
 const l1t = ts(15, 11, 5)
 const l2t = ts(15, 15, 40)
-const l1 = {
-  from: 'paul', to: 'ken', amount: 5000, currency: 'USD', t: l1t, memo: '',
-  row_ids: [
-    addRow('paul', 'transactions', l1t, 'Sent $5,000 to Ken Ong (Swiftpay), no memo', { app: 'Swiftpay', from: NUMBERS.paul, to: NUMBERS.ken, amount: 5000, currency: 'USD', memo: '' }),
-    addRow('ken', 'transactions', l1t, 'Received $5,000 from Paul Tan (Swiftpay), no memo', { app: 'Swiftpay', from: NUMBERS.paul, to: NUMBERS.ken, amount: 5000, currency: 'USD', memo: '' }),
-  ],
-}
-const l2 = {
-  from: 'ken', to: 'cara', amount: 4500, currency: 'USD', t: l2t, memo: 'materials',
-  row_ids: [
-    addRow('ken', 'transactions', l2t, 'Sent $4,500 to Cara Diaz (Swiftpay), memo "materials"', { app: 'Swiftpay', from: NUMBERS.ken, to: NUMBERS.cara, amount: 4500, currency: 'USD', memo: 'materials' }),
-    addRow('cara', 'transactions', l2t, 'Received $4,500 from Ken Ong (Swiftpay), memo "materials"', { app: 'Swiftpay', from: NUMBERS.ken, to: NUMBERS.cara, amount: 4500, currency: 'USD', memo: 'materials' }),
-  ],
-}
-export const S4: ChainOutput = {
+const tx = (owner: PersonId, t: string, from: PersonId, to: PersonId, amount: number, memo: string) =>
+  addRow(owner, 'transactions', t, `${owner === from ? `Sent $${amount.toLocaleString()} to ${personOf(to).name}` : `Received $${amount.toLocaleString()} from ${personOf(from).name}`} (Swiftpay)${memo ? `, memo "${memo}"` : ', no memo'}`, {
+    app: 'Swiftpay',
+    from: NUMBERS[from],
+    to: NUMBERS[to],
+    amount,
+    currency: 'USD',
+    memo,
+  })
+const l1 = { from: 'paul', to: 'cara', amount: 4800, currency: 'USD', t: l1t, memo: 'invoice HSC-2291', row_ids: [tx('paul', l1t, 'paul', 'cara', 4800, 'invoice HSC-2291'), tx('cara', l1t, 'paul', 'cara', 4800, 'invoice HSC-2291')] }
+const l2 = { from: 'cara', to: 'paul', amount: 4320, currency: 'USD', t: l2t, memo: 'thx', row_ids: [tx('cara', l2t, 'cara', 'paul', 4320, 'thx'), tx('paul', l2t, 'cara', 'paul', 4320, 'thx')] }
+export const CHAIN: ChainOutput = {
   kind: 'chain',
   links: [l1, l2],
-  gap_minutes: 275,
+  gap_minutes: minsBetween(l1t, l2t),
   gap_label: '4 h 35 min',
   ratio: 0.9,
   thresholds: { window_h: 24, ratio_min: 0.8, ratio_max: 1.0, min_amount: 500 },
 }
-/** Just the first link, for the "Paul sent Ken $5,000" brief item. */
-export const S4_FIRST: ChainOutput = { ...S4, links: [l1] }
 
 // =====================================================================
-// S5  Silent meetings: Paul's and Cara's phones at Dock Cafe on 13, 15, 16, 18 Apr; no contact anywhere
+// MEET  Paul's and Cara's phones at Dock Cafe on 13, 15, 16, 18 Apr; no call or text between them anywhere
 // =====================================================================
 const occasionsDef = [
   { day: 13, h: 8, m: 10, slots: 5 },
@@ -277,7 +329,7 @@ const occasionsDef = [
   { day: 16, h: 12, m: 30, slots: 5 },
   { day: 18, h: 9, m: 0, slots: 6 },
 ]
-export const S5: MeetingsOutput = {
+export const MEET: MeetingsOutput = {
   kind: 'meetings',
   person_a: 'paul',
   person_b: 'cara',
@@ -305,100 +357,68 @@ export const S5: MeetingsOutput = {
 }
 
 // =====================================================================
-// S7  Synchronised behaviour on 17 Apr: audit notice 10:00, deletions + power-offs 10:20–11:10
+// HOSTILE  Ken's posts about Ravi after his dismissal on 14 Apr (Snapline, scored by a fixed classifier)
 // =====================================================================
-const auditT = ts(17, 10, 0)
-const auditBody = 'Harbor Supply Co. Finance: an external audit of all supplier payments starts Monday 20 April. Please keep every record as it is.'
-const auditId = addRow('paul', 'messages', auditT, `From Harbor Supply Finance: "${auditBody}"`, { thread_id: 'sms:hsc-finance', app: 'SMS', direction: 'in', from: COMPANY_NUMBER, to: NUMBERS.paul, body: auditBody })
-const syncDef: [PersonId, 'thread_deleted' | 'power_off' | 'power_on', string, string][] = [
-  ['paul', 'thread_deleted', ts(17, 10, 20), `WhatsApp thread with ${NUMBERS.ken} (Ken)`],
-  ['paul', 'power_off', ts(17, 10, 25), 'Device powered off'],
-  ['ken', 'thread_deleted', ts(17, 10, 40), `WhatsApp thread with ${NUMBERS.paul} (Paul)`],
-  ['ken', 'thread_deleted', ts(17, 10, 41), `WhatsApp thread with ${NUMBERS.cara} (Cara)`],
-  ['ken', 'power_off', ts(17, 10, 45), 'Device powered off'],
-  ['cara', 'thread_deleted', ts(17, 11, 0), `WhatsApp thread with ${NUMBERS.ken} (Ken)`],
-  ['cara', 'power_off', ts(17, 11, 10), 'Device powered off'],
-  ['paul', 'power_on', ts(17, 13, 5), 'Device powered on'],
-  ['ken', 'power_on', ts(17, 13, 30), 'Device powered on'],
-  ['cara', 'power_on', ts(17, 14, 0), 'Device powered on'],
+export const HOSTILITY_MODEL = 'toxic-bert v1.2 (local, deterministic)'
+const firedT = ts(14, 16, 20)
+const firedBody = 'Ken, as discussed: today is your last day. HR will send the paperwork. Please return your keys to Paul.'
+const firedId = msg('ken', firedT, 'in', 'ravi', firedBody)
+export const FIRED_RAVI_ID = msg('ravi', firedT, 'out', 'ken', firedBody)
+export function social(owner: PersonId, t: string, kind: 'post' | 'comment' | 'reply' | 'like' | 'follow', text: string, score: number | null, target: PersonId | null, where: string) {
+  return addRow(owner, 'social_interactions', t, `Snapline ${kind}${text ? `: "${text}"` : ''}${where ? ` (${where})` : ''}`, {
+    platform: 'Snapline',
+    actor: personOf(owner).handle,
+    target: target ? personOf(target).handle : null,
+    kind,
+    text,
+    where,
+    hostility: score,
+  })
+}
+const kenPosts: [string, 'post' | 'comment' | 'reply', string, number, string][] = [
+  [ts(14, 19, 2), 'post', '11 years at Pier 9 and Ravi Mehta walks me out with a cardboard box. Remember that name.', 0.74, 'own profile'],
+  [ts(14, 22, 40), 'comment', "Ask the owner where the 'missing' stock really goes.", 0.62, 'Harbor Supply Co. page'],
+  [ts(15, 8, 15), 'post', 'Some people only learn when it costs them.', 0.71, 'own profile'],
+  [ts(15, 21, 30), 'reply', 'Enjoy it while it lasts.', 0.78, "reply to @ravi.mehta's post"],
+  [ts(16, 12, 5), 'post', "He'll get what's coming to him. Not my problem anymore.", 0.86, 'own profile'],
+  [ts(17, 9, 50), 'post', 'karma.', 0.73, 'own profile'],
 ]
-const syncEvents: SyncOutput['events'] = syncDef.map(([owner, type, t, detail]) => ({
-  id: addRow(owner, 'device_events', t, `${type}: ${detail}`, { event_type: type, detail }),
-  device_owner: owner,
-  event_type: type,
-  t,
-  detail,
-}))
-export const S7: SyncOutput = {
-  kind: 'sync',
-  window: { start: ts(17, 10, 20), end: ts(17, 11, 10), minutes: 50 },
-  view: { start: ts(17, 9, 30), end: ts(17, 14, 30) },
-  trigger: { id: auditId, device_owner: 'paul', t: auditT, from_label: 'Harbor Supply Finance', body: auditBody, minutes_before_window: 20 },
-  events: syncEvents,
-  phones: ['paul', 'ken', 'cara'],
-  thresholds: { window_min: 60, min_phones: 3 },
+export const HOSTILE: HostilityOutput = {
+  kind: 'hostility',
+  actor: 'ken',
+  target: 'ravi',
+  platform: 'Snapline',
+  threshold: 0.7,
+  model: HOSTILITY_MODEL,
+  items: kenPosts.map(([t, kind, text, score, where]) => ({ id: social('ken', t, kind, text, score, 'ravi', where), t, kind, text, score, where })),
+  flagged: kenPosts.filter((p) => p[3] >= 0.7).length,
+  context: { id: firedId, t: firedT, label: "Ravi's text ending Ken's job" },
 }
-
-// =====================================================================
-// Coverage rows: first and last location row per phone (used by cannot_tell findings)
-// =====================================================================
-const homes: Record<PersonId, string> = { paul: 'Tan residence', amy: 'Lim residence', ken: 'Ong residence', cara: 'Diaz residence' }
-const coverageDevices = PEOPLE.map((p) => {
-  const first = locRow(p.person_id, ts(13, 0, 0), homes[p.person_id])
-  const last = locRow(p.person_id, ts(19, 23, 50), homes[p.person_id])
-  return { owner: p.person_id, first: { id: first.id, t: first.t }, last: { id: last.id, t: last.t } }
-})
-export function coverageFor(item: string): CoverageOutput {
-  return { kind: 'coverage', item, start: ts(13, 0, 0), end: ts(19, 23, 50), devices: coverageDevices }
-}
-export const COVERAGE_IDS = coverageDevices.flatMap((d) => [d.first.id, d.last.id])
-
-// =====================================================================
-// Relations graph extras (social, decoy co-location) — not findings, but the mapper's raw material
-// =====================================================================
-const caraLikeId = addRow('cara', 'social_interactions', ts(16, 21, 14), 'Snapline: @cara.diaz liked a post by @paultan_', { platform: 'Snapline', actor: '@cara.diaz', target: '@paultan_', kind: 'like' })
-const caraFollowId = addRow('cara', 'social_interactions', ts(13, 7, 2), 'Snapline follow list: @cara.diaz follows @paultan_ (date followed not recorded)', { platform: 'Snapline', actor: '@cara.diaz', target: '@paultan_', kind: 'follow' })
-const amyKenMall: string[] = []
-for (let i = 0; i < 3; i++) {
-  const t = ts(16, 17, 30 + i * 10)
-  amyKenMall.push(locRow('amy', t, 'FreshMart', 20).id, locRow('ken', t, 'FreshMart', 20).id)
-}
-const paulKenCall = addRow('paul', 'calls', ts(14, 12, 3), 'Outgoing call to Ken, 312 s', { direction: 'out', from: NUMBERS.paul, to: NUMBERS.ken, duration_s: 312, status: 'answered' })
-const kenPaulCall = addRow('ken', 'calls', ts(14, 12, 3), 'Incoming call from Paul, 312 s', { direction: 'in', from: NUMBERS.paul, to: NUMBERS.ken, duration_s: 312, status: 'answered' })
-const lunchIds = [
-  addRow('paul', 'transactions', ts(16, 13, 20), 'Sent $50 to Amy Lim (Swiftpay), memo "lunch"', { app: 'Swiftpay', from: NUMBERS.paul, to: NUMBERS.amy, amount: 50, currency: 'USD', memo: 'lunch' }),
-  addRow('amy', 'transactions', ts(16, 13, 20), 'Received $50 from Paul Tan (Swiftpay), memo "lunch"', { app: 'Swiftpay', from: NUMBERS.paul, to: NUMBERS.amy, amount: 50, currency: 'USD', memo: 'lunch' }),
+// Ravi's own post that Ken replied to.
+export const RAVI_POST = social('ravi', ts(15, 18, 0), 'post', "Cleaning house at Harbor Supply. Honesty isn't optional.", 0.12, null, 'own profile')
+// Decoy: Amy's vague post scores below the threshold and names no one.
+export const AMY_POST = social('amy', ts(16, 20, 33), 'post', 'Done being lied to.', 0.55, null, 'own profile')
+// Ordinary ties the relationship mapper picks up.
+export const SOCIAL_TIES = [
+  social('cara', ts(13, 7, 2), 'follow', '', null, 'paul', 'follow list (date followed not recorded)'),
+  social('paul', ts(16, 23, 48), 'like', '', null, 'cara', "liked @cara.novak's post"),
+  social('amy', ts(13, 9, 12), 'follow', '', null, 'ravi', 'follow list'),
+  social('ken', ts(13, 9, 40), 'follow', '', null, 'ravi', 'follow list'),
+  social('paul', ts(15, 18, 22), 'like', '', null, 'ravi', "liked @ravi.mehta's post"),
 ]
-const ev = (owner: PersonId, type: string) => syncEvents.filter((e) => e.device_owner === owner && e.event_type === type).map((e) => e.id)
 
 // =====================================================================
-// Location gaps (revision 2). A gap runs from the slot after the last location row to the slot
-// before the next one, so rows at 13:50 and 16:40 mean "no location data from 14:00 to 16:30".
+// Location gaps. A gap runs from the slot after the last location row to the slot before the next one.
 // =====================================================================
-const addMin = (iso: string, m: number) => {
-  const d = new Date(new Date(iso).getTime() + m * 60000 - 4 * 3600000)
-  return `${d.toISOString().slice(0, 19)}${TZ}`
-}
-function makeGap(
-  person: PersonId,
-  last: string,
-  next: string,
-  places: [string, string],
-  gap_type: GapType,
-  raised: boolean,
-  activity: GapOutput['activity'] = [],
-  power_event_ids: string[] = [],
-): GapOutput {
-  const before = locRow(person, last, places[0], 20)
-  const after = locRow(person, next, places[1], 20)
-  const start = addMin(last, 10)
-  const end = addMin(next, -10)
+function makeGap(person: PersonId, before: TrackPoint, after: TrackPoint, gap_type: GapType, raised: boolean, activity: GapOutput['activity'] = [], power_event_ids: string[] = []): GapOutput {
+  const start = addMin(before.t, 10)
+  const end = addMin(after.t, -10)
   return {
     kind: 'gap',
     person,
     start,
     end,
-    minutes: Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000),
+    minutes: minsBetween(start, end),
     gap_type,
     raised,
     bounding: { before: { id: before.id, t: before.t }, after: { id: after.id, t: after.t } },
@@ -408,60 +428,76 @@ function makeGap(
   }
 }
 
-// G1: Ken's phone, 15 Apr 14:00–16:30, no location rows but a message at 15:10 and the $4,500 transfer at 15:40.
-const g1MsgT = ts(15, 15, 10)
-const g1Msg = addRow('ken', 'messages', g1MsgT, 'To Dave (saved contact): "Out for a bit, back around 5."', {
-  thread_id: 'sms:dave', app: 'SMS', direction: 'out', from: NUMBERS.ken, to: '+1 555 010 0611', body: 'Out for a bit, back around 5.',
-})
-export const G1: GapOutput = makeGap('ken', ts(15, 13, 50), ts(15, 16, 40), ['Ong residence', 'Ong residence'], 'location_off', true, [
-  { id: g1Msg, t: g1MsgT, table: 'messages', label: 'SMS sent to Dave' },
-  { id: l2.row_ids[0], t: l2.t, table: 'transactions', label: '$4,500 Swiftpay transfer to Cara' },
-])
+// GPAUL: Paul's phone heads toward Pier 9 and is powered off 21:16–23:38, covering most of the window.
+export const PAUL_TRAVEL = [pointRow('paul', ts(16, 20, 50), 40.969, -72.008, 'In transit'), pointRow('paul', ts(16, 21, 0), 40.955, -71.99, 'In transit')]
+export const PAUL_LAST_FIX = pointRow('paul', ts(16, 21, 10), place('Harbor Rd lot').lat, place('Harbor Rd lot').lon, 'Harbor Rd lot')
+const paulOff = addRow('paul', 'device_events', ts(16, 21, 16), 'power_off: Device powered off', { event_type: 'power_off', detail: 'Device powered off' })
+const paulOn = addRow('paul', 'device_events', ts(16, 23, 38), 'power_on: Device powered on', { event_type: 'power_on', detail: 'Device powered on' })
+const paulBack = locRow('paul', ts(16, 23, 40), 'Becker residence', 20)
+export const GPAUL: GapOutput = makeGap('paul', PAUL_LAST_FIX, paulBack, 'powered_off', true, [], [paulOff, paulOn])
 
-// G1 decoy: Amy's phone, 16 Apr 09:10–10:00, no location rows and no activity of any kind.
-export const AMY_GAP: GapOutput = makeGap('amy', ts(16, 9, 0), ts(16, 10, 10), ['Lim residence', 'Northgate Mall'], 'unexplained', false)
+// GAMY: Amy's phone reports no location 21:40–22:50 while it calls Ravi twice (it also sent the 22:15 text, since deleted).
+const amyBefore = locRow('amy', ts(16, 21, 30), 'Brooks residence', 20)
+const amyAfter = locRow('amy', ts(16, 23, 0), 'Brooks residence', 20)
+export const GAMY: GapOutput = makeGap('amy', amyBefore, amyAfter, 'location_off', true, amyCalls.map((c, i) => ({ id: c.on_b, t: c.t, table: 'calls' as const, label: i ? 'Second call to Ravi, not answered' : 'Call to Ravi, not answered' })))
 
-// Existing decoy: Ken's phone off overnight 15→16 Apr.
-const kenOff = addRow('ken', 'device_events', ts(15, 23, 10), 'power_off: Device powered off', { event_type: 'power_off', detail: 'Device powered off' })
-const kenOn = addRow('ken', 'device_events', ts(16, 7, 0), 'power_on: Device powered on', { event_type: 'power_on', detail: 'Device powered on' })
-export const KEN_NIGHT: GapOutput = makeGap('ken', ts(15, 23, 10), ts(16, 7, 10), ['Ong residence', 'Ong residence'], 'powered_off', false, [], [kenOff, kenOn])
+// Decoy: Ken's phone off overnight 14→15 Apr.
+const kenOff = addRow('ken', 'device_events', ts(14, 23, 14), 'power_off: Device powered off', { event_type: 'power_off', detail: 'Device powered off' })
+const kenOn = addRow('ken', 'device_events', ts(15, 7, 2), 'power_on: Device powered on', { event_type: 'power_on', detail: 'Device powered on' })
+export const KEN_NIGHT: GapOutput = makeGap('ken', locRow('ken', ts(14, 23, 10), 'Walsh residence', 20), locRow('ken', ts(15, 7, 10), 'Walsh residence', 20), 'powered_off', false, [], [kenOff, kenOn])
 
-// S7 power-offs show up as powered_off gaps; raised because they overlap the synchronised-behaviour signal.
+// Decoy: Cara's phone, 19 Apr 09:10–10:00, no location and no activity of any kind.
+export const CARA_GAP: GapOutput = makeGap('cara', locRow('cara', ts(19, 9, 0), 'Novak residence', 20), locRow('cara', ts(19, 10, 10), 'Novak residence', 20), 'unexplained', false)
+
+// Sync power-offs show up as powered_off gaps, raised because they overlap the synchronised-behaviour signal.
 const powerIds = (owner: PersonId) => syncEvents.filter((e) => e.device_owner === owner && e.event_type !== 'thread_deleted').map((e) => e.id)
-export const S7_GAPS: GapOutput[] = [
-  makeGap('paul', ts(17, 10, 20), ts(17, 13, 10), ['Harbor Supply Co.', 'Harbor Supply Co.'], 'powered_off', true, [], powerIds('paul')),
-  makeGap('ken', ts(17, 10, 40), ts(17, 13, 40), ['Ong residence', 'Ong residence'], 'powered_off', true, [], powerIds('ken')),
-  makeGap('cara', ts(17, 11, 10), ts(17, 14, 10), ['Pier 9 Warehouse', 'Pier 9 Warehouse'], 'powered_off', true, [], powerIds('cara')),
+export const SYNC_GAPS: GapOutput[] = [
+  makeGap('paul', locRow('paul', ts(17, 9, 20), 'Harbor Supply Co.', 20), locRow('paul', ts(17, 12, 50), 'Harbor Supply Co.', 20), 'powered_off', true, [], powerIds('paul')),
+  makeGap('cara', locRow('cara', ts(17, 9, 50), 'Novak residence', 20), locRow('cara', ts(17, 13, 20), 'Novak residence', 20), 'powered_off', true, [], powerIds('cara')),
 ]
 
-export const GRAPH: Graph = {
-  nodes: PEOPLE.map((p) => ({ id: p.person_id, label: p.name, color: p.color })),
-  edges: [
-    { source: 'paul', target: 'amy', channel: 'call', label: '2 calls in the window, on both phones', evidence_ids: s1Items.filter((i) => i.channel === 'call').flatMap((i) => [i.on_a!, i.on_b!]) },
-    { source: 'paul', target: 'amy', channel: 'message', label: "3 texts, on Paul's phone only", evidence_ids: s1Items.filter((i) => i.channel === 'message').map((i) => i.on_a!) },
-    { source: 'paul', target: 'amy', channel: 'transfer', label: '$50 "lunch"', evidence_ids: lunchIds },
-    { source: 'paul', target: 'ken', channel: 'call', label: 'Call on 14 Apr, on both phones', evidence_ids: [paulKenCall, kenPaulCall] },
-    { source: 'paul', target: 'ken', channel: 'transfer', label: '$5,000, no memo', evidence_ids: l1.row_ids },
-    { source: 'paul', target: 'ken', channel: 'deleted_thread', label: 'Thread deleted on both phones, 17 Apr', evidence_ids: [...ev('paul', 'thread_deleted'), ev('ken', 'thread_deleted')[0]] },
-    { source: 'ken', target: 'cara', channel: 'transfer', label: '$4,500 "materials"', evidence_ids: l2.row_ids },
-    { source: 'ken', target: 'cara', channel: 'deleted_thread', label: 'Thread deleted on both phones, 17 Apr', evidence_ids: [ev('ken', 'thread_deleted')[1], ...ev('cara', 'thread_deleted')] },
-    { source: 'paul', target: 'cara', channel: 'colocation', label: 'Within 100 m at Dock Cafe, 4 occasions', evidence_ids: S5.occasions.flatMap((o) => o.row_ids) },
-    { source: 'cara', target: 'paul', channel: 'social', label: "Cara's Snapline account follows and liked Paul's", evidence_ids: [caraFollowId, caraLikeId] },
-    { source: 'amy', target: 'ken', channel: 'colocation', label: '1 occasion at FreshMart (below the 2-occasion threshold)', weak: true, evidence_ids: amyKenMall },
-  ],
+// The victim's phone: battery runs out at the scene, after which there is no data.
+export const RAVI_DEAD_BATTERY = addRow('ravi', 'device_events', ts(17, 1, 52), 'power_off: Battery depleted (0%)', { event_type: 'power_off', detail: 'Battery depleted (0%)' })
+export const RAVI_END = ts(17, 1, 52)
+
+export const ALL_GAPS: GapOutput[] = [GPAUL, GAMY, KEN_NIGHT, CARA_GAP, ...SYNC_GAPS]
+
+// =====================================================================
+// Other planted ties: Paul → Amy $50 "lunch" (decoy), Amy and Ken at FreshMart once (decoy)
+// =====================================================================
+export const LUNCH_IDS = [tx('paul', ts(16, 13, 20), 'paul', 'amy', 50, 'lunch'), tx('amy', ts(16, 13, 20), 'paul', 'amy', 50, 'lunch')]
+export const FRESHMART_IDS: string[] = []
+for (let i = 0; i < 3; i++) {
+  const t = ts(15, 17, 30 + i * 10)
+  FRESHMART_IDS.push(locRow('amy', t, 'FreshMart', 20).id, locRow('ken', t, 'FreshMart', 20).id)
 }
 
+// =====================================================================
+// Coverage rows: first and last location row per phone (used by cannot_tell answers)
+// =====================================================================
+const coverageDevices = PEOPLE.map((p) => {
+  const first = locRow(p.person_id, ts(13, 0, 0), HOME[p.person_id])
+  const isV = p.person_id === VICTIM
+  const last = locRow(p.person_id, isV ? ts(17, 1, 50) : ts(19, 23, 50), isV ? 'Pier 9 Warehouse' : HOME[p.person_id], isV ? 8 : 25)
+  return { owner: p.person_id, first: { id: first.id, t: first.t }, last: { id: last.id, t: last.t } }
+})
+export function coverageFor(item: string): CoverageOutput {
+  return { kind: 'coverage', item, start: ts(13, 0, 0), end: ts(19, 23, 50), devices: coverageDevices }
+}
+export const COVERAGE_IDS = coverageDevices.flatMap((d) => [d.first.id, d.last.id])
+
 export const NEXT_STEPS = [
-  'Interview Amy about the evening of 14 April and the SMS thread with Paul that her phone deleted on 17 April.',
-  'Interview Paul and Cara separately about the four occasions their phones were together at Dock Cafe.',
-  'Ask Ken what the $4,500 Swiftpay transfer to Cara on 15 April, memo "materials", was for.',
-  'Request Swiftpay account records for Paul, Ken and Cara for 1 to 30 April.',
-  'Request WhatsApp account metadata for the Paul–Ken and Ken–Cara threads deleted on 17 April.',
-  'Request Dock Cafe card-payment and CCTV records for 13, 15, 16 and 18 April.',
+  "Ask Paul where he was between 21:16 and 23:38 on 16 April, when his phone was off, and about the 18:05 text from Ravi's phone.",
+  'Ask Amy where she was between 21:40 and 22:50 on 16 April, and why the thread with Ravi was deleted at 09:25 on 17 April.',
+  'Request Swiftpay records for Paul and Cara, and the Harbor Supply Co. invoice HSC-2291.',
+  'Request CCTV and parking records for Harbor Rd lot and Pier 9, 16 April 20:30 to 00:00.',
+  "Request carrier cell-site records for Paul's and Amy's numbers for the same window; a phone that is off leaves none.",
+  "Preserve Ken's Snapline account; the posts are context for interview, not evidence of presence.",
 ]
 
 export const ASSUMPTIONS = [
   'Phone data is treated as genuine; spoofing is not assessed.',
-  "Names stand for each person's phone: \"Amy was at Northgate Mall\" means Amy's phone was there. A phone's location is not proof of where its owner was.",
-  'Data covers 13 to 19 April 2026 only.',
+  "A phone's location is not proof of where its owner was.",
+  'The time-of-death window comes from the medical examiner and is taken as given.',
+  "Data covers 13 to 19 April 2026; the victim's phone ends at 01:52 on 17 April.",
 ]

@@ -77,7 +77,7 @@ export default function SyncTimeline({ out }: { out: SyncOutput }) {
         })}
       </svg>
       <div className="flex flex-wrap gap-5 text-xs text-faint">
-        <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full border border-fg" /> audit notice</span>
+        <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full border border-fg" /> trigger message</span>
         <span className="inline-flex items-center gap-2"><span className="h-2 w-2 rotate-45 bg-terra-soft" /> thread deleted</span>
         <span className="inline-flex items-center gap-2"><span className="h-2 w-4 rounded-sm bg-[var(--off)]" /> powered off</span>
       </div>

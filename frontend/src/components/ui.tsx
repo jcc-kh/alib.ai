@@ -24,7 +24,7 @@ export const VERDICT: Record<Verdict | 'sweep', { label: string; color: string }
   confirmed: { label: 'Confirmed', color: 'var(--good)' },
   inconsistent: { label: 'Inconsistent', color: 'var(--serious)' },
   cannot_tell: { label: 'Cannot tell', color: 'var(--ink-2)' },
-  sweep: { label: 'Found unprompted', color: 'var(--amber)' },
+  sweep: { label: 'Finding', color: 'var(--accent)' },
 }
 
 export function VerdictBadge({ v }: { v: Verdict | 'sweep' }) {

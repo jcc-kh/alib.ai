@@ -1,7 +1,6 @@
 // Mock implementation of the Alib.ai API. Same shapes as the planned FastAPI endpoints:
 //   GET  /api/case          -> getCase
 //   POST /api/ingest        -> ingest
-//   POST /api/analyse (SSE) -> analyse (events delivered through onEvent)
 //   GET  /api/evidence?ids= -> getEvidence
 //   GET  /api/graph         -> getGraph
 //   GET  /api/briefing      -> getBriefing (proactive, generated at ingest)
@@ -9,12 +8,11 @@
 //   GET  /api/timeline      -> getTimeline (stays: stay / travel / gap per person)
 //   GET  /api/signals       -> getSignals (every sweep hit)
 
-import type { AgentEvent, Answer, AskEvent, Brief, Briefing, CaseInfo, EvidenceByPhone, Graph, IngestReport, IngestStage, Report, RunEvent, Segment, Signal } from './types'
-import '../mock/background'
-import { GRAPH, PEOPLE, PLACES, ROWS } from '../mock/data'
+import type { Answer, AskEvent, Briefing, CaseInfo, EvidenceByPhone, Graph, IngestReport, IngestStage, RunEvent, Segment, Signal } from './types'
+import { GRAPH } from '../mock/derived'
+import { FOUND_AT, PEOPLE, PLACES, ROWS, SCENE, TOD, VICTIM } from '../mock/data'
 import { INGEST_STAGES, buildIngestReport } from '../mock/ingest'
-import { planRun } from '../mock/report'
-import { buildBriefing } from '../mock/briefing'
+import { buildBriefing, scopeBriefing } from '../mock/briefing'
 import { answerQuestion } from '../mock/ask'
 import { SEGMENTS } from '../mock/segments'
 import { SIGNALS } from '../mock/signals'
@@ -32,13 +30,22 @@ const sleep = (ms: number, signal?: AbortSignal) =>
 export async function getCase(): Promise<CaseInfo> {
   await sleep(150)
   return {
-    case_id: 'harbor-supply-2026-04',
-    title: 'Harbor Supply Co. missing funds',
-    summary: 'Money is missing from Harbor Supply Co. An audit was announced on 17 April at 10:00. All four people say they barely know each other.',
+    case_id: 'pier9-2026-04',
+    title: 'Death at Pier 9',
+    summary: 'Ravi Mehta, owner of Harbor Supply Co., was found dead at the Pier 9 warehouse on 17 April at 07:40. Five phones were seized, including his own, recovered at the scene.',
     timezone: '-04:00',
     coverage: { start: '2026-04-13', end: '2026-04-19' },
     people: PEOPLE,
     places: PLACES,
+    incident: {
+      kind: 'death',
+      victim: VICTIM,
+      scene: SCENE,
+      tod_start: TOD.start,
+      tod_end: TOD.end,
+      found_at: FOUND_AT,
+      summary: 'Medical examiner: time of death between 21:00 and 23:30 on 16 April.',
+    },
   }
 }
 
@@ -53,26 +60,6 @@ export async function ingest(file: File | null, onStage: (stages: IngestStage[])
   }
   const report = buildIngestReport()
   return { ...report, bundle_name: file?.name ?? report.bundle_name }
-}
-
-let failedOnce = false
-
-export async function analyse(brief: Brief, onEvent: (e: AgentEvent) => void, signal?: AbortSignal): Promise<Report> {
-  const plan = planRun(brief)
-  const shouldFail = new URLSearchParams(window.location.search).has('fail') && !failedOnce
-  let i = 0
-  for (const { delay, event } of plan.events) {
-    if (delay) await sleep(delay, signal)
-    onEvent(event)
-    if (shouldFail && ++i === 14) {
-      failedOnce = true
-      const err: AgentEvent = { type: 'error', message: 'financial-analyst: the model request timed out after 30 s. No partial report was saved.' }
-      onEvent(err)
-      throw new Error(err.message)
-    }
-  }
-  onEvent({ type: 'report', report: plan.report })
-  return plan.report
 }
 
 export async function getEvidence(ids: string[]): Promise<EvidenceByPhone> {
@@ -127,8 +114,8 @@ export async function getSignals(): Promise<Signal[]> {
  * Case-load run (sweep + triage) as a stream of agent events. In the real system this is
  * GET /api/run/stream (SSE). `speed` > 1 plays it faster; Infinity delivers everything at once.
  */
-export async function analyseCase(onEvent: (e: RunEvent) => void, speed = 1, signal?: AbortSignal): Promise<Briefing> {
-  const script = buildRunScript()
+export async function analyseCase(onEvent: (e: RunEvent) => void, speed = 1, signal?: AbortSignal, range: [number, number] = [13, 19]): Promise<Briefing> {
+  const script = buildRunScript(range)
   let last = 0
   for (const e of script.events) {
     const t = eventTime(e)
@@ -136,5 +123,5 @@ export async function analyseCase(onEvent: (e: RunEvent) => void, speed = 1, sig
     last = Math.max(last, t)
     onEvent(e)
   }
-  return buildBriefing()
+  return scopeBriefing(buildBriefing(), range)
 }

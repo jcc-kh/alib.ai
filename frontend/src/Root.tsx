@@ -1,16 +1,13 @@
 import { useEffect, useState } from 'react'
 import { CaseProvider } from './state/caseStore'
 import ProApp from './ui/pro/ProApp'
-import NoirApp from './ui/noir/NoirApp'
 
-export type Skin = 'pro' | 'noir'
-
-function parse(): { skin: Skin; view: string } {
-  const [, skin, view] = window.location.hash.split('/')
-  return { skin: skin === 'noir' ? 'noir' : 'pro', view: view ?? '' }
+function parse(): { view: string } {
+  const [, , view] = window.location.hash.split('/')
+  return { view: view ?? '' }
 }
 
-/** Two UIs over one case store: #/pro/<step> and #/noir/<room>. */
+/** One dashboard over one case store: #/pro/<view>. */
 export default function Root() {
   const [route, setRoute] = useState(parse)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -27,12 +24,12 @@ export default function Root() {
     return () => window.removeEventListener('hashchange', on)
   }, [])
   useEffect(() => {
-    document.documentElement.dataset.skin = route.skin
-    document.documentElement.dataset.theme = route.skin === 'pro' ? theme : 'light'
-  }, [route.skin, theme])
+    document.documentElement.dataset.skin = 'pro'
+    document.documentElement.dataset.theme = theme
+  }, [theme])
 
-  const go = (skin: Skin, view: string) => {
-    window.location.hash = `/${skin}/${view}`
+  const go = (view: string) => {
+    window.location.hash = `/pro/${view}`
   }
   const toggleTheme = () =>
     setTheme((t) => {
@@ -47,11 +44,7 @@ export default function Root() {
 
   return (
     <CaseProvider>
-      {route.skin === 'pro' ? (
-        <ProApp view={route.view} go={(v) => go('pro', v)} theme={theme} toggleTheme={toggleTheme} switchSkin={() => go('noir', '')} />
-      ) : (
-        <NoirApp view={route.view} go={(v) => go('noir', v)} switchSkin={() => go('pro', '')} />
-      )}
+      <ProApp view={route.view} go={go} theme={theme} toggleTheme={toggleTheme} />
     </CaseProvider>
   )
 }

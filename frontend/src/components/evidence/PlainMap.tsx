@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react'
-import { CircleMarker, MapContainer, Tooltip } from 'react-leaflet'
+import { useEffect, type ReactNode } from 'react'
+import { CircleMarker, MapContainer, Tooltip, useMap } from 'react-leaflet'
 import type { LatLngBoundsExpression } from 'leaflet'
 import type { Place } from '../../api'
 
@@ -24,7 +24,7 @@ export default function PlainMap({
   const labelled = (p: Place) => !labelNear || labelNear.some(([la, lo]) => Math.abs(la - p.lat) < labelTol && Math.abs(lo - p.lon) < labelTol * 1.25)
   return (
     <div className="overflow-hidden rounded-xl border border-line" style={{ height }}>
-      <MapContainer bounds={bounds} boundsOptions={{ padding: [40, 40] }} style={{ height: '100%', width: '100%' }} attributionControl={false} scrollWheelZoom={false}>
+      <MapContainer bounds={bounds} boundsOptions={{ padding: [40, 40] }} zoomSnap={0.25} zoomDelta={0.5} style={{ height: '100%', width: '100%' }} attributionControl={false} scrollWheelZoom={false}>
         {places.map((p) => (
           <CircleMarker key={p.name} center={[p.lat, p.lon]} radius={3.5} pathOptions={{ color: 'var(--ink-3)', fillColor: 'var(--surface)', fillOpacity: 1, weight: 1.2 }}>
             {labelled(p) ? (
@@ -37,7 +37,29 @@ export default function PlainMap({
           </CircleMarker>
         ))}
         {children}
+        <FitOnMount bounds={bounds} />
       </MapContainer>
     </div>
   )
+}
+
+/** Leaflet measures its container on mount; inside a grid that size can be 0, so re-fit once laid out. */
+function FitOnMount({ bounds }: { bounds: LatLngBoundsExpression }) {
+  const map = useMap()
+  useEffect(() => {
+    const fit = () => {
+      map.invalidateSize()
+      map.fitBounds(bounds, { padding: [30, 30] })
+    }
+    const t = setTimeout(fit, 60)
+    // Re-fit whenever the container changes size (grid layout settling, drawer opening, window resize).
+    const ro = new ResizeObserver(() => fit())
+    ro.observe(map.getContainer())
+    return () => {
+      clearTimeout(t)
+      ro.disconnect()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, JSON.stringify(bounds)])
+  return null
 }

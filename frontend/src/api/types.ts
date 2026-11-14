@@ -19,6 +19,12 @@ export interface Person {
   device_id: string
   color: string
   counts: PhoneCounts
+  /** Path to a portrait under /public (GAN-generated; see public/portraits/CREDITS.md). */
+  portrait: string
+  /** The victim's phone, recovered at the scene. */
+  is_victim?: boolean
+  /** Social media handle, for the social panels. */
+  handle: string
 }
 
 export interface Place {
@@ -36,6 +42,19 @@ export interface CaseInfo {
   coverage: { start: string; end: string }
   people: Person[]
   places: Place[]
+  /** What the investigator knows going in: the scene and the time-of-death window. */
+  incident: IncidentFacts
+}
+
+export interface IncidentFacts {
+  kind: 'death'
+  victim: PersonId
+  scene: Place
+  /** From the medical examiner: the earliest and latest likely time of death. */
+  tod_start: string
+  tod_end: string
+  found_at: string
+  summary: string
 }
 
 export interface Brief {
@@ -153,6 +172,7 @@ export type SubagentName =
   | 'relationship-mapper'
   | 'financial-analyst'
   | 'device-forensics'
+  | 'social-analyst'
 
 export interface Todo {
   id: string
@@ -184,6 +204,10 @@ export type CheckName =
   | 'unresolved_identifiers'
   | 'group_meetings'
   | 'get_coverage'
+  | 'presence_window'
+  | 'activity_space'
+  | 'social_hostility'
+  | 'last_contacts'
 
 export type FindingStatus = 'current' | 'changed' | 'withdrawn'
 
@@ -348,7 +372,71 @@ export interface GapOutput {
   thresholds: { min_gap_min: number; interval_min: number }
 }
 
-export type CheckOutput = DistanceOutput | MissingOutput | ChainOutput | MeetingsOutput | SyncOutput | CoverageOutput | GapOutput
+export type PresenceStatus = 'scene' | 'near' | 'away' | 'no_data'
+
+/** presence_window(): where every phone was, slot by slot, during the time-of-death window. */
+export interface PresenceOutput {
+  kind: 'presence'
+  scene: Place
+  window: { start: string; end: string }
+  thresholds: { scene_m: number; near_m: number; slot_min: number }
+  phones: {
+    person: PersonId
+    slots: { t: string; status: PresenceStatus; distance_m: number | null; row_id: string | null; gap_type?: GapType }[]
+    closest_m: number | null
+    closest_t: string | null
+    counts: Record<PresenceStatus, number>
+  }[]
+}
+
+/** activity_space(): each phone's routine area, as an anchor point plus the radius holding most of its fixes. */
+export interface SpaceOutput {
+  kind: 'space'
+  scene: Place
+  victim: PersonId
+  /** A routine place is one the phone stayed at on at least `min_days` separate days. */
+  rule: { min_days: number; buffer_m: number }
+  spaces: {
+    person: PersonId
+    anchor: Place
+    /** Distance to the farthest routine place, plus the buffer. */
+    radius_m: number
+    fixes: number
+    routine: { name: string; days: number; distance_m: number }[]
+    scene_distance_m: number
+    scene_inside: boolean
+    /** Share of this phone's circle that overlaps the victim's circle (0–1). */
+    overlap_with_victim: number
+    /** Location rows within 150 m of the scene, by day. */
+    scene_visits: { date: string; fixes: number; first: string; last: string }[]
+    top_places: { name: string; minutes: number }[]
+  }[]
+}
+
+/** social_hostility(): posts and comments by one account about another, scored by a fixed classifier. */
+export interface HostilityOutput {
+  kind: 'hostility'
+  actor: PersonId
+  target: PersonId
+  platform: string
+  threshold: number
+  model: string
+  items: { id: string; t: string; kind: 'post' | 'comment' | 'reply'; text: string; score: number; where: string }[]
+  flagged: number
+  /** The event the posts started after, if any (e.g. a dismissal). */
+  context: { id: string; t: string; label: string } | null
+}
+
+/** last_contacts(): the victim's final interactions before and during the time-of-death window. */
+export interface LastContactsOutput {
+  kind: 'last_contacts'
+  person: PersonId
+  window: { start: string; end: string }
+  items: { id: string; t: string; table: 'messages' | 'calls'; direction: 'in' | 'out'; counterpart: PersonId | 'other'; label: string; body?: string; on_counterpart: 'present' | 'deleted' | 'n/a' }[]
+  last_active: { id: string; t: string; label: string }
+}
+
+export type CheckOutput = DistanceOutput | MissingOutput | ChainOutput | MeetingsOutput | SyncOutput | CoverageOutput | GapOutput | PresenceOutput | SpaceOutput | HostilityOutput | LastContactsOutput
 
 // ---------- Evidence ----------
 
@@ -389,7 +477,7 @@ export type EvidenceByPhone = Record<PersonId, EvidenceRow[]>
 
 // ---------- Relations graph ----------
 
-export type Channel = 'message' | 'call' | 'transfer' | 'social' | 'deleted_thread' | 'colocation'
+export type Channel = 'message' | 'call' | 'transfer' | 'social' | 'hostile' | 'deleted_thread' | 'colocation'
 
 export interface GraphEdge {
   source: PersonId
@@ -397,6 +485,10 @@ export interface GraphEdge {
   channel: Channel
   label: string
   weak?: boolean
+  /** Number of interactions behind the edge (rows de-duplicated across phones). */
+  count: number
+  first?: string
+  last?: string
   evidence_ids: string[]
 }
 
@@ -422,8 +514,13 @@ export interface Signal {
   reliability_flags?: ReliabilityReason[]
 }
 
+/** The investigative questions the product is organised around. */
+export type InquiryId = 'connections' | 'radius' | 'window' | 'changes' | 'motive'
+
 /** Signals grouped by triage (shared people, overlapping time). */
 export interface Incident {
+  /** Which line of inquiry this insight answers. */
+  inquiry: InquiryId
   incident_id: string
   signal_ids: string[]
   people: PersonId[]

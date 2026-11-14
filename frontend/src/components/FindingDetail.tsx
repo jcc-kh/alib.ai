@@ -12,6 +12,9 @@ import MeetingsList from './evidence/MeetingsList'
 import SyncTimeline from './evidence/SyncTimeline'
 import CoverageView from './evidence/CoverageView'
 import GapView from './evidence/GapView'
+import { HostilityList, LastContactsList } from './evidence/SocialEvidence'
+import PresenceGrid from './PresenceGrid'
+import RadiusMap from './RadiusMap'
 
 type Tab = 'evidence' | 'how' | 'verify' | 'sources'
 
@@ -41,7 +44,7 @@ export default function FindingDetail({ finding }: { finding: Finding }) {
     <div className="space-y-6">
       <div className="space-y-3">
         <div className="flex items-center gap-3">
-          <VerdictBadge v={finding.section === 'unprompted' ? 'sweep' : finding.verdict} />
+          <VerdictBadge v={finding.verdict === 'cannot_tell' ? 'cannot_tell' : 'sweep'} />
           <Mono>
             {finding.check} · {finding.agent}
           </Mono>
@@ -86,6 +89,14 @@ export default function FindingDetail({ finding }: { finding: Finding }) {
             <SyncTimeline out={o} />
           ) : o.kind === 'gap' ? (
             <GapView out={o} />
+          ) : o.kind === 'presence' ? (
+            <PresenceGrid out={o} compact />
+          ) : o.kind === 'space' ? (
+            <RadiusMap space={o} show={o.spaces.map((s) => s.person)} height={360} />
+          ) : o.kind === 'hostility' ? (
+            <HostilityList out={o} />
+          ) : o.kind === 'last_contacts' ? (
+            <LastContactsList out={o} />
           ) : (
             <CoverageView out={o} />
           ))}
