@@ -1,4 +1,6 @@
-# Crosscheck
+# Alib.ai
+
+*Alibi + AI = **Alib.ai**: it checks whether everyone's story holds up across their phones.*
 
 **Compare phones from the same case. See what's confirmed, what doesn't add up, and what can't be known, with every claim one click from its evidence.**
 
@@ -10,7 +12,7 @@
 
 Investigators often hold data from several phones in one case. Reading them by hand takes days, and some facts only show up when you compare phones. One example: a message that is still on Paul's phone but has been deleted from Amy's.
 
-Crosscheck does that comparison. The investigator writes a short **brief** in three parts: what they believe, what confuses them, and what they don't know. An AI agent checks the brief against every phone and returns a report. Every finding cites the exact data rows behind it.
+Alib.ai does that comparison. The investigator writes a short **brief** in three parts: what they believe, what confuses them, and what they don't know. An AI agent checks the brief against every phone and returns a report. Every finding cites the exact data rows behind it.
 
 ## How it works
 
@@ -63,7 +65,7 @@ They are built with LangChain **deepagents** (`create_deep_agent`). The orchestr
 
 ## The data format
 
-Crosscheck ingests **Case Bundle v1**: one folder per phone, one JSONL file per record type. The record types are contacts, messages, calls, locations, transactions, device events, social accounts and social interactions. People are referenced by phone number, email or handle, and ingest works out who is who.
+Alib.ai ingests **Case Bundle v1**: one folder per phone, one JSONL file per record type. The record types are contacts, messages, calls, locations, transactions, device events, social accounts and social interactions. People are referenced by phone number, email or handle, and ingest works out who is who.
 
 Any source can be supported by writing an adapter that outputs this format.
 

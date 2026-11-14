@@ -1,4 +1,4 @@
-// Mock implementation of the Crosscheck API. Same shapes as the planned FastAPI endpoints:
+// Mock implementation of the Alib.ai API. Same shapes as the planned FastAPI endpoints:
 //   GET  /api/case          -> getCase
 //   POST /api/ingest        -> ingest
 //   POST /api/analyse (SSE) -> analyse (events delivered through onEvent)

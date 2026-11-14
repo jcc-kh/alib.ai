@@ -1,6 +1,6 @@
-# Case Bundle v1: the Crosscheck ingest format
+# Case Bundle v1: the Alib.ai ingest format
 
-Crosscheck ingests any multi-phone case in this format. A forensic export, such as one from a commercial extraction tool, a spreadsheet or the synthetic generator, gets an **adapter** that writes a Case Bundle. After that, everything downstream (the checks, the agents and the UI) works the same way.
+Alib.ai ingests any multi-phone case in this format. A forensic export, such as one from a commercial extraction tool, a spreadsheet or the synthetic generator, gets an **adapter** that writes a Case Bundle. After that, everything downstream (the checks, the agents and the UI) works the same way.
 
 A worked example is in [`example/`](example/).
 
@@ -27,7 +27,7 @@ A bundle is a folder, or a `.zip` of that folder:
 
 - `.jsonl` means one JSON object per line.
 - Every per-device file is optional. A file that is missing means "not extracted". That isn't the same as "nothing happened", and the report treats the two differently.
-- Per-device files hold **what that phone holds**. When two case phones messaged each other, the message appears in both phones' `messages.jsonl`. Crosscheck relies on comparing those two copies.
+- Per-device files hold **what that phone holds**. When two case phones messaged each other, the message appears in both phones' `messages.jsonl`. Alib.ai relies on comparing those two copies.
 
 ## Shared conventions
 

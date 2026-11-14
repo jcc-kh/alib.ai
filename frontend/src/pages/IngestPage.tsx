@@ -40,7 +40,7 @@ export default function IngestPage({ onOpenCase }: { onOpenCase: () => void }) {
         <div>
           <h1 className="text-xl font-semibold">Ingest a case bundle</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Crosscheck reads any phone extraction once it is converted to the <b>Case Bundle v1</b> format. One folder per device, one JSONL
+            Alib.ai reads any phone extraction once it is converted to the <b>Case Bundle v1</b> format. One folder per device, one JSONL
             file per record type. People are referenced by identifiers (phone, email, handle), not by name.
           </p>
         </div>

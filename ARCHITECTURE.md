@@ -1,4 +1,4 @@
-# Crosscheck architecture
+# Alib.ai architecture
 
 This document covers the target design for iteration 1 and later. The front-end mock-up in `frontend/` already follows these interfaces. Each mock is meant to be replaced by the real component behind the same contract.
 

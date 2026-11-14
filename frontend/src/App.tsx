@@ -21,7 +21,7 @@ export default function App() {
       <header className="flex items-center gap-6 border-b border-slate-200 bg-white px-5 py-2.5">
         <div className="flex items-center gap-2">
           <div className="grid h-7 w-7 place-items-center rounded-md bg-slate-900 text-sm font-bold text-white">✓✗</div>
-          <span className="text-lg font-semibold tracking-tight">Crosscheck</span>
+          <span className="text-lg font-semibold tracking-tight">Alib.ai</span>
           <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-800">mock-up</span>
         </div>
         <nav className="flex gap-1 text-sm">
