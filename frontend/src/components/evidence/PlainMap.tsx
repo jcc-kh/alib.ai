@@ -26,7 +26,7 @@ export default function PlainMap({
     <div className="overflow-hidden rounded-xl border border-line" style={{ height }}>
       <MapContainer bounds={bounds} boundsOptions={{ padding: [40, 40] }} style={{ height: '100%', width: '100%' }} attributionControl={false} scrollWheelZoom={false}>
         {places.map((p) => (
-          <CircleMarker key={p.name} center={[p.lat, p.lon]} radius={3.5} pathOptions={{ color: '#6f6a63', fillColor: '#101010', fillOpacity: 1, weight: 1.2 }}>
+          <CircleMarker key={p.name} center={[p.lat, p.lon]} radius={3.5} pathOptions={{ color: 'var(--ink-3)', fillColor: 'var(--surface)', fillOpacity: 1, weight: 1.2 }}>
             {labelled(p) ? (
               <Tooltip permanent direction="right" offset={[6, 0]} className="place-label">
                 {p.name}

@@ -338,6 +338,10 @@ export interface Incident {
   strength: number
   rank: number
   headline: string
+  /** Short label for tables and graphs. */
+  title: string
+  /** Two or three key numbers, straight from check output. */
+  facts: string[]
   why_it_matters: string
   rank_reason: string
   anchor_id?: string
@@ -417,3 +421,50 @@ export interface Answer {
   steps: string[]
   suggestions: string[]
 }
+
+// ---------- Case-load agent run (sweep + triage) ----------
+
+export interface ToolCall {
+  id: string
+  agent: SubagentName
+  check: string
+  args: string
+  /** Rows the check read, counted from the case store. */
+  rows: number
+  /** Milliseconds since the run started. */
+  start_ms: number
+  ms: number
+  result: string
+  /** Set when this call was made because another agent asked for it. */
+  follow_up_from?: SubagentName
+}
+
+export interface FollowUp {
+  from: SubagentName
+  to: SubagentName
+  note: string
+  at_ms: number
+}
+
+/** What one subagent hands back: the content of its findings/<area>.json. */
+export interface AgentEnvelope {
+  agent: SubagentName
+  file: string
+  started_ms: number
+  finished_ms: number
+  summary: string
+  tool_calls: ToolCall[]
+  signal_ids: string[]
+  findings: Finding[]
+  follow_ups_sent: FollowUp[]
+  follow_ups_received: FollowUp[]
+  dismissed: Dismissal[]
+}
+
+export type RunEvent =
+  | { type: 'phase'; phase: 'sweep' | 'triage' | 'done'; at_ms: number }
+  | { type: 'agent'; agent: SubagentName; status: 'running' | 'done'; at_ms: number }
+  | { type: 'tool'; call: ToolCall }
+  | { type: 'follow_up'; hop: FollowUp }
+  | { type: 'log'; agent: SubagentName; text: string; at_ms: number }
+  | { type: 'envelope'; envelope: AgentEnvelope }

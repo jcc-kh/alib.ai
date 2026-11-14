@@ -40,7 +40,7 @@ export default function DerivationView({ finding }: { finding: Finding }) {
               {i < d.steps.length - 1 && <span className="absolute left-[11px] top-6 bottom-0 w-px bg-line" />}
               <span
                 className="relative z-10 mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[10px] font-semibold"
-                style={{ borderColor: s.actor === 'code' ? '#6b9bff' : '#e8a33d', color: s.actor === 'code' ? '#6b9bff' : '#e8a33d' }}
+                style={{ borderColor: s.actor === 'code' ? 'var(--accent)' : 'var(--amber)', color: s.actor === 'code' ? 'var(--accent)' : 'var(--amber)' }}
               >
                 {i + 1}
               </span>

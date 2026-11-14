@@ -21,14 +21,14 @@ export default function SyncTimeline({ out }: { out: SyncOutput }) {
   return (
     <div className="space-y-5">
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
-        <rect x={x(out.window.start)} y={0} width={x(out.window.end) - x(out.window.start)} height={rows.length * ROW} fill="#c8553a" opacity={0.14} />
-        <text x={x(out.window.start) + 4} y={11} fontSize={9.5} fill="#e07a5f">
+        <rect x={x(out.window.start)} y={0} width={x(out.window.end) - x(out.window.start)} height={rows.length * ROW} fill="var(--serious)" opacity={0.14} />
+        <text x={x(out.window.start) + 4} y={11} fontSize={9.5} fill="var(--serious)">
           {out.window.minutes}-minute window
         </text>
         {ticks.map((t) => (
           <g key={t}>
-            <line x1={x(t)} x2={x(t)} y1={0} y2={rows.length * ROW} stroke="#2a2826" />
-            <text x={x(t)} y={rows.length * ROW + 16} fontSize={9.5} textAnchor="middle" fill="#6f6a63">
+            <line x1={x(t)} x2={x(t)} y1={0} y2={rows.length * ROW} stroke="var(--line)" />
+            <text x={x(t)} y={rows.length * ROW + 16} fontSize={9.5} textAnchor="middle" fill="var(--ink-3)">
               {fmtTime(t)}
             </text>
           </g>
@@ -43,11 +43,11 @@ export default function SyncTimeline({ out }: { out: SyncOutput }) {
               <text x={0} y={y + 4} fontSize={12} fill={personColor(owner)}>
                 {personName(owner)}
               </text>
-              <line x1={LABEL} x2={W - 12} y1={y} y2={y} stroke="#2a2826" strokeDasharray="2 4" />
+              <line x1={LABEL} x2={W - 12} y1={y} y2={y} stroke="var(--line)" strokeDasharray="2 4" />
               {off && (
                 <g>
-                  <rect x={x(off.t)} y={y - 6} width={(on ? x(on.t) : W - 12) - x(off.t)} height={12} rx={3} fill="#4a4642" />
-                  <text x={x(off.t) + 6} y={y + 3.5} fontSize={9} fill="#d6d1c9">
+                  <rect x={x(off.t)} y={y - 6} width={(on ? x(on.t) : W - 12) - x(off.t)} height={12} rx={3} fill="var(--off)" />
+                  <text x={x(off.t) + 6} y={y + 3.5} fontSize={9} fill="var(--ink-2)">
                     off {fmtTime(off.t)}–{on ? fmtTime(on.t) : '…'}
                   </text>
                 </g>
@@ -57,18 +57,18 @@ export default function SyncTimeline({ out }: { out: SyncOutput }) {
                 .map((e) => (
                   <g key={e.id}>
                     <title>{`${fmtTime(e.t)} thread deleted: ${e.detail} (${e.id})`}</title>
-                    <rect x={x(e.t) - 5} y={y - 5} width={10} height={10} transform={`rotate(45 ${x(e.t)} ${y})`} fill="#e07a5f" stroke="#101010" strokeWidth={1.5} />
+                    <rect x={x(e.t) - 5} y={y - 5} width={10} height={10} transform={`rotate(45 ${x(e.t)} ${y})`} fill="var(--serious)" stroke="var(--surface)" strokeWidth={1.5} />
                   </g>
                 ))}
               {out.trigger && out.trigger.device_owner === owner && (
                 <g>
                   <title>{`${fmtTime(out.trigger.t)} ${out.trigger.from_label}: ${out.trigger.body}`}</title>
-                  <circle cx={x(out.trigger.t)} cy={y} r={8} fill="none" stroke="#f5f1ea" strokeWidth={1.5} />
-                  <circle cx={x(out.trigger.t)} cy={y} r={3} fill="#f5f1ea" />
+                  <circle cx={x(out.trigger.t)} cy={y} r={8} fill="none" stroke="var(--ink)" strokeWidth={1.5} />
+                  <circle cx={x(out.trigger.t)} cy={y} r={3} fill="var(--ink)" />
                 </g>
               )}
               {evs.length === 0 && (
-                <text x={LABEL + 6} y={y - 7} fontSize={9.5} fill="#6f6a63">
+                <text x={LABEL + 6} y={y - 7} fontSize={9.5} fill="var(--ink-3)">
                   no deletions or power-offs
                 </text>
               )}
@@ -79,7 +79,7 @@ export default function SyncTimeline({ out }: { out: SyncOutput }) {
       <div className="flex flex-wrap gap-5 text-xs text-faint">
         <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full border border-fg" /> audit notice</span>
         <span className="inline-flex items-center gap-2"><span className="h-2 w-2 rotate-45 bg-terra-soft" /> thread deleted</span>
-        <span className="inline-flex items-center gap-2"><span className="h-2 w-4 rounded-sm bg-[#4a4642]" /> powered off</span>
+        <span className="inline-flex items-center gap-2"><span className="h-2 w-4 rounded-sm bg-[var(--off)]" /> powered off</span>
       </div>
       {out.trigger && (
         <blockquote className="border-l-2 border-fg/60 pl-4">

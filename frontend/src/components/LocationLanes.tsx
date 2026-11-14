@@ -3,9 +3,9 @@ import { personColor, personName } from '../mock/data'
 import { caseMinutes, fmtTime } from '../lib/format'
 
 export const GAP_STYLE: Record<GapType, { color: string; label: string; reading: string }> = {
-  location_off: { color: '#e07a5f', label: 'location_off', reading: 'Phone in use while reporting no location' },
-  powered_off: { color: '#8a847c', label: 'powered_off', reading: 'A power-off event covers the gap' },
-  unexplained: { color: '#5a5550', label: 'unexplained', reading: 'No activity of any kind (battery, signal…)' },
+  location_off: { color: 'var(--serious)', label: 'location_off', reading: 'Phone in use while reporting no location' },
+  powered_off: { color: 'var(--ink-3)', label: 'powered_off', reading: 'A power-off event covers the gap' },
+  unexplained: { color: 'var(--line-strong)', label: 'unexplained', reading: 'No activity of any kind (battery, signal…)' },
 }
 
 export interface LaneMarker {
@@ -57,15 +57,15 @@ export default function LocationLanes({
       <defs>
         {(Object.keys(GAP_STYLE) as GapType[]).map((g) => (
           <pattern key={g} id={`hatch-${g}`} width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <rect width="7" height="7" fill="#101010" />
+            <rect width="7" height="7" fill="var(--surface)" />
             <line x1="0" y1="0" x2="0" y2="7" stroke={GAP_STYLE[g].color} strokeWidth="3" />
           </pattern>
         ))}
       </defs>
       {ticks.map((m) => (
         <g key={m}>
-          <line x1={x(m)} x2={x(m)} y1={TOP - 6} y2={H - 4} stroke="#2a2826" />
-          <text x={x(m) + 4} y={12} fontSize={10.5} fill="#6f6a63">
+          <line x1={x(m)} x2={x(m)} y1={TOP - 6} y2={H - 4} stroke="var(--line)" />
+          <text x={x(m) + 4} y={12} fontSize={10.5} fill="var(--ink-3)">
             {tickLabel(m)}
           </text>
         </g>
@@ -98,16 +98,16 @@ export default function LocationLanes({
                 return (
                   <g key={s.segment_id} onClick={click} className="cursor-pointer">
                     <title>{title}</title>
-                    <rect x={a} y={y + 8} width={w} height={rowH - 16} rx={4} fill={`url(#hatch-${s.gap_type})`} stroke={sel ? '#f5f1ea' : GAP_STYLE[s.gap_type!].color} strokeWidth={sel ? 2 : s.raised ? 1.4 : 0.6} opacity={s.raised ? 1 : 0.7} />
+                    <rect x={a} y={y + 8} width={w} height={rowH - 16} rx={4} fill={`url(#hatch-${s.gap_type})`} stroke={sel ? 'var(--ink)' : GAP_STYLE[s.gap_type!].color} strokeWidth={sel ? 2 : s.raised ? 1.4 : 0.6} opacity={s.raised ? 1 : 0.7} />
                     {s.raised && w > 14 && <circle cx={a + w / 2} cy={y + 6} r={3} fill={GAP_STYLE[s.gap_type!].color} />}
                   </g>
                 )
               return (
                 <g key={s.segment_id} onClick={click} className="cursor-pointer">
                   <title>{title}</title>
-                  <rect x={a} y={y + 12} width={w} height={rowH - 24} rx={4} fill={personColor(p)} opacity={sel ? 0.95 : 0.32} stroke={sel ? '#f5f1ea' : 'none'} strokeWidth={1.5} />
+                  <rect x={a} y={y + 12} width={w} height={rowH - 24} rx={4} fill={personColor(p)} opacity={sel ? 0.95 : 0.32} stroke={sel ? 'var(--ink)' : 'none'} strokeWidth={1.5} />
                   {w > 70 && (
-                    <text x={a + 6} y={mid + 4} fontSize={10.5} fill="#f5f1ea" style={{ pointerEvents: 'none' }}>
+                    <text x={a + 6} y={mid + 4} fontSize={10.5} fill="var(--ink)" style={{ pointerEvents: 'none' }}>
                       {s.place!.length * 6 > w - 10 ? s.place!.slice(0, Math.max(3, Math.floor((w - 16) / 6))) + '…' : s.place}
                     </text>
                   )}

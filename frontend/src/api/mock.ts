@@ -9,14 +9,16 @@
 //   GET  /api/timeline      -> getTimeline (stays: stay / travel / gap per person)
 //   GET  /api/signals       -> getSignals (every sweep hit)
 
-import type { AgentEvent, Answer, AskEvent, Brief, Briefing, CaseInfo, EvidenceByPhone, Graph, IngestReport, IngestStage, Report, Segment, Signal } from './types'
+import type { AgentEvent, Answer, AskEvent, Brief, Briefing, CaseInfo, EvidenceByPhone, Graph, IngestReport, IngestStage, Report, RunEvent, Segment, Signal } from './types'
+import '../mock/background'
 import { GRAPH, PEOPLE, PLACES, ROWS } from '../mock/data'
-import { INGEST_REPORT, INGEST_STAGES } from '../mock/ingest'
+import { INGEST_STAGES, buildIngestReport } from '../mock/ingest'
 import { planRun } from '../mock/report'
 import { buildBriefing } from '../mock/briefing'
 import { answerQuestion } from '../mock/ask'
 import { SEGMENTS } from '../mock/segments'
 import { SIGNALS } from '../mock/signals'
+import { buildRunScript, eventTime } from '../mock/run'
 
 const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
@@ -40,16 +42,17 @@ export async function getCase(): Promise<CaseInfo> {
   }
 }
 
-export async function ingest(file: File | null, onStage: (stages: IngestStage[]) => void): Promise<IngestReport> {
+export async function ingest(file: File | null, onStage: (stages: IngestStage[]) => void, fast = false): Promise<IngestReport> {
   const stages = INGEST_STAGES.map((s) => ({ ...s }))
   for (const s of stages) {
     s.status = 'running'
     onStage(stages.map((x) => ({ ...x })))
-    await sleep(450 + Math.random() * 300)
+    if (!fast) await sleep(450 + Math.random() * 300)
     s.status = 'done'
     onStage(stages.map((x) => ({ ...x })))
   }
-  return { ...INGEST_REPORT, bundle_name: file?.name ?? INGEST_REPORT.bundle_name }
+  const report = buildIngestReport()
+  return { ...report, bundle_name: file?.name ?? report.bundle_name }
 }
 
 let failedOnce = false
@@ -118,4 +121,20 @@ export async function getTimeline(): Promise<Segment[]> {
 export async function getSignals(): Promise<Signal[]> {
   await sleep(100)
   return SIGNALS
+}
+
+/**
+ * Case-load run (sweep + triage) as a stream of agent events. In the real system this is
+ * GET /api/run/stream (SSE). `speed` > 1 plays it faster; Infinity delivers everything at once.
+ */
+export async function analyseCase(onEvent: (e: RunEvent) => void, speed = 1, signal?: AbortSignal): Promise<Briefing> {
+  const script = buildRunScript()
+  let last = 0
+  for (const e of script.events) {
+    const t = eventTime(e)
+    if (Number.isFinite(speed) && t > last) await sleep((t - last) / speed, signal)
+    last = Math.max(last, t)
+    onEvent(e)
+  }
+  return buildBriefing()
 }

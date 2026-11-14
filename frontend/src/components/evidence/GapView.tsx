@@ -18,7 +18,7 @@ export default function GapView({ out }: { out: GapOutput }) {
           t1={t1}
           rowH={70}
           width={680}
-          markers={out.activity.map((a) => ({ person: out.person, t: a.t, label: `${fmtTime(a.t)} ${a.label}`, color: a.table === 'transactions' ? '#4fc493' : '#6b9bff' }))}
+          markers={out.activity.map((a) => ({ person: out.person, t: a.t, label: `${fmtTime(a.t)} ${a.label}`, color: a.table === 'transactions' ? 'var(--good)' : 'var(--accent)' }))}
         />
       </div>
       <div className="grid grid-cols-3 divide-x divide-line rounded-xl border border-line">
@@ -43,7 +43,7 @@ export default function GapView({ out }: { out: GapOutput }) {
           {out.activity.length === 0 && <div className="px-4 py-3 text-sm text-faint">None. Nothing was sent, received or paid during the gap.</div>}
           {out.activity.map((a) => (
             <div key={a.id} className="flex items-center gap-4 px-4 py-3 text-sm">
-              <span className="h-2 w-2 rounded-full" style={{ background: a.table === 'transactions' ? '#4fc493' : '#6b9bff' }} />
+              <span className="h-2 w-2 rounded-full" style={{ background: a.table === 'transactions' ? 'var(--good)' : 'var(--accent)' }} />
               <span className="w-12 tabular-nums text-fg">{fmtTime(a.t)}</span>
               <span className="text-muted">{a.label}</span>
               <span className="ml-auto font-mono text-[10.5px] text-faint">{a.id}</span>

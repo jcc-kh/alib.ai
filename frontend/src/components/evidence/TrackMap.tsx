@@ -13,7 +13,7 @@ export default function TrackMap({ out, places }: { out: DistanceOutput; places:
   return (
     <div className="space-y-6">
       <PlainMap places={places} bounds={[...a, ...b]} labelNear={[a[0], b[0]]}>
-        <Polyline positions={[a[mid], b[mid]]} pathOptions={{ color: '#e07a5f', weight: 1.2, dashArray: '5 7' }}>
+        <Polyline positions={[a[mid], b[mid]]} pathOptions={{ color: 'var(--serious)', weight: 1.2, dashArray: '5 7' }}>
           <Tooltip permanent direction="center" className="dist-label">
             {fmtKm(out.median_m)}
           </Tooltip>

@@ -13,7 +13,7 @@ export default function MeetingsList({ out, places }: { out: MeetingsOutput; pla
       <div className="grid grid-cols-[1fr_1fr] gap-4">
         <PlainMap places={nearby} bounds={[...pts, ...nearby.map((p) => [p.lat, p.lon] as [number, number])]} height={230}>
           {out.occasions.map((o, i) => (
-            <CircleMarker key={i} center={[o.lat, o.lon]} radius={9 + i * 4} pathOptions={{ color: '#e8a33d', fillColor: '#e8a33d', fillOpacity: 0.08, weight: 1 }}>
+            <CircleMarker key={i} center={[o.lat, o.lon]} radius={9 + i * 4} pathOptions={{ color: 'var(--amber)', fillColor: 'var(--amber)', fillOpacity: 0.08, weight: 1 }}>
               <Tooltip>{o.date}</Tooltip>
             </CircleMarker>
           ))}

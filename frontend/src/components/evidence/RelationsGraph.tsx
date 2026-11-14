@@ -6,12 +6,12 @@ import SourcesView from '../SourcesView'
 const POS: Record<string, [number, number]> = { paul: [170, 170], amy: [70, 50], ken: [400, 70], cara: [370, 290] }
 
 export const CHANNEL_STYLE: Record<Channel, { color: string; dash?: string; label: string }> = {
-  call: { color: '#6b9bff', label: 'Calls' },
-  message: { color: '#a7b8ff', label: 'Messages' },
-  transfer: { color: '#4fc493', label: 'Money' },
-  deleted_thread: { color: '#e07a5f', dash: '2 4', label: 'Deleted thread' },
-  social: { color: '#c79bff', dash: '6 4', label: 'Social' },
-  colocation: { color: '#e8a33d', dash: '9 5', label: 'Co-location only' },
+  call: { color: 'var(--accent)', label: 'Calls' },
+  message: { color: 'var(--accent)', label: 'Messages' },
+  transfer: { color: 'var(--good)', label: 'Money' },
+  deleted_thread: { color: 'var(--serious)', dash: '2 4', label: 'Deleted thread' },
+  social: { color: 'var(--violet)', dash: '6 4', label: 'Social' },
+  colocation: { color: 'var(--amber)', dash: '9 5', label: 'Co-location only' },
 }
 
 export default function RelationsGraph() {
@@ -64,7 +64,7 @@ export default function RelationsGraph() {
           const [x, y] = POS[n.id]
           return (
             <g key={n.id}>
-              <circle cx={x} cy={y} r={26} fill="#101010" stroke={n.color} strokeWidth={1.5} />
+              <circle cx={x} cy={y} r={26} fill="var(--surface)" stroke={n.color} strokeWidth={1.5} />
               <text x={x} y={y + 5} textAnchor="middle" fontSize={14} fill={n.color} style={{ fontFamily: 'Instrument Serif, serif' }}>
                 {n.label.split(' ')[0]}
               </text>

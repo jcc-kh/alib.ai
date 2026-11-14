@@ -110,25 +110,62 @@ npm run dev
 
 Open http://localhost:5173 in Chrome on a laptop-size screen.
 
-### Demo click-path
-1. **Briefing (opens on load).** No brief has been entered yet. Check:
-   - the **anchor moment** (17 April around 10:00, found without being told about the audit)
-   - the **week timeline**, with gaps hatched; faint gaps were checked and not raised
-   - **4 ranked incidents** built from 11 signals, each showing how many checks agree and how many phones are involved
-   - the **people map**
-   - **checked and dismissed**, which includes Amy's unexplained 50-minute gap and Ken's overnight power-off, each with the rule that dismissed it
-2. **Open the chained finding.** In incident 02, click the one marked **chained**. Work through the four tabs:
-   - **Evidence** shows Ken's lane with the hatched `location_off` gap, plus the SMS and transfer inside it.
-   - **How we know** shows sweep → triage → check → follow-up to financial-analyst → follow-up to comms-analyst.
-   - **Verify** recomputes the gap length, activity count and gap type from raw rows.
-   - **Sources** shows the file and line for each row.
-3. **Location timeline.** It opens on Wednesday 15 April with Ken's gap selected. The map shows where every phone was in that window. Switch to **Whole week**. The table at the bottom lists every gap with its type and whether it was raised.
-4. **Ask.** Try `Was any phone's location off while it was in use?` or `Did Paul meet Cara in March?` (cannot tell).
-5. **Sharpen with your brief.** On the Briefing page, click **Refine with my brief**. Each line is matched to an existing incident (`match_brief_item → INC-…`). The money question triggers live **follow-up hops** between subagents. The report puts the chained gap finding under Answers.
-6. **Try variations in the brief** on the Investigate page:
-   - Add `Paul met Cara in March.` and you get **cannot tell** (a targeted check, because no signal matches).
-   - Open http://localhost:5173/?fail=1#investigate and click Analyse to see the error state and **Retry**.
-7. **Ingest** is still available from the nav, to show the six-stage pipeline.
+Two UIs run over the same case data. Switch between them from either one.
+
+| UI | URL | For |
+|---|---|---|
+| **Pro**: analyst dashboard, light/dark | http://localhost:5173/#/pro/ingest | Day-to-day use |
+| **Noir**: case-file / escape-room | http://localhost:5173/#/noir/locker | Stage demos |
+
+Deep links such as `#/pro/review` or `#/noir/board` load a completed demo case automatically.
+
+### Pro click-path (guided: Ingest → Analyse → Review → Refine → Ask)
+1. **Ingest.** Click **Load sample bundle**. You get:
+   - KPI tiles
+   - rows by table per phone
+   - a location coverage chart with gaps hatched by type
+   - the devices table and ingest log
+
+   Click **Run analysis →**.
+2. **Analyse.** Watch the sweep and triage live:
+   - **agent network:** bundle → orchestrator → people map → four domain agents → triage → write-up → **conclusion**. Dots travel along the edges while data moves, and follow-ups show as dashed arcs.
+   - **run log:** a streaming list of every call and result
+   - **trace:** a Gantt of every tool call, with follow-up arrows
+
+   Click a finished node to open its **envelope** (`findings/*.json`). When every agent is done, the conclusion card lists the ranked incidents.
+3. **Review.** The dashboard has:
+   - **KPI strip:** four counts
+   - **Incidents:** short title plus key numbers; click to open the evidence
+   - **Anchor window:** close-up of 17 Apr 08:00–16:00
+   - **Activity chart:** hourly, with power-offs shaded and the audit notice marked
+   - **Location timeline:** click a block to filter "time at places"
+   - **Time at places** and **distance between phones**
+
+   Each chart has **Expand**, which opens its own view.
+
+   Toggle light/dark with ☾ in the top bar.
+4. **Refine with brief.** Run the pre-filled brief. Each item is matched to existing incidents, and the money question shows a live follow-up chain. Results are grouped by verdict, and every row opens the finding drawer (Evidence · How we know · Verify · Sources).
+5. **Ask.** Try `Was any phone's location off while it was in use?` or `Did Paul meet Cara in March?` (the second returns cannot tell).
+6. **Views:**
+   - **Activity:** larger chart plus counts per day.
+   - **Location timeline:** day or week, with a gap table and a map of the window.
+   - **Places:** time at places, by week or by day.
+   - **Distance between phones:** all six pairs.
+   - **Signals:** every sweep hit, sortable.
+
+### Noir click-path (five locked rooms)
+1. **Evidence locker.** Four evidence bags. Click **Log the evidence** and the tags fill in with computed counts.
+2. **Back room.** Seven desks type out their checks. Follow-up notes slide between desks, and a sealed manila envelope lands on each desk when its agent finishes. Break the wax seal to read the typed findings.
+3. **Evidence board.** A corkboard with:
+   - polaroids of the four phones' owners
+   - red string by channel
+   - incident index cards, with the anchor circled in red marker
+   - a ledger strip
+   - set-aside notes
+
+   Click a card to open the dossier.
+4. **Your theory.** Write the brief on the notepad. Each line comes back as a pinned note stamped HOLDS, DOESN'T HOLD, CAN'T TELL or ANSWERED.
+5. **Interrogation.** A typewritten Q&A whose answers carry clickable exhibit tags.
 
 ## Status
 
@@ -139,7 +176,9 @@ Open http://localhost:5173 in Chrome on a laptop-size screen.
 | Fact-check: in-browser recomputation from raw rows; row provenance | ✅ Built (works on any rows from `/api/evidence`) |
 | API contract (`frontend/src/api/types.ts`) | ✅ Defined |
 | Case Bundle v1 format and example | ✅ Defined |
-| Revision 2: sweep → triage → brief refines; signals, incidents, anchors, dismissals; location timeline and typed gaps; follow-up chaining | ✅ Built in the mock (Briefing as home, Location timeline page, gap evidence view, live follow-up hops) |
+| Revision 2: sweep → triage → brief refines; signals, incidents, anchors, dismissals; location timeline and typed gaps; follow-up chaining | ✅ Built in the mock |
+| UI revamp: guided flow, Pro dashboard (light/dark) and Noir case-file UI, live agent board + envelopes, charts from computed rows | ✅ Built in the mock |
+| Background data: full week of messages, calls, locations, transactions per phone (seeded), counts computed | ✅ Built in the mock (`src/mock/background.ts`) |
 | Synthetic data generator and answer key | ⏳ Next | (including gap plants G1 and its decoy)
 | Ingest pipeline, SQLite store, checks and tests | ⏳ Next |
 | deepagents orchestrator, subagents, briefing and Ask | ⏳ Next |
@@ -157,16 +196,16 @@ ARCHITECTURE.md            full engineering design
 DERIVATION.md              how every statement is derived and traced to source
 docs/architecture.png      system diagram (source: docs/architecture-diagram.html)
 schema/case-bundle-v1/     ingest format spec + example bundle
-frontend/
-  src/api/types.ts         the API contract (shared shapes)
-  src/api/index.ts         swap point: mock today, FastAPI later
-  src/api/mock.ts          mock API (simulated agent run, briefing, Ask)
-  src/mock/                case data, findings + derivations, signals/incidents (signals.ts),
-                           stays (segments.ts), briefing, Ask
-  src/lib/verify.ts        independent recomputation used by the Verify tab
-  src/pages/               BriefingPage (home), TimelinePage, InvestigatePage, IngestPage
-  src/components/          FindingDetail (4 tabs), drawers, WeekTimeline, RunProgress
-  src/components/evidence/ one view per check + relations graph
+frontend/src/
+  api/types.ts             the API contract (shared shapes)
+  api/index.ts, mock.ts    swap point: mock today, FastAPI later (incl. analyseCase run stream)
+  mock/                    planted scenarios (data.ts), seeded background week (background.ts),
+                           stays (segments.ts), signals/incidents (signals.ts), run script (run.ts)
+  lib/                     aggregates.ts (chart series), verify.ts (in-browser recompute), format.ts
+  state/caseStore.tsx      one case-flow store shared by both UIs
+  components/              shared finding detail (4 tabs), evidence views, location lanes
+  ui/pro/                  analyst dashboard: shell, steps/*, charts, envelope drawer, Ask panel
+  ui/noir/                 case-file UI: locker, back room, board, theory, interrogation
 ```
 
 These folders are planned and not yet created: `data/` (the generator), `backend/` (ingest, checks, agents, API) and `backend/tests/`. See [ARCHITECTURE.md](ARCHITECTURE.md).

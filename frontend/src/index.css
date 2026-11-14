@@ -1,69 +1,166 @@
 @import "tailwindcss";
 
-/* Alib.ai theme: dark editorial canvas, warm off-white serif headings, hairline frames.
-   Design cues taken from arlq.ai (Arlequin AI); the wordmark and palette details are our own. */
+/* ------------------------------------------------------------------
+   Semantic tokens. Components only use these; each skin/theme sets them.
+   Pro light/dark follow the validated dataviz reference palette
+   (people = categorical slots 1–4; status colours reserved).
+   ------------------------------------------------------------------ */
 @theme {
-  --color-canvas: #101010;
-  --color-panel: #161616;
-  --color-raised: #1d1d1d;
-  --color-line: #2a2826;
-  --color-line-strong: #3a3734;
-  --color-fg: #f5f1ea;
-  --color-muted: #a39d94;
-  --color-faint: #6f6a63;
-  --color-terra: #c8553a;
-  --color-terra-soft: #e07a5f;
-  --color-azure: #1652d6;
-  --color-azure-soft: #6b9bff;
-  --color-amber: #e8a33d;
-  --color-sage: #4fc493;
-  --color-rose: #ec7fa9;
-  --font-serif: "Instrument Serif", Georgia, serif;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-accent: var(--accent);
+  --color-good: var(--good);
+  --color-serious: var(--serious);
+  --color-amber: var(--amber);
+  --color-off: var(--off);
+  /* aliases used by the shared finding/evidence components */
+  --color-canvas: var(--page);
+  --color-panel: var(--surface);
+  --color-raised: var(--sunken);
+  --color-fg: var(--ink);
+  --color-muted: var(--ink-2);
+  --color-faint: var(--ink-3);
+  --color-terra: var(--serious);
+  --color-terra-soft: var(--serious);
+  --color-azure: var(--accent);
+  --color-azure-soft: var(--accent);
+  --color-sage: var(--good);
+  --color-rose: var(--p-amy);
+  --font-sans: var(--ui-font);
+  --font-serif: var(--display-font);
+  --font-mono: var(--mono-font);
+  --font-type: var(--type-font);
+}
+
+:root,
+[data-skin="pro"][data-theme="light"] {
+  color-scheme: light;
+  --page: #f3f3f1;
+  --surface: #fcfcfb;
+  --sunken: #f0efec;
+  --line: #e1e0d9;
+  --line-strong: #c3c2b7;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --ink-3: #898781;
+  --accent: #6250d6;
+  --good: #0ca30c;
+  --serious: #d03b3b;
+  --amber: #e87ba4;
+  --violet: #6250d6;
+  --off: #a8a6a0;
+  --p-paul: #2a78d6;
+  --p-amy: #eb6834;
+  --p-ken: #1baf7a;
+  --p-cara: #eda100;
+  --ui-font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display-font: var(--ui-font);
+  --mono-font: ui-monospace, "SF Mono", Menlo, monospace;
+  --type-font: var(--mono-font);
+}
+
+[data-skin="pro"][data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --sunken: #222221;
+  --line: #2c2c2a;
+  --line-strong: #383835;
+  --ink: #f0efec;
+  --ink-2: #c3c2b7;
+  --ink-3: #898781;
+  --accent: #9085e9;
+  --good: #0ca30c;
+  --serious: #e66767;
+  --amber: #d55181;
+  --violet: #9085e9;
+  --off: #5c5b57;
+  --p-paul: #3987e5;
+  --p-amy: #d95926;
+  --p-ken: #199e70;
+  --p-cara: #c98500;
+}
+
+/* Noir: components render on paper (dossiers, index cards); the desk itself uses .noir-desk. */
+[data-skin="noir"] {
+  color-scheme: light;
+  --page: #ece0c4;
+  --surface: #f6eedb;
+  --sunken: #e8dabb;
+  --line: #d3c09a;
+  --line-strong: #b39e74;
+  --ink: #221a10;
+  --ink-2: #594834;
+  --ink-3: #85745b;
+  --accent: #284a7a;
+  --good: #3b6b2c;
+  --serious: #a3201e;
+  --amber: #a3201e;
+  --violet: #5b3f86;
+  --off: #9a8a70;
+  --p-paul: #2b5c9e;
+  --p-amy: #b0501d;
+  --p-ken: #2c7a5b;
+  --p-cara: #9c7210;
+  --ui-font: "IBM Plex Mono", ui-monospace, monospace;
+  --display-font: "Playfair Display", Georgia, serif;
+  --mono-font: "IBM Plex Mono", ui-monospace, monospace;
+  --type-font: "Special Elite", "Courier New", monospace;
 }
 
 html, body, #root { height: 100%; }
-body {
-  background: var(--color-canvas);
-  color: var(--color-fg);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-}
-::selection { background: var(--color-terra); color: #fff; }
+body { background: var(--page); color: var(--ink); font-family: var(--ui-font); -webkit-font-smoothing: antialiased; font-size: 13px; }
+.tnum { font-variant-numeric: tabular-nums; }
+* { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 
-/* Scrollbars that don't shout on a dark canvas */
-* { scrollbar-width: thin; scrollbar-color: #3a3734 transparent; }
-
-/* Hairline frame with corner dots, used for page sections */
-.frame { position: relative; border-left: 1px solid var(--color-line); border-right: 1px solid var(--color-line); }
-.dot-rule { position: relative; border-top: 1px solid var(--color-line); }
-.dot-rule::before, .dot-rule::after { content: ""; position: absolute; top: -3px; width: 5px; height: 5px; border-radius: 9999px; background: #d6d1c9; }
-.dot-rule::before { left: -3px; }
-.dot-rule::after { right: -3px; }
-
-/* Primary button: solid blue with a thin outer ring, as on the reference site */
-.btn-primary { background: var(--color-azure); color: #fff; border-radius: 8px; box-shadow: 0 0 0 3px var(--color-canvas), 0 0 0 4px #2b3a5a; transition: filter .15s; }
-.btn-primary:hover { filter: brightness(1.12); }
-.btn-primary:disabled { opacity: .5; }
-.btn-ghost { border: 1px solid var(--color-line-strong); border-radius: 8px; color: var(--color-fg); transition: background .15s; }
-.btn-ghost:hover { background: var(--color-raised); }
-
-/* Leaflet on a dark canvas without base tiles (the city is invented) */
-.leaflet-container { background: #141414; font: inherit; }
-.leaflet-bar a { background: #1d1d1d !important; color: #f5f1ea !important; border-color: #2a2826 !important; }
-.place-label { background: transparent; border: none; box-shadow: none; color: #a39d94; font-size: 11px; font-weight: 500; }
+/* Leaflet without base tiles (the city is invented) */
+.leaflet-container { background: var(--sunken); font: inherit; }
+.leaflet-bar a { background: var(--surface) !important; color: var(--ink) !important; border-color: var(--line) !important; }
+.place-label { background: transparent; border: none; box-shadow: none; color: var(--ink-2); font-size: 11px; font-weight: 500; }
 .place-label::before { display: none; }
-.dist-label { background: #101010; border: 1px solid var(--color-terra); color: var(--color-terra-soft); font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 9999px; box-shadow: none; }
+.dist-label { background: var(--surface); border: 1px solid var(--serious); color: var(--serious); font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 9999px; box-shadow: none; }
 .dist-label::before { display: none; }
-.leaflet-tooltip { background: #1d1d1d; color: #f5f1ea; border-color: #3a3734; }
+.leaflet-tooltip { background: var(--surface); color: var(--ink); border-color: var(--line); box-shadow: 0 2px 8px rgb(0 0 0 / 0.12); }
 
 @keyframes pulse-dot { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
 .pulse-dot { animation: pulse-dot 1s ease-in-out infinite; }
-@keyframes rise { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
-.rise { animation: rise .35s ease-out both; }
+@keyframes rise { from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: none } }
+.rise { animation: rise .25s ease-out both; }
 @keyframes slide-in { from { transform: translateX(24px); opacity: 0 } to { transform: none; opacity: 1 } }
-.slide-in { animation: slide-in .25s ease-out both; }
+.slide-in { animation: slide-in .22s ease-out both; }
 
-/* Soft glow behind hero headings, echoing the reference site's gradient circles */
-.glow { background: radial-gradient(closest-side, rgba(200,85,58,.18), transparent 70%), radial-gradient(closest-side, rgba(22,82,214,.14), transparent 70%); background-size: 520px 520px, 520px 520px; background-position: calc(50% - 130px) 50%, calc(50% + 130px) 50%; background-repeat: no-repeat; }
+/* ---------------- Noir desk ---------------- */
+.noir-desk {
+  background:
+    radial-gradient(ellipse at 30% 0%, rgba(255, 210, 140, 0.16), transparent 55%),
+    repeating-linear-gradient(92deg, rgba(0,0,0,0.05) 0 2px, transparent 2px 9px),
+    linear-gradient(180deg, #2b1d13, #1c130c);
+  color: #efe3c8;
+  font-family: var(--type-font);
+}
+.cork {
+  background-color: #b48a5a;
+  background-image:
+    radial-gradient(rgba(0,0,0,0.18) 1px, transparent 1.4px),
+    radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1.4px);
+  background-size: 7px 7px, 11px 11px;
+  background-position: 0 0, 3px 5px;
+  box-shadow: inset 0 0 40px rgba(0,0,0,0.45);
+}
+.paper { background: #f6eedb; color: #221a10; box-shadow: 0 1px 0 rgba(0,0,0,0.05), 0 8px 22px rgba(0,0,0,0.35); }
+.manila { background: linear-gradient(180deg, #e6c98f, #d9b874); color: #3a2a12; box-shadow: 0 10px 24px rgba(0,0,0,0.45); }
+.stamp { font-family: var(--type-font); border: 2px solid currentColor; padding: 2px 8px; letter-spacing: 0.12em; text-transform: uppercase; transform: rotate(-6deg); display: inline-block; opacity: 0.85; }
+.pin { width: 12px; height: 12px; border-radius: 9999px; background: radial-gradient(circle at 35% 35%, #ff8a80, #a3201e 60%, #5c0f0e); box-shadow: 0 2px 3px rgba(0,0,0,0.5); }
+@keyframes typewriter { from { clip-path: inset(0 100% 0 0) } to { clip-path: inset(0 0 0 0) } }
+.typed { animation: typewriter .6s steps(30) both; }
+@keyframes unseal { 0% { transform: rotateX(0) } 100% { transform: rotateX(180deg) } }
+@keyframes drop-in { from { transform: translateY(-30px) rotate(-8deg); opacity: 0 } to { transform: none; opacity: 1 } }
+.drop-in { animation: drop-in .45s cubic-bezier(.2,.9,.3,1.2) both; }
+@keyframes unlock { 0% { transform: translateY(0) } 40% { transform: translateY(-6px) } 100% { transform: translateY(0) } }
+.unlock { animation: unlock .5s ease-out; }

@@ -48,6 +48,8 @@ interface IncidentDef {
   sids: ScenarioId[]
   signal_ids: string[]
   headline: string
+  title: string
+  facts: string[]
   why: string
   follow_ups: string[]
   anchor_id?: string
@@ -59,6 +61,8 @@ const DEFS: IncidentDef[] = [
     sids: ['S7'],
     signal_ids: ['sig_01', 'sig_02', 'sig_03', 'sig_04'],
     headline: 'Three phones went dark together on the morning of 17 April',
+    title: 'Three phones went dark together',
+    facts: ['17 Apr 10:20–11:10', '3 phones', 'starts 20 min after audit notice'],
     why: 'Coordinated deletion and power-off on 3 of the 4 phones within one hour. The sweep found this moment without being told about the audit; the audit notice turned up afterwards as the latest message before the window.',
     follow_ups: ['Did anyone react to the audit announcement?', 'Which threads were deleted on 17 April?'],
     anchor_id: 'A1',
@@ -68,6 +72,8 @@ const DEFS: IncidentDef[] = [
     sids: ['S4b', 'G1'],
     signal_ids: ['sig_05', 'sig_06'],
     headline: '$5,000 moved Paul → Ken → Cara, and Ken’s phone reported no location while sending it on',
+    title: 'Money chain Paul → Ken → Cara',
+    facts: ['$5,000 → $4,500', '4 h 35 min apart', 'sent during location gap'],
     why: 'Money passed on within hours at a similar amount. The onward transfer happened inside a window when Ken’s phone was in use but reported no location, which is the one kind of gap worth raising.',
     follow_ups: ['Where did the missing money end up?', "Was Ken's location off while his phone was in use?"],
   },
@@ -76,6 +82,8 @@ const DEFS: IncidentDef[] = [
     sids: ['S2', 'S1'],
     signal_ids: ['sig_10', 'sig_08'],
     headline: 'On the evening of 14 April, Paul’s texts asked Amy to come; her phone stayed 23 km away and later deleted them',
+    title: 'Paul–Amy: apart, texts deleted',
+    facts: ['14 Apr evening', '23 km apart', '3 texts missing on Amy'],
     why: 'Two checks agree on the same evening: the phones were far apart, and the texts that would explain it survive only on the sender’s phone.',
     follow_ups: ['Were Paul and Amy together on the evening of 14 April?', 'What did Paul text Amy on 14 April?'],
   },
@@ -84,6 +92,8 @@ const DEFS: IncidentDef[] = [
     sids: ['S5'],
     signal_ids: ['sig_07'],
     headline: 'Paul’s and Cara’s phones met four times with no contact on record',
+    title: 'Paul–Cara: met with no contact',
+    facts: ['4 meetings', '≤ 100 m', '0 calls or texts'],
     why: 'Repeated meetings with no texts or calls may mean another channel. This contradicts “barely know each other”.',
     follow_ups: ['Do Paul and Cara know each other?'],
   },
@@ -122,6 +132,8 @@ function buildIncidents(): Incident[] {
     strength: r.strength,
     rank: i + 1,
     headline: r.d.headline,
+    title: r.d.title,
+    facts: r.d.facts,
     why_it_matters: r.d.why,
     rank_reason: `${r.n_checks} check${r.n_checks > 1 ? 's' : ''} agree (${r.checks.join(', ')}) across ${r.n_phones} phones; strongest signal ${r.strength.toFixed(2)}.`,
     anchor_id: r.d.anchor_id,

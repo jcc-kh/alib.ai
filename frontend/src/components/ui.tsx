@@ -7,7 +7,7 @@ export function Eyebrow({ children, className = '' }: { children: ReactNode; cla
 }
 
 export function Title({ children, size = 'lg', className = '' }: { children: ReactNode; size?: 'xl' | 'lg' | 'md' | 'sm'; className?: string }) {
-  const s = { xl: 'text-5xl leading-[1.08]', lg: 'text-4xl leading-tight', md: 'text-2xl leading-snug', sm: 'text-xl leading-snug' }[size]
+  const s = { xl: 'text-5xl leading-[1.08]', lg: 'text-4xl leading-tight', md: 'text-xl leading-snug', sm: 'text-xl leading-snug' }[size]
   return <h2 className={`font-serif font-normal tracking-[-0.01em] text-fg ${s} ${className}`}>{children}</h2>
 }
 
@@ -21,10 +21,10 @@ export function PersonChip({ id, small = false }: { id: PersonId; small?: boolea
 }
 
 export const VERDICT: Record<Verdict | 'sweep', { label: string; color: string }> = {
-  confirmed: { label: 'Confirmed', color: '#4fc493' },
-  inconsistent: { label: 'Inconsistent', color: '#e07a5f' },
-  cannot_tell: { label: 'Cannot tell', color: '#a39d94' },
-  sweep: { label: 'Found unprompted', color: '#e8a33d' },
+  confirmed: { label: 'Confirmed', color: 'var(--good)' },
+  inconsistent: { label: 'Inconsistent', color: 'var(--serious)' },
+  cannot_tell: { label: 'Cannot tell', color: 'var(--ink-2)' },
+  sweep: { label: 'Found unprompted', color: 'var(--amber)' },
 }
 
 export function VerdictBadge({ v }: { v: Verdict | 'sweep' }) {

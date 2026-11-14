@@ -75,13 +75,13 @@ export const NUMBERS: Record<PersonId, string> = {
 export const COMPANY_NUMBER = '+1 555 010 0900'
 
 export const PEOPLE: Person[] = [
-  { person_id: 'paul', name: 'Paul Tan', role: 'Bookkeeper at Harbor Supply Co.', phone_number: NUMBERS.paul, device_id: 'paul-iphone', color: '#6b9bff', counts: { messages: 912, calls: 64, locations: 992, transfers: 14, social: 41 } },
-  { person_id: 'amy', name: 'Amy Lim', role: "Paul's friend", phone_number: NUMBERS.amy, device_id: 'amy-pixel', color: '#ec7fa9', counts: { messages: 801, calls: 51, locations: 1008, transfers: 9, social: 67 } },
-  { person_id: 'ken', name: 'Ken Ong', role: "Paul's friend", phone_number: NUMBERS.ken, device_id: 'ken-galaxy', color: '#e8a33d', counts: { messages: 655, calls: 47, locations: 944, transfers: 11, social: 22 } },
-  { person_id: 'cara', name: 'Cara Diaz', role: 'Supplier to Harbor Supply Co.', phone_number: NUMBERS.cara, device_id: 'cara-iphone', color: '#4fc493', counts: { messages: 702, calls: 39, locations: 991, transfers: 17, social: 35 } },
+  { person_id: 'paul', name: 'Paul Tan', role: 'Bookkeeper at Harbor Supply Co.', phone_number: NUMBERS.paul, device_id: 'paul-iphone', color: 'var(--p-paul)', counts: { messages: 912, calls: 64, locations: 992, transfers: 14, social: 41 } },
+  { person_id: 'amy', name: 'Amy Lim', role: "Paul's friend", phone_number: NUMBERS.amy, device_id: 'amy-pixel', color: 'var(--p-amy)', counts: { messages: 801, calls: 51, locations: 1008, transfers: 9, social: 67 } },
+  { person_id: 'ken', name: 'Ken Ong', role: "Paul's friend", phone_number: NUMBERS.ken, device_id: 'ken-galaxy', color: 'var(--p-ken)', counts: { messages: 655, calls: 47, locations: 944, transfers: 11, social: 22 } },
+  { person_id: 'cara', name: 'Cara Diaz', role: 'Supplier to Harbor Supply Co.', phone_number: NUMBERS.cara, device_id: 'cara-iphone', color: 'var(--p-cara)', counts: { messages: 702, calls: 39, locations: 991, transfers: 17, social: 35 } },
 ]
 export const personName = (id: PersonId) => PEOPLE.find((p) => p.person_id === id)?.name.split(' ')[0] ?? id
-export const personColor = (id: PersonId) => PEOPLE.find((p) => p.person_id === id)?.color ?? '#8a857e'
+export const personColor = (id: PersonId) => PEOPLE.find((p) => p.person_id === id)?.color ?? 'var(--ink-3)'
 
 // ---------- row store ----------
 
@@ -116,7 +116,7 @@ const EXTRACTED_AT: Record<PersonId, string> = {
 }
 const deviceOf = (owner: PersonId) => PEOPLE.find((p) => p.person_id === owner)!.device_id
 
-function addRow(owner: PersonId, table: EvidenceTable, timestamp: string, summary: string, fields: EvidenceRow['fields']) {
+export function addRow(owner: PersonId, table: EvidenceTable, timestamp: string, summary: string, fields: EvidenceRow['fields']) {
   const id = nextId(owner, table)
   const recordNo = Number(id.split(':')[2])
   const record_id = `${SHORT[table][0]}${recordNo}`

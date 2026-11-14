@@ -221,6 +221,8 @@ Example (required by acceptance):
 | `GET /api/case` | `CaseInfo`: people, per-phone counts, places |
 | `GET /api/briefing` | `Briefing`: top 5 incidents, anchors, timeline events, dismissed signals. Available as soon as triage finishes; this is what the page shows on load. |
 | `GET /api/signals?people=&check=&start=&end=` | Raw `signals` rows, for the "everything the sweep found" view |
+| `GET /api/run/stream` | SSE of the case-load run (sweep + triage): `phase`, `agent`, `tool` (check, args, rows, ms), `follow_up`, `log`, `envelope` (an agent's `findings/*.json`) |
+| `GET /api/stats/{activity,heatmap,contacts,money,distance,places,volume}` | Chart aggregates computed from rows (see `frontend/src/lib/aggregates.ts`) |
 | `GET /api/timeline?people=&start=&end=` | `stays` segments per person (stay, travel, gap with `gap_type`) for the location timeline |
 | `POST /api/analyse` (Brief) | SSE stream: `todos`, `subagent` (start, tool, done, `follow_up`) and `report`, with `error` on failure. Uses ③. The last report is cached by brief hash. |
 | `POST /api/ask` (question) | SSE stream: `step`, then `answer` with cited findings or `cannot_tell` |
@@ -233,26 +235,37 @@ Every `Finding` carries `derivation` (steps including follow-up hops, number tra
 
 ## 8. Front end (`frontend/`)
 
-It is built with React, Vite, TypeScript, Tailwind v4 and react-leaflet. The look is a dark editorial canvas with serif headings and hairline frames, taking its cues from arlq.ai. Maps have no base tiles, because the city is invented.
+There are two UIs over one case store (`src/state/caseStore.tsx`), with one guided flow: **Ingest → Analyse → Review → Refine → Ask**. Each step unlocks the next, and earlier steps stay viewable.
 
-| Page | Purpose |
+| UI | Route | Design |
+|---|---|---|
+| **Pro** (`src/ui/pro`) | `#/pro/<step>` | Analyst dashboard with a left rail stepper, top bar search and a 12-column panel grid. Light/dark themes come from semantic tokens; charts follow the validated dataviz palette (people = categorical slots 1–4; status colours reserved, always with an icon and label). |
+| **Noir** (`src/ui/noir`) | `#/noir/<room>` | Case-file / escape-room skin. Five locked rooms: evidence locker, back room (agents at desks, sealed manila envelopes), evidence board (corkboard and string), your theory (notepad → stamped notes), interrogation (typewritten Q&A). |
+
+**Shared by both UIs:**
+- **FindingDetail:** Evidence · How we know · Verify · Sources.
+- **Evidence views:** keyed by `check_output.kind`, including `gap`.
+- **LocationLanes:** the stays/travel/gaps lanes.
+- **lib/verify.ts and lib/aggregates.ts.**
+
+**Pro screens:**
+
+| Screen | Panels |
 |---|---|
-| **Briefing (home)** | Opens with the briefing already shown, before any brief is entered. Has the anchor moments, the top 5 incidents, the week timeline, the relations graph, and checked-and-dismissed. A brief panel sits on the page to sharpen it. |
-| **Location timeline** | One horizontal lane per person on a shared time axis. Stays are blocks labelled with the place, travel is a thin line, and gaps are **hatched** blocks coloured by `gap_type`. Selecting a window shows a map of every phone in that window. |
-| **Investigate** | The brief (believe · confused · don't know) → live to-dos and agent lanes, including follow-up hops → report index + finding detail |
-| **Ingest** | Drop a bundle, run the six stages, then go to the briefing |
+| Ingest | KPIs, rows by table, coverage with gaps, devices, ingest log |
+| Analyse | Agent board with envelopes, streaming run log, tool-call trace with follow-up arrows |
+| Review | KPI strip, incident table, anchor window, hourly activity, location timeline, time at places, pair distance, heatmaps, contact matrix, money Sankey, dismissed |
+| Refine | Brief, progress, agents, results by verdict, next steps |
+| Ask | Thread and the case's findings |
+| Views | Location timeline (with map), Signals table |
 
-The Ask drawer and the finding drawer are global. Every finding opens the same **FindingDetail** with four tabs: Evidence · How we know · Verify · Sources. Evidence views are keyed by `check_output.kind`:
+**Data realism:** `src/mock/background.ts` generates a seeded week for every phone. It includes:
+- diurnal messaging in conversation bursts
+- log-normal call durations
+- location fixes every 10 minutes from the stays table
+- everyday card spend
 
-| `kind` | View |
-|---|---|
-| `missing` | Two-column thread diff, gaps marked, deletion event beneath |
-| `distance` | Map with both tracks, median-distance line, per-slot bar |
-| `chain` | Person → person → person with amounts, times, gap |
-| `meetings` | Map, "0 contacts" figure, duration bars |
-| `sync` | Per-phone timeline, shared window shaded, trigger quoted |
-| `gap` **new** | That person's lane with the gap hatched, plus the activity rows that fell inside it (messages, calls, transfers) |
-| `coverage` | Coverage bars per phone (`cannot_tell`) |
+Every count and chart is computed from these rows. No activity falls inside power-offs or planted gaps.
 
 The swap point between the mock and the real backend is [`frontend/src/api/index.ts`](frontend/src/api/index.ts).
 

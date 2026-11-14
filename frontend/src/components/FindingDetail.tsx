@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getEvidence, type EvidenceByPhone, type Finding } from '../api'
-import { useApp } from '../state'
+import { useCase } from '../state/caseStore'
 import { Mono, PersonChip, Tabs, Title, VerdictBadge } from './ui'
 import DerivationView from './DerivationView'
 import VerifyView from './VerifyView'
@@ -16,7 +16,7 @@ import GapView from './evidence/GapView'
 type Tab = 'evidence' | 'how' | 'verify' | 'sources'
 
 export default function FindingDetail({ finding }: { finding: Finding }) {
-  const { caseInfo } = useApp()
+  const { caseInfo } = useCase()
   const [tab, setTab] = useState<Tab>('evidence')
   const [rows, setRows] = useState<EvidenceByPhone | null>(null)
   const [err, setErr] = useState<string | null>(null)
