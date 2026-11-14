@@ -33,6 +33,7 @@ import requests
 from remotezip import RemoteZip
 
 PRESETS = {
+    # Core evidence only (about 100 MB on the MSAB iPhone 12)
     "ios": [
         "Library/SMS/sms.db",
         "Library/AddressBook/AddressBook.sqlitedb",
@@ -41,7 +42,10 @@ PRESETS = {
         "Library/CoreDuet/Knowledge/knowledgeC.db",
         "Library/Accounts/Accounts3.sqlite",
         "Library/Safari/History.db",
+        "Library/Mail/Envelope Index",
+        "Library/Mail/Protected Index",
         "Library/Caches/com.apple.routined/Local.sqlite",
+        "Library/Caches/com.apple.routined/Cloud-V2.sqlite",
         "Library/Caches/locationd/cache_encryptedB.db",
         "Media/PhotoData/Photos.sqlite",
         "Library/Notes/notes.sqlite",
@@ -49,16 +53,27 @@ PRESETS = {
         "ChatStorage.sqlite",          # WhatsApp
         "signal.sqlite",               # Signal (encrypted; key is in the keychain)
     ],
+    # Every database plus the plists that name each app folder
+    # (about 560 MB and 2,500 files on the MSAB iPhone 12; takes a few minutes)
+    "ios-all": [
+        ".db", ".sqlite", ".sqlite3", ".sqlitedb", ".storedata",
+        "Library/Mail/Envelope Index", "Library/Mail/Protected Index",
+        ".com.apple.mobile_container_manager.metadata.plist",
+    ],
     "android": [
         "com.android.providers.telephony/databases/mmssms.db",
         "com.android.providers.contacts/databases/contacts2.db",
         "com.android.providers.contacts/databases/calllog.db",
+        "com.google.android.apps.messaging/databases/bugle_db",
         "com.whatsapp/databases/msgstore.db",
         "com.whatsapp/databases/wa.db",
+        "org.thoughtcrime.securesms/databases/signal.db",
         "com.instagram.android/databases/direct.db",
         "com.android.chrome/app_chrome/Default/History",
     ],
 }
+# System data that is large and holds no user evidence
+SKIP = ("/MobileAsset", "/System/Library/", "pron_dict", "valid.sqlite3", "MapTiles")
 SIDECARS = ("", "-wal", "-shm")
 
 
@@ -139,7 +154,7 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     total = 0
     for i in infos:
-        if i.is_dir() or not i.filename.endswith(suffixes):
+        if i.is_dir() or not i.filename.endswith(suffixes) or any(k in i.filename for k in SKIP):
             continue
         dest = os.path.join(args.out, i.filename.strip("/"))  # keep the phone's own path
         os.makedirs(os.path.dirname(dest), exist_ok=True)

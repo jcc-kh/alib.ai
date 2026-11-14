@@ -19,6 +19,9 @@ MD5 values are on the CFReDS listing. The same Google Drive limits as 2023 apply
 ## Answer key
 The CFReDS listing says the backstory, questions and solutions are at https://cellebrite.com/the-101/resources/notebook/. We haven't confirmed that, and we found no written walkthrough.
 
+## Data shape
+Not verified, because we have not opened these files. Each file should be a zip of one phone's full file system: Android and iPhone. Expect the standard layout in [schemas/README.md](schemas/README.md): one SQLite database per app, with the texts, calls, contacts and chat apps at the paths listed there. The [MSAB 2026 listings](msab-2026.md) show what a real iPhone and a real Android copy look like in practice.
+
 ## Fit for Alib.ai
 - **Good:** the same people as 2023, so the two years together give a graph that spans two cases.
 - **Weak:** answer key unconfirmed; hard to download; contents unverified.

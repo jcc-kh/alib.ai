@@ -24,6 +24,9 @@ Sizes are unknown. Abe's file is larger than 1.3 GB.
 - Russell: https://cellebrite.com/en/cellebrites-ctf-2023-recap-answers-for-russells-android-device/
 - Abe: https://cellebrite.com/en/cellebrites-ctf-2023-recap-answers-on-abes-iphone
 
+## Data shape
+Not verified, because we have not opened these files. Each file should be a zip of one phone's full file system: Android (Sharon, Russell) and iPhone (Abe, Felix). Expect the standard layout in [schemas/README.md](schemas/README.md): one SQLite database per app, with the texts, calls, contacts and chat apps at the paths listed there. The [MSAB 2026 listings](msab-2026.md) show what a real iPhone and a real Android copy look like in practice.
+
 ## Fit for Alib.ai
 - **Good:** four people with one phone each gives six pairs to cross-check; the best-documented answer key.
 - **Weak:** hard to download; contents unverified; public write-ups mean a model may already know the answers.

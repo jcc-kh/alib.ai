@@ -15,6 +15,9 @@ No password is listed. CFReDS tags it iOS.
 ## Answer key
 Not found. A recap of Cellebrite's wrap-up video says walkthroughs are on https://cellebrite.com/the-101/resources/notebook/. Contact: ctf@cellebrite.com.
 
+## Data shape
+Not verified, because we have not opened these files. Each file should be a zip of one phone's full file system: iPhone, by the CFReDS tag. Expect the standard layout in [schemas/README.md](schemas/README.md): one SQLite database per app, with the texts, calls, contacts and chat apps at the paths listed there. The [MSAB 2026 listings](msab-2026.md) show what a real iPhone and a real Android copy look like in practice.
+
 ## Fit for Alib.ai
 - **Good:** the newest case, so a model is least likely to know it. Useful as a held-out test.
 - **Weak:** very large; no confirmed story or answers.
