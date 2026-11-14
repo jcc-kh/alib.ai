@@ -12,7 +12,7 @@ Raw downloads go in `data/raw/`, which is git-ignored. Never commit phone data.
 |---|---|---|---|---|---|
 | **MSAB 2026** | 2: Blaise (iPhone 12), Emily (Samsung S20). Employee and boss, same case | Yes: 40 questions, all answered | iPhone: 560 MB with our script. Samsung: 9 GB | **Both phones downloaded; all 2,370 databases listed; the same conversations confirmed on both** | [msab-2026.md](datasets/msab-2026.md) |
 | **Cellebrite 2023** | 4: Sharon, Abe, Russell, Felix | Yes: question list and a walkthrough per phone | Several GB per phone, Google Drive | Not opened (Drive blocked us) | [cellebrite-2023.md](datasets/cellebrite-2023.md) |
-| **Cellebrite 2024** | 4: Otto, Felix, Russell, Sharon. Continues 2023 | Said to be on Cellebrite's notebook page, not confirmed | Unknown size, Google Drive | Not opened | [cellebrite-2024.md](datasets/cellebrite-2024.md) |
+| **Cellebrite 2024** | 4: Otto, Felix, Russell, Sharon. Continues 2023 | Said to be on Cellebrite's notebook page, not confirmed | Unknown size, Google Drive | Case document read; phones not opened | [cellebrite-2024.md](datasets/cellebrite-2024.md) |
 | **Cellebrite 2025** | 4 files, one is Anne Lockwood | Not found | About 24 GB per phone, Google Drive | Not opened | [cellebrite-2025.md](datasets/cellebrite-2025.md) |
 | **NGDC 2012** | 2 main: Carry, Tracy, plus "Joe". Phones, tablet, laptop | Yes: instructor packet and a report per device | 200 MB per phone copy, but they are raw disk images | Answer key and emails read; one phone copy opened (raw partitions, not parsed) | [ngdc-2012.md](datasets/ngdc-2012.md) |
 | **MVS 2024** | 2: Rocco (Pixel 3), Chad (iPhone 14) | Partial: community write-ups | Unknown, and the CFReDS link may be wrong | Not opened | [mvs-2024.md](datasets/mvs-2024.md) |
@@ -70,6 +70,7 @@ pip install -r requirements.txt
 | `fetch_zip_entry.py` | Downloads one entry of a remote zip, resumably. For phone copies that are compressed inside the outer zip |
 | `extract_dbs_from_zip.py` | Pulls every database out of a local phone-copy zip |
 | `dump_schema.py` | Writes the table, row-count and column listing for a folder of databases |
+| `fetch_gdrive.sh` | Downloads Google Drive files by id, skipping any that Drive refuses. Drive often blocks these files, so expect to fall back to a browser |
 | `summarize_ios.py` | Prints message, call, contact and account counts for an iPhone |
 
 The exact commands for both MSAB phones are in [datasets/msab-2026.md](datasets/msab-2026.md).
