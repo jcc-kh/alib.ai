@@ -13,6 +13,7 @@ import NetworkView from '../../../components/NetworkView'
 import Scorecard from '../Scorecard'
 import BoardCard, { type CardId } from './BoardCard'
 import InsightNote from './InsightNote'
+import AgentRunPanel, { SHEET_MIN, SHEET_OPEN } from './AgentRunPanel'
 import { ACTION_CLASS, ActionLabel, AddSourceMenu, ChangeToast, IngestPanel } from './AddSource'
 
 const FLASH: Record<CardId, number> = { relations: 0 }
@@ -25,6 +26,8 @@ export default function BoardView({ open, onAsk }: { open: (v: View) => void; on
   const [tie, setTie] = useState<Tie | null>(null)
   const [allNotes, setAllNotes] = useState(false)
   const [full, setFull] = useState(false)
+  const [runMin, setRunMin] = useState(false)
+  const sheet = c.runFor && c.runStage !== 'idle' ? (runMin ? SHEET_MIN : SHEET_OPEN) : null
   const flash = (id: CardId) => (fresh ? FLASH[id] : undefined)
 
 
@@ -32,7 +35,7 @@ export default function BoardView({ open, onAsk }: { open: (v: View) => void; on
   const tagOf = (id: string) => (fresh?.newIncidents.includes(id) ? 'new' : fresh?.strengthened.includes(id) ? 'stronger' : undefined)
 
   return (
-    <div className="board-surface relative min-h-full p-4">
+    <div className="board-surface relative min-h-full p-4" style={sheet ? { paddingBottom: `calc(${sheet} + 16px)` } : undefined}>
       <CaseStrip />
       {c.ingesting && (
         <div className="mt-3">
@@ -121,7 +124,8 @@ export default function BoardView({ open, onAsk }: { open: (v: View) => void; on
 
       </div>
 
-      <ChangeToast />
+      <AgentRunPanel min={runMin} onToggle={() => setRunMin((m) => !m)} />
+      <ChangeToast lift={sheet} />
     </div>
   )
 }

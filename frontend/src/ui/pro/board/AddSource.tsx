@@ -167,7 +167,8 @@ export function IngestPanel() {
 }
 
 /** What the last source changed, shown for a few seconds after it lands. */
-export function ChangeToast() {
+/** `lift`: height of the subagents sheet, so the toast sits just above it. */
+export function ChangeToast({ lift }: { lift?: string | null }) {
   const c = useCase()
   const f = c.fresh
   if (!f) return null
@@ -179,7 +180,7 @@ export function ChangeToast() {
     ties ? `${ties} relationship${ties > 1 ? 's' : ''} updated` : null,
   ].filter(Boolean)
   return (
-    <div className="toast-in fixed bottom-5 left-1/2 z-40 flex items-center gap-3 rounded-lg border border-line bg-surface py-2 pl-2.5 pr-2 shadow-xl">
+    <div style={lift ? { bottom: `calc(${lift} + 12px)` } : undefined} className="toast-in fixed bottom-5 left-1/2 z-40 flex items-center gap-3 rounded-lg border border-line bg-surface py-2 pl-2.5 pr-2 shadow-xl">
       <Portrait id={f.source} size={26} />
       <span className="text-[12.5px] text-ink">
         <span className="font-semibold">

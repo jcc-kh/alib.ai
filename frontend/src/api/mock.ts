@@ -119,8 +119,8 @@ export async function getSignals(): Promise<Signal[]> {
  * Case-load run (sweep + triage) as a stream of agent events. In the real system this is
  * GET /api/run/stream (SSE). `speed` > 1 plays it faster; Infinity delivers everything at once.
  */
-export async function analyseCase(onEvent: (e: RunEvent) => void, speed = 1, signal?: AbortSignal, range: [number, number] = [13, 19]): Promise<Briefing> {
-  const script = buildRunScript(range)
+export async function analyseCase(onEvent: (e: RunEvent) => void, speed = 1, signal?: AbortSignal, range: [number, number] = [13, 19], phones?: PersonId[]): Promise<Briefing> {
+  const script = buildRunScript(range, phones)
   let last = 0
   for (const e of script.events) {
     const t = eventTime(e)
@@ -154,8 +154,11 @@ export async function getBoard(loaded: PersonId[]): Promise<Board> {
   return computeBoard(loaded)
 }
 
-/** Ingest one source, then re-run the checks it affects. Calls onProgress throughout (about 4 s). */
-export async function addSource(id: PersonId, loaded: PersonId[], onProgress: (p: SourceProgress) => void, signal?: AbortSignal): Promise<void> {
+/**
+ * Ingest one source, then re-run the checks it affects. Calls onProgress throughout (about 4 s).
+ * `rerun`, if given, plays the subagent run during the "Re-run checks" stage instead of a fixed wait.
+ */
+export async function addSource(id: PersonId, loaded: PersonId[], onProgress: (p: SourceProgress) => void, signal?: AbortSignal, rerun?: () => Promise<void>): Promise<void> {
   const src = sourceOf(id)
   const files = Object.values(src.tables).filter((n) => n > 0).length
   const before = new Set(unlockedFor(loaded))
@@ -167,7 +170,7 @@ export async function addSource(id: PersonId, loaded: PersonId[], onProgress: (p
     { id: 'normalise', label: 'Normalise', detail: 'Numbers to E.164, timestamps to ISO 8601, places geofenced', status: 'pending' },
     { id: 'resolve', label: 'Identify owner', detail: 'Own number, accounts and saved name matched to people already in the case', status: 'pending' },
     { id: 'store', label: 'Store', detail: 'Rows written to the case store with device_owner', status: 'pending' },
-    { id: 'checks', label: 'Re-run checks', detail: checks.join(' · '), status: 'pending' },
+    { id: 'checks', label: 'Re-run subagents', detail: checks.join(' · '), status: 'pending' },
     { id: 'board', label: 'Update board', detail: fresh.length ? `${fresh.length} new finding${fresh.length > 1 ? 's' : ''}` : 'No new findings; ties refreshed', status: 'pending' },
   ]
   const DUR: Record<string, number> = { load: 650, validate: 500, normalise: 450, resolve: 500, store: 450, checks: 1100, board: 350 }
@@ -181,6 +184,14 @@ export async function addSource(id: PersonId, loaded: PersonId[], onProgress: (p
   }
   for (const s of stages) {
     s.status = 'running'
+    if (s.id === 'checks' && rerun) {
+      emit(0)
+      await rerun()
+      s.status = 'done'
+      done += DUR[s.id]
+      emit(0)
+      continue
+    }
     const steps = 6
     for (let k = 0; k < steps; k++) {
       emit((DUR[s.id] * k) / steps)

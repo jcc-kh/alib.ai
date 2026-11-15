@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useCase } from '../../state/caseStore'
 import { ROWS } from '../../mock/data'
+import { START } from '../../mock/sources'
 import FindingDrawer from '../../components/FindingDrawer'
 import AskPanel from './AskPanel'
 import CasesView from './CasesView'
@@ -8,6 +9,7 @@ import BoardView from './board/BoardView'
 import WindowView from './inquiries/WindowView'
 import MotiveView from './inquiries/MotiveView'
 import InterviewsView from './interviews/InterviewsView'
+import EnvelopeDrawer from './agents/EnvelopeDrawer'
 import { INQUIRIES } from './inquiries/meta'
 import type { InquiryId } from '../../api'
 
@@ -54,7 +56,7 @@ export default function ProApp({ view, go, theme, toggleTheme }: { view: string;
             c.reset()
             go('board')
           }}
-          disabled={c.loaded.length <= 2 && !c.askTurns.length && !c.ingesting && !c.transcripts.length && !c.reading}
+          disabled={c.loaded.length <= START.length && !c.askTurns.length && !c.ingesting && !c.transcripts.length && !c.reading && c.runStage === 'idle'}
           title="Remove the added phones, verified transcripts and Ask history: back to the two-phone start"
           className="inline-flex h-7 items-center gap-1 rounded-md border border-line px-2 text-[12px] text-ink-2 hover:bg-sunken hover:text-ink disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
         >
@@ -76,6 +78,7 @@ export default function ProApp({ view, go, theme, toggleTheme }: { view: string;
       </main>
 
       <AskPanel open={askOpen} onClose={() => setAskOpen(false)} />
+      <EnvelopeDrawer />
       <FindingDrawer
         finding={c.finding}
         item={c.evidence}
