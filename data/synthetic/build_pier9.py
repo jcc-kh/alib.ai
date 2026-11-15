@@ -79,7 +79,7 @@ PLACES = [
 ]
 LL = {n: (lat, lon) for n, _, lat, lon, _ in PLACES}
 COVER_START, COVER_END = T(13, 0, 0), T(19, 23, 50)
-COVER_END_BY = {"ravi": T(17, 8, 0)}                # the victim's phone was seized on the morning of the 17th
+COVER_END_BY = {"ravi": T(17, 1, 52)}               # the victim's phone was recovered at the scene; its data ends here
 
 # Truth windows. OFF = phone powered off (no rows at all, messages arrive late).
 OFF = {"paul": [(T(16, 21, 16), T(16, 23, 38)), (T(17, 9, 30), T(17, 12, 40))],

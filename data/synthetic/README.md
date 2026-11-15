@@ -25,7 +25,7 @@ pier9/
 
 | Device | Owner | Messages | Calls | Location fixes | Coverage |
 |---|---|---|---|---|---|
-| `ravi-iphone` | Ravi Mehta, the victim | 96 | 7 | 616 | 13 Apr to 17 Apr 08:00 (seized) |
+| `ravi-iphone` | Ravi Mehta, the victim | 96 | 7 | 580 | 13 Apr to 17 Apr 01:52 (recovered at the scene) |
 | `paul-iphone` | Paul Becker, bookkeeper | 77 | 11 | 960 | 13 to 19 Apr |
 | `amy-pixel` | Amy Brooks, Ravi's estranged partner | 78 | 7 | 986 | 13 to 19 Apr |
 | `cara-iphone` | Cara Novak, supplier | 60 | 7 | 971 | 13 to 19 Apr |
@@ -92,3 +92,12 @@ Case Bundle v1 (`schema/case-bundle-v1`), with optional additions modelled on wh
 - The group patterns in architecture §12.1 that don't belong to this story: the three-person relay, the recurring three-phone group and spoofed GPS.
 - Cell-tower and Wi-Fi location sources. All fixes are GPS, with a few marked Wi-Fi.
 - Message text is from a small template bank for background chatter, so it repeats.
+
+## Scene replay
+
+`replay/index.html` replays the evening of 16 April, 18:00 to midnight, on a chart of the invented town: one dot per phone, a lane per phone showing when it has location data, and a log of messages and calls between the five. It is meant for the demo video.
+
+- Everything shown comes from the phone files. `replay/build_replay_data.py` extracts it into `replay-data.js`; rerun it after rebuilding the case.
+- To view it: `cd data/synthetic/replay && python3 -m http.server 5174`, then open http://127.0.0.1:5174/index.html
+- Options in the address: `?autoplay` starts it playing, `&seconds=20` sets the length of one run (default 40), `&clean` hides the buttons for recording, `?at=21:16` opens paused at a time.
+- Click or drag on the lanes to move through time. Space plays and pauses; the arrow keys step five minutes.
