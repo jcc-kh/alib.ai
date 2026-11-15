@@ -213,11 +213,17 @@ function ToneByPerson({ loaded, selected, onSelect }: { loaded: PersonId[]; sele
               <Portrait id={r.p} size={20} ring={false} label />
               <span className="tnum text-[10.5px] text-ink-3">{r.n} post{r.n === 1 ? '' : 's'}</span>
             </div>
-            <div className="relative mt-1 flex h-8 items-end gap-1">
-              <span className="absolute inset-x-0 border-t border-dashed border-ink-3/60" style={{ bottom: `${T * 100}%` }} />
+            <div className="relative mt-1 flex h-14 items-end gap-1">
+              <span className="absolute inset-x-0 border-t border-dashed border-ink-3/60" style={{ bottom: `${T * 68}%` }} />
               {r.days.map((x, i) => (
                 <span key={i} className="flex flex-1 flex-col items-center justify-end" style={{ height: '100%' }} title={`${DAYS[i]} Apr: ${x === null ? 'no posts' : x.toFixed(2)}`}>
-                  <span className="w-full rounded-t-[2px]" style={{ height: x === null ? 1 : `${Math.max(6, x * 100)}%`, background: x === null ? 'var(--line)' : x >= T ? 'var(--serious)' : x >= 0.4 ? 'var(--warning)' : 'var(--ink-3)' }} />
+                  {/* a coloured column says what its colour means and the score behind it */}
+                  {x !== null && x >= 0.4 && (
+                    <span className="tnum relative z-10 mb-0.5 whitespace-nowrap rounded-sm bg-surface px-1 text-[10px] leading-[13px] text-ink-2">
+                      <span className="font-semibold text-ink">{x >= T ? 'hostile' : 'sharper'}</span> {x.toFixed(2)}
+                    </span>
+                  )}
+                  <span className="w-full shrink-0 rounded-t-[2px]" style={{ height: x === null ? 1 : `${Math.max(4, x * 68)}%`, background: x === null ? 'var(--line)' : x >= T ? 'var(--serious)' : x >= 0.4 ? 'var(--warning)' : 'var(--ink-3)' }} />
                 </span>
               ))}
             </div>
