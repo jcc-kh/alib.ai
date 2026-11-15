@@ -148,7 +148,7 @@ export function NeedsSources({ people, what = 'this view' }: { people: PersonId[
         ))}
       </span>
       <span>
-        {what[0].toUpperCase() + what.slice(1)} can’t run on the phones examined so far. It needs {n > 1 ? `${n} more phones` : 'one more phone'}; add evidence from the board.
+        {what[0].toUpperCase() + what.slice(1)} can’t run on the phones examined so far. It needs {n > 1 ? `${n} more phones` : 'one more phone'}; add evidence from the dashboard.
       </span>
     </div>
   )

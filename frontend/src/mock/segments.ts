@@ -107,8 +107,8 @@ function build(person: PersonId): Raw[] {
 }
 
 const FINDING_OF_GAP = new Map<GapOutput, string>([
-  [GPAUL, 'INC-1:f2'],
-  [GAMY, 'INC-3:f2'],
+  [GPAUL, 'INC-1:f1'],
+  [GAMY, 'INC-9:f1'],
   [SYNC_GAPS[0], 'INC-2:f1'],
   [SYNC_GAPS[1], 'INC-2:f1'],
 ])

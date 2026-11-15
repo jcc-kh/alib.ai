@@ -25,7 +25,11 @@ export default function InsightNote({
       data-note={i.incident_id}
       onMouseEnter={() => onHover(i.incident_id)}
       onMouseLeave={() => onHover(null)}
-      className={`board-card relative rounded-lg border px-3.5 py-3 transition-[border-color,opacity] duration-200 ${active ? 'border-accent' : 'border-line'} ${dim ? 'opacity-45' : ''} ${tag ? 'note-drop' : ''}`}
+      onClick={() => c.openFinding(i.findings[0])}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), c.openFinding(i.findings[0]))}
+      role="button"
+      tabIndex={0}
+      className={`board-card relative cursor-pointer rounded-lg border px-3.5 py-3 transition-[border-color,opacity] duration-200 hover:border-line-strong ${active ? 'border-accent' : 'border-line'} ${dim ? 'opacity-45' : ''} ${tag ? 'note-drop' : ''}`}
       style={tag && delay !== undefined ? { animationDelay: `${delay}ms` } : undefined}
     >
       <div className="flex items-start gap-2">
@@ -48,9 +52,7 @@ export default function InsightNote({
         <span className="ml-1.5 text-[11px] text-ink-3">
           {i.findings.length} finding{i.findings.length === 1 ? '' : 's'} · {i.n_checks} check{i.n_checks === 1 ? '' : 's'}
         </span>
-        <button onClick={() => c.openFinding(i.findings[0])} className="ml-auto rounded-md border border-line px-2 py-0.5 text-[11.5px] font-medium text-ink hover:bg-sunken">
-          Evidence
-        </button>
+        <span className="ml-auto text-[13px] text-ink-3">›</span>
       </div>
     </article>
   )

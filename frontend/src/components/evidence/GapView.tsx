@@ -4,7 +4,8 @@ import { SEGMENTS } from '../../mock/segments'
 import { caseMinutes, fmtDate, fmtTime } from '../../lib/format'
 import LocationLanes, { GAP_STYLE } from '../LocationLanes'
 
-export default function GapView({ out }: { out: GapOutput }) {
+/** `caption` sits directly under the timeline, the figure it describes. */
+export default function GapView({ out, caption }: { out: GapOutput; caption?: string }) {
   const g = GAP_STYLE[out.gap_type]
   const t0 = caseMinutes(out.start) - 4 * 60
   const t1 = caseMinutes(out.end) + 4 * 60
@@ -20,6 +21,7 @@ export default function GapView({ out }: { out: GapOutput }) {
           width={680}
           markers={out.activity.map((a) => ({ person: out.person, t: a.t, label: `${fmtTime(a.t)} ${a.label}`, color: a.table === 'transactions' ? 'var(--good)' : 'var(--accent)' }))}
         />
+        {caption && <p className="mt-3 text-[12.5px] leading-snug text-ink-3">{caption}</p>}
       </div>
       <div className="grid grid-cols-3 divide-x divide-line rounded-xl border border-line">
         {[
@@ -51,11 +53,7 @@ export default function GapView({ out }: { out: GapOutput }) {
           ))}
         </div>
       </div>
-      <p className="border-l-2 border-line-strong pl-4 text-sm leading-relaxed text-muted">
-        Reported as <span className="text-fg">no location data</span>, not as proof of intent. Phones lose location for ordinary reasons. A gap is raised by
-        default only when the phone was clearly in use during it ({g.label === 'location_off' ? 'as here' : 'not the case here'}), or when it overlaps another
-        signal.
-      </p>
+      <p className="border-l-2 border-line-strong pl-4 text-[12.5px] text-ink-2">No location data is not proof of intent: phones lose location for ordinary reasons.</p>
     </div>
   )
 }

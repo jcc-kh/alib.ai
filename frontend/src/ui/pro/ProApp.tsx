@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useCase } from '../../state/caseStore'
 import { ROWS } from '../../mock/data'
+import { START } from '../../mock/sources'
 import FindingDrawer from '../../components/FindingDrawer'
 import AskPanel from './AskPanel'
 import CasesView from './CasesView'
@@ -8,12 +9,15 @@ import BoardView from './board/BoardView'
 import WindowView from './inquiries/WindowView'
 import MotiveView from './inquiries/MotiveView'
 import InterviewsView from './interviews/InterviewsView'
+import EnvelopeDrawer from './agents/EnvelopeDrawer'
 import { INQUIRIES } from './inquiries/meta'
 import type { InquiryId } from '../../api'
 
 export type View = 'cases' | 'board' | 'interviews' | InquiryId
 
-const VIEWS: { id: View; label: string }[] = [{ id: 'board', label: 'Board' }, ...INQUIRIES.filter((q) => q.id === 'window' || q.id === 'motive').map((q) => ({ id: q.id as View, label: q.label })), { id: 'interviews', label: 'Interviews' }]
+const VIEWS: { id: View; label: string }[] = [{ id: 'board', label: 'Dashboard' }, ...INQUIRIES.filter((q) => q.id === 'window' || q.id === 'motive').map((q) => ({ id: q.id as View, label: q.label })), { id: 'interviews', label: 'Interviews' }]
+/** Tabs in the header. Interviews is opened from the dashboard's "Verify interview" button instead. */
+const NAV = VIEWS.filter((s) => s.id !== 'interviews')
 
 export default function ProApp({ view, go, theme, toggleTheme }: { view: string; go: (v: View) => void; theme: 'light' | 'dark'; toggleTheme: () => void }) {
   const c = useCase()
@@ -32,14 +36,14 @@ export default function ProApp({ view, go, theme, toggleTheme }: { view: string;
         <span className="text-line-strong">/</span>
         <span className="text-[13px] font-medium text-ink">{c.caseName}</span>
         <nav className="ml-3 flex items-center gap-0.5 rounded-lg bg-sunken p-0.5">
-          {VIEWS.map((s) => (
+          {NAV.map((s) => (
             <button
               key={s.id}
               onClick={() => go(s.id)}
               className={`rounded-md px-2.5 py-1 text-[12px] transition ${v === s.id ? 'bg-surface font-medium text-ink shadow-sm' : 'text-ink-2 hover:text-ink'}`}
             >
               {s.label}
-              {s.id === 'interviews' ? <InterviewCount /> : s.id !== 'board' && <InquiryCount id={s.id as InquiryId} />}
+              {s.id !== 'board' && <InquiryCount id={s.id as InquiryId} />}
             </button>
           ))}
         </nav>
@@ -52,22 +56,19 @@ export default function ProApp({ view, go, theme, toggleTheme }: { view: string;
             c.reset()
             go('board')
           }}
-          disabled={c.loaded.length <= 2 && !c.askTurns.length && !c.ingesting && !c.transcripts.length && !c.reading}
+          disabled={c.loaded.length <= START.length && !c.askTurns.length && !c.ingesting && !c.transcripts.length && !c.reading && c.runStage === 'idle'}
           title="Remove the added phones, verified transcripts and Ask history: back to the two-phone start"
           className="inline-flex h-7 items-center gap-1 rounded-md border border-line px-2 text-[12px] text-ink-2 hover:bg-sunken hover:text-ink disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent"
         >
           ↺ Reset demo
         </button>
-        <button onClick={() => setAskOpen(true)} className="inline-flex h-7 items-center gap-1.5 rounded-md bg-ink px-3 text-[12px] font-medium text-surface">
-          Ask
-        </button>
       </header>
       <main className="min-h-0 flex-1 overflow-y-auto">
-        {v === 'board' && <BoardView open={go} />}
+        {v === 'board' && <BoardView open={go} onAsk={() => setAskOpen(true)} />}
         {v !== 'board' && (
           <div className="px-4 pt-3">
             <button onClick={() => go('board')} className="rounded-md px-1.5 py-0.5 text-[12px] text-ink-2 hover:bg-sunken hover:text-ink">
-              ← Board
+              ← Dashboard
             </button>
           </div>
         )}
@@ -77,6 +78,7 @@ export default function ProApp({ view, go, theme, toggleTheme }: { view: string;
       </main>
 
       <AskPanel open={askOpen} onClose={() => setAskOpen(false)} />
+      <EnvelopeDrawer />
       <FindingDrawer
         finding={c.finding}
         item={c.evidence}
@@ -87,12 +89,6 @@ export default function ProApp({ view, go, theme, toggleTheme }: { view: string;
       />
     </div>
   )
-}
-
-function InterviewCount() {
-  const c = useCase()
-  if (c.reading) return <span className="pulse-dot ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-accent" />
-  return c.transcripts.length ? <span className="tnum ml-1 text-[10.5px] text-ink-3">{c.transcripts.length}</span> : null
 }
 
 function InquiryCount({ id }: { id: InquiryId }) {

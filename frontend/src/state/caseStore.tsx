@@ -2,7 +2,7 @@
 // sources, the board is recomputed from them, and adding a source shows what it changed.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { addSource as addSourceApi, ask as askApi, type Answer, type Board, type BoardDiff, type Finding, type PersonId, type SourceProgress } from '../api'
+import { addSource as addSourceApi, analyseCase, ask as askApi, type AgentEnvelope, type Answer, type Board, type BoardDiff, type Finding, type FollowUp, type PersonId, type RunEvent, type SourceProgress, type SubagentName, type ToolCall } from '../api'
 import { QUEUE, START, computeBoard, diffBoard } from '../mock/sources'
 import { VICTIM } from '../mock/data'
 import { transcriptOf } from '../mock/interviews'
@@ -39,8 +39,57 @@ export interface EvidenceItem {
 
 export const READ_STAGES = ['Read transcript', 'Extract claims', 'Plan checks', 'Run checks', 'Score'] as const
 
+// ---- Agent re-run: when a phone is added, the subagents run again over every loaded phone ----
+/** Playback speed of the re-run (1 = real script timing, about 8 s). */
+export const RERUN_SPEED = 1.6
+export type RunStage = 'idle' | 'running' | 'done'
+
+export interface AgentLive {
+  status: 'idle' | 'running' | 'done'
+  current: string
+  calls: number
+}
+export interface RunState {
+  phase: 'idle' | 'sweep' | 'triage' | 'done'
+  elapsed_ms: number
+  agents: Record<SubagentName, AgentLive>
+  calls: ToolCall[]
+  hops: FollowUp[]
+  logs: { at_ms: number; agent: SubagentName; text: string }[]
+  envelopes: Partial<Record<SubagentName, AgentEnvelope>>
+}
+export const AGENTS: SubagentName[] = ['orchestrator', 'relationship-mapper', 'location-analyst', 'comms-analyst', 'financial-analyst', 'device-forensics', 'social-analyst']
+const idleAgents = () => Object.fromEntries(AGENTS.map((a) => [a, { status: 'idle', current: '', calls: 0 }])) as Record<SubagentName, AgentLive>
+const emptyRun = (): RunState => ({ phase: 'idle', elapsed_ms: 0, agents: idleAgents(), calls: [], hops: [], logs: [], envelopes: {} })
+
+/** Folds one run event into the run state. `elapsed` is the playback clock in script milliseconds. */
+function applyRunEvent(r: RunState, e: RunEvent, elapsed: number): RunState {
+  const next = { ...r, elapsed_ms: Math.max(r.elapsed_ms, elapsed) }
+  if (e.type === 'phase') next.phase = e.phase
+  if (e.type === 'agent') next.agents = { ...r.agents, [e.agent]: { ...r.agents[e.agent], status: e.status, current: e.status === 'done' ? 'finished' : r.agents[e.agent].current } }
+  if (e.type === 'tool') {
+    next.calls = [...r.calls, e.call]
+    const a = r.agents[e.call.agent]
+    next.agents = { ...r.agents, [e.call.agent]: { ...a, status: a.status === 'done' ? 'done' : 'running', current: `${e.call.check}(${e.call.args})`, calls: a.calls + 1 } }
+  }
+  if (e.type === 'follow_up') next.hops = [...r.hops, e.hop]
+  if (e.type === 'log') next.logs = [...r.logs, { at_ms: e.at_ms, agent: e.agent, text: e.text }]
+  if (e.type === 'envelope') next.envelopes = { ...r.envelopes, [e.envelope.agent]: e.envelope }
+  return next
+}
+
 interface CaseStore {
   caseName: string
+  /** The last subagent re-run, started by adding a phone. */
+  run: RunState
+  runStage: RunStage
+  /** The phone whose arrival started the run. */
+  runFor: PersonId | null
+  /** Phones the run covered. */
+  runPhones: PersonId[]
+  closeRun: () => void
+  openedEnvelope: AgentEnvelope | null
+  openEnvelope: (e: AgentEnvelope | null) => void
   loaded: PersonId[]
   /** Sources not yet added, in demo order. */
   queue: PersonId[]
@@ -79,6 +128,29 @@ export function CaseProvider({ children }: { children: ReactNode }) {
   const [transcripts, setTranscripts] = useState<string[]>([])
   const [reading, setReading] = useState<Reading | null>(null)
   const readAbort = useRef<AbortController | null>(null)
+
+  // ---- agent re-run ----
+  const [run, setRun] = useState<RunState>(emptyRun)
+  const [runStage, setRunStage] = useState<RunStage>('idle')
+  const [runFor, setRunFor] = useState<PersonId | null>(null)
+  const [runPhones, setRunPhones] = useState<PersonId[]>([])
+  const [openedEnvelope, setOpenedEnvelope] = useState<AgentEnvelope | null>(null)
+  const closeRun = useCallback(() => {
+    setRunStage('idle')
+    setRunFor(null)
+    setRun(emptyRun())
+  }, [])
+
+  /** Plays the subagent run over `phones`, updating `run` as each event arrives. */
+  const rerun = useCallback(async (phones: PersonId[], signal?: AbortSignal) => {
+    setRun(emptyRun())
+    setRunPhones(phones)
+    setRunStage('running')
+    const t0 = performance.now()
+    await analyseCase((e) => setRun((r) => applyRunEvent(r, e, (performance.now() - t0) * RERUN_SPEED)), RERUN_SPEED, signal, [13, 19], phones)
+    setRunStage('done')
+  }, [])
+
   const abort = useRef<AbortController | null>(null)
   const freshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const loadedRef = useRef(loaded)
@@ -101,8 +173,11 @@ export function CaseProvider({ children }: { children: ReactNode }) {
     const ctrl = new AbortController()
     abort.current = ctrl
     dismissFresh()
+    setRunFor(id)
+    setRunStage('idle')
+    setRun(emptyRun())
     try {
-      await addSourceApi(id, before, (p) => setIngesting({ source: id, ...p }), ctrl.signal)
+      await addSourceApi(id, before, (p) => setIngesting({ source: id, ...p }), ctrl.signal, () => rerun([...before, id], ctrl.signal))
     } catch (err) {
       if ((err as Error).name === 'AbortError') return
       throw err
@@ -112,7 +187,7 @@ export function CaseProvider({ children }: { children: ReactNode }) {
     setLoaded(after)
     setIngesting(null)
     freshTimer.current = setTimeout(() => setFresh(null), FRESH_MS)
-  }, [dismissFresh])
+  }, [dismissFresh, rerun])
 
   const ask = useCallback(async (q: string) => {
     const question = q.trim()
@@ -170,6 +245,8 @@ export function CaseProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const reset = useCallback(() => {
+    closeRun()
+    setOpenedEnvelope(null)
     readAbort.current?.abort()
     setReading(null)
     setTranscripts([])
@@ -179,19 +256,19 @@ export function CaseProvider({ children }: { children: ReactNode }) {
     setLoaded(START)
     setAskTurns([])
     setFinding(null)
-  }, [dismissFresh])
+  }, [dismissFresh, closeRun])
 
   const queue = useMemo(() => QUEUE.filter((p) => !loaded.includes(p)), [loaded])
 
   const value = useMemo<CaseStore>(
-    () => ({ caseName: DEMO_CASE_NAME, loaded, queue, board, ingesting, fresh, finding, evidence, askTurns, askBusy, transcripts, reading, addSource, dismissFresh, openFinding: (f: Finding | null) => {
+    () => ({ caseName: DEMO_CASE_NAME, run, runStage, runFor, runPhones, closeRun, openedEnvelope, openEnvelope: setOpenedEnvelope, loaded, queue, board, ingesting, fresh, finding, evidence, askTurns, askBusy, transcripts, reading, addSource, dismissFresh, openFinding: (f: Finding | null) => {
       setEvidence(null)
       setFinding(f)
     }, openEvidence: (e: EvidenceItem | null) => {
       setFinding(null)
       setEvidence(e)
     }, ask, verifyTranscript, reset }),
-    [loaded, queue, board, ingesting, fresh, finding, evidence, askTurns, askBusy, transcripts, reading, addSource, dismissFresh, ask, verifyTranscript, reset],
+    [run, runStage, runFor, runPhones, closeRun, openedEnvelope, loaded, queue, board, ingesting, fresh, finding, evidence, askTurns, askBusy, transcripts, reading, addSource, dismissFresh, ask, verifyTranscript, reset],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

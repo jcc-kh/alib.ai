@@ -21,9 +21,9 @@ export const INQUIRIES: { id: InquiryId; label: string; question: string; method
   },
   {
     id: 'window',
-    label: 'Time of death',
+    label: 'Timeline of events',
     question: 'What was everyone doing in the days and hours before Ravi died?',
-    method: 'One timeline built from location fixes, device logs and the calls, texts and payments between the people on the board',
+    method: 'One timeline built from location fixes, device logs and the calls, texts and payments between the people in the case',
     answers: 'Each day in blocks of a few hours: where each phone was, when it went dark, what it deleted, who it was with, and every exchange between them. The medical examiner’s window (21:00–23:30 on 16 April) is outlined in red.',
   },
   {
@@ -68,7 +68,13 @@ export function InquiryHeader({ id, right }: { id: InquiryId; right?: ReactNode 
 export function InsightCard({ i, showInquiry = false, onInquiry }: { i: Incident; showInquiry?: boolean; onInquiry?: (id: InquiryId) => void }) {
   const c = useCase()
   return (
-    <div className="flex flex-col rounded-lg border border-line bg-surface px-3.5 py-3">
+    <div
+      onClick={() => c.openFinding(i.findings[0])}
+      onKeyDown={(e) => e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), c.openFinding(i.findings[0]))}
+      role="button"
+      tabIndex={0}
+      className="flex cursor-pointer flex-col rounded-lg border border-line bg-surface px-3.5 py-3 hover:border-line-strong"
+    >
       <div className="flex items-center gap-2">
         <span className="tnum grid h-5 w-5 place-items-center rounded-full bg-ink text-[10.5px] font-semibold text-surface">{i.rank}</span>
         <span className="min-w-0 flex-1 text-[13.5px] font-semibold leading-snug text-ink">{i.title}</span>
@@ -88,20 +94,29 @@ export function InsightCard({ i, showInquiry = false, onInquiry }: { i: Incident
         <span className="ml-2 text-[11px] text-ink-3">{i.n_checks} {i.n_checks === 1 ? 'check' : 'checks'}</span>
         <span className="ml-auto flex gap-1">
           {showInquiry && onInquiry && (
-            <button onClick={() => onInquiry(i.inquiry)} className="rounded-md px-2 py-1 text-[11.5px] text-ink-2 hover:bg-sunken">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onInquiry(i.inquiry)
+              }}
+              className="rounded-md px-2 py-1 text-[11.5px] text-ink-2 hover:bg-sunken">
               {inquiryOf(i.inquiry).label} →
             </button>
           )}
-          <button onClick={() => c.openFinding(i.findings[0])} className="rounded-md border border-line px-2 py-1 text-[11.5px] font-medium text-ink hover:bg-sunken">
-            Evidence
-          </button>
+          <span className="px-1 text-[13px] text-ink-3">›</span>
         </span>
       </div>
       {i.findings.length > 1 && (
         <div className="mt-2 flex flex-wrap gap-1 border-t border-line pt-2">
           {i.findings.map((f, k) => (
-            <button key={f.id} onClick={() => c.openFinding(f)} className="rounded px-1.5 py-0.5 text-[11px] text-ink-2 hover:bg-sunken" title={f.statement}>
-              {k + 1}. {f.check.replace(/_/g, ' ')}
+            <button
+              key={f.id}
+              onClick={(e) => {
+                e.stopPropagation()
+                c.openFinding(f)
+              }}
+              className="rounded px-1.5 py-0.5 text-[11px] text-ink-2 hover:bg-sunken" title={f.statement}>
+              {k + 1}. {f.heading ?? f.check.replace(/_/g, ' ')}
             </button>
           ))}
         </div>

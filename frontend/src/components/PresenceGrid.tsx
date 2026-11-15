@@ -72,11 +72,6 @@ export default function PresenceGrid({ out, onPick, compact = false, fresh = [],
   const nameW = compact ? 84 : 110
   return (
     <div>
-      {(
-        <p className={`max-w-3xl text-ink-2 ${compact ? 'mb-2.5 text-[11.5px]' : 'mb-3 text-[12.5px]'}`}>
-          The medical examiner puts the death between {fmtTime(out.window.start)} and {fmtTime(out.window.end)}. Each bar is one phone’s location data across that window, coloured by how far it was from {out.scene.name}.
-        </p>
-      )}
       <div className="space-y-1.5">
         {out.phones.map((p) => {
           const v = verdict(p, slotMin)

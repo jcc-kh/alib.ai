@@ -1,6 +1,16 @@
 import MapTimeline from './MapTimeline'
 
-/** Time of death: the map over time, under a plain title. */
+const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const HATCH = 'repeating-linear-gradient(45deg, var(--line-strong) 0 1.5px, transparent 1.5px 6px)'
+/** Columns never get narrower than this; with many people the timeline scrolls sideways instead. */
+const COL_MIN = 210
+
+/**
+ * Timeline of events: one timeline of the week leading up to it. Each day is split into blocks of a few
+ * hours; each column is a phone on the board. A cell says where that phone was (or that it was dark),
+ * what it deleted, and who it was with; under each block, every exchange between the people.
+ * Anything in the timeline opens its evidence.
+ */
 export default function WindowView() {
   return (
     <div className="space-y-3 p-4">

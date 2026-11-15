@@ -60,7 +60,7 @@ function ItemDetail({ item }: { item: EvidenceItem }) {
         onChange={setTab}
         tabs={[
           ['evidence', 'Evidence'],
-          ['sources', 'Sources (raw logs)'],
+          ['sources', 'Raw logs'],
         ]}
       />
       <div className="rise" key={tab}>
@@ -94,7 +94,10 @@ export function ReadableRows({ rows }: { rows: EvidenceByPhone }) {
   if (!all.length) return null
   return (
     <div>
-      <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">What the phones recorded</div>
+      <div className="mb-2">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">Source rows · {all.length}</div>
+        <div className="text-[12.5px] text-ink-2">Every row this rests on, oldest first, in plain words</div>
+      </div>
       <ul className="divide-y divide-line rounded-lg border border-line">
         {all.map((r) => (
           <li key={r.id} className="flex gap-3 px-3 py-2 text-[13px]">

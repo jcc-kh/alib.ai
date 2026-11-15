@@ -148,6 +148,8 @@ body { background: var(--page); color: var(--ink); font-family: var(--ui-font); 
 @keyframes rise { from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: none } }
 .rise { animation: rise .25s ease-out both; }
 @keyframes slide-in { from { transform: translateX(24px); opacity: 0 } to { transform: none; opacity: 1 } }
+@keyframes sheet-up { from { transform: translateY(100%) } to { transform: none } }
+.sheet-up { animation: sheet-up .3s cubic-bezier(.2,.8,.2,1) both }
 .slide-in { animation: slide-in .22s ease-out both; }
 
 /* ---------------- Noir desk ---------------- */

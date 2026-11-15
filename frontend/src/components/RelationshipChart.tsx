@@ -1,27 +1,42 @@
 import { useEffect, useState } from 'react'
-import type { Board, BoardDiff, Channel, PersonId, Tie, TieLevel } from '../api'
+import type { Board, BoardDiff, Channel, PersonId, Tie } from '../api'
 import { PEOPLE, pairKey, personColor, personName } from '../mock/data'
 import { TIE_RULE } from '../mock/sources'
 import { fmtDate } from '../lib/format'
 
 /**
- * Relationship chart: who is tied to whom, how strongly, and what kind of tie. One line per pair,
- * styled by tie strength (from calls and texts), labelled with the relationship, with the notable
- * channels (money, meetings without contact, deleted threads, hostility) as badges on the line.
+ * Relationship chart: who is tied to whom and how strongly. One line per pair, in one of three
+ * weights (strong, medium, weak) from calls and texts, labelled with the relationship. Anything
+ * worth noting about a tie (money, meetings without contact, deleted threads, hostility) shows as a
+ * single "!" on the line, explained on hover.
  * People whose phone is not examined yet appear as unidentified nodes: a question mark and a first name.
  */
-export const TIE_STYLE: Record<TieLevel, { stroke: string; width: number; dash?: string; label: string; rule: string }> = {
-  close: { stroke: 'var(--ink-2)', width: 4.5, label: 'Close', rule: `${TIE_RULE.close}+ calls or texts in the week` },
-  regular: { stroke: 'var(--ink-2)', width: 2.2, label: 'Regular', rule: `${TIE_RULE.regular}–${TIE_RULE.close - 1} calls or texts` },
-  acquaintance: { stroke: 'var(--ink-3)', width: 1.6, dash: '2 5', label: 'Occasional', rule: 'a few contacts, or a saved number' },
-  hidden: { stroke: 'var(--amber)', width: 3, dash: '9 6', label: 'Hidden', rule: 'meet in person, never call or text' },
+export type TieWeight = 'strong' | 'medium' | 'weak'
+
+export const TIE_STYLE: Record<TieWeight, { stroke: string; width: number; dash?: string; label: string; rule: string }> = {
+  strong: { stroke: 'var(--ink-2)', width: 4.5, label: 'Strong', rule: `${TIE_RULE.close}+ calls or texts in the week` },
+  medium: { stroke: 'var(--ink-2)', width: 1.6, label: 'Medium', rule: `${TIE_RULE.regular}–${TIE_RULE.close - 1} calls or texts` },
+  weak: { stroke: 'var(--ink-3)', width: 1.6, dash: '5 5', label: 'Weak', rule: `fewer than ${TIE_RULE.regular} calls or texts` },
 }
 
-export const FLAG_STYLE: Partial<Record<Channel, { glyph: string; color: string; label: string }>> = {
-  transfer: { glyph: '$', color: 'var(--accent)', label: 'money' },
-  colocation: { glyph: '◎', color: 'var(--amber)', label: 'met, no contact' },
-  deleted_thread: { glyph: '✕', color: 'var(--serious)', label: 'thread deleted' },
-  hostile: { glyph: '!', color: 'var(--serious)', label: 'hostile posts' },
+export const tieWeight = (t: Tie): TieWeight => (t.level === 'close' ? 'strong' : t.level === 'regular' ? 'medium' : 'weak')
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
+
+/** What is worth noting about a tie, one short line each. Empty when there is nothing to note. */
+export function tieNotes(t: Tie): string[] {
+  const out: string[] = []
+  const edge = (c: Channel) => t.edges.find((e) => e.channel === c)
+  const met = edge('colocation')
+  if (t.level === 'hidden' && met) out.push(`Met ${plural(met.count, 'time')}, never called or texted`)
+  else if (met) out.push(`Met in person ${plural(met.count, 'time')}`)
+  const money = edge('transfer')
+  if (money) out.push(plural(money.count, 'money transfer'))
+  const del = edge('deleted_thread')
+  if (del) out.push(`Message thread deleted${del.last ? ` ${fmtDate(del.last)}` : ''}`)
+  const hostile = edge('hostile')
+  if (hostile) out.push(plural(hostile.count, 'hostile post'))
+  return out
 }
 
 // The victim on the left, everyone else on an arc, so no tie has to pass through a person.
@@ -48,6 +63,7 @@ function curve(a: PersonId, b: PersonId) {
 export default function RelationshipChart({ board, fresh, onTie, height = H, selectedKey }: { board: Board; fresh?: BoardDiff | null; onTie?: (t: Tie | null) => void; height?: number; selectedKey?: string | null }) {
   const [focus, setFocus] = useState<PersonId | null>(null)
   const [sel, setSel] = useState<string | null>(null)
+  const [tip, setTip] = useState<{ tie: Tie; notes: string[]; x: number; y: number } | null>(null)
   // Follow a selection cleared from outside (the exchange list's close button).
   useEffect(() => {
     if (selectedKey === null) setSel(null)
@@ -62,6 +78,7 @@ export default function RelationshipChart({ board, fresh, onTie, height = H, sel
     onTie?.(t)
   }
   return (
+    <div className="relative">
     <svg
       viewBox={`0 0 ${W} ${H}`}
       className="w-full select-none"
@@ -94,11 +111,11 @@ export default function RelationshipChart({ board, fresh, onTie, height = H, sel
 
       {/* Ties */}
       {board.ties.map((t) => {
-        const s = TIE_STYLE[t.level]
+        const s = TIE_STYLE[tieWeight(t)]
         const c = curve(t.a, t.b)
         const on = lit(t)
         const ghostTie = !board.loaded.includes(t.a) || !board.loaded.includes(t.b)
-        const flags = t.flags.filter((f) => FLAG_STYLE[f])
+        const notes = tieNotes(t)
         return (
           <g key={t.key} opacity={on ? 1 : 0.15} style={{ transition: 'opacity .2s' }}>
             {changed.has(t.key) && <path d={c.d} fill="none" stroke="var(--accent)" strokeWidth={s.width + 10} strokeLinecap="round" className="tie-glow" />}
@@ -116,23 +133,30 @@ export default function RelationshipChart({ board, fresh, onTie, height = H, sel
             >
               <title>{`${personName(t.a)} – ${personName(t.b)}: ${t.label} · ${t.contacts} calls or texts`}</title>
             </path>
-            <g className="pointer-events-none">
-              <text x={c.mx} y={c.my - 3} textAnchor="middle" fontSize={11.5} fontWeight={t.declared ? 600 : 500} fill={t.level === 'hidden' ? 'var(--amber)' : 'var(--ink)'} stroke="var(--board-card)" strokeWidth={5} paintOrder="stroke" strokeLinejoin="round">
-                {t.label}
-              </text>
-              {flags.length > 0 && (
-                <g transform={`translate(${c.mx - (flags.length * 18) / 2 + 9}, ${c.my + 11})`}>
-                  {flags.map((f, i) => (
-                    <g key={f} transform={`translate(${i * 18}, 0)`}>
-                      <circle r={7.5} fill="var(--board-card)" stroke={FLAG_STYLE[f]!.color} strokeWidth={1.4} />
-                      <text y={3.6} textAnchor="middle" fontSize={9.5} fontWeight={700} fill={FLAG_STYLE[f]!.color}>
-                        {FLAG_STYLE[f]!.glyph}
-                      </text>
-                    </g>
-                  ))}
-                </g>
-              )}
-            </g>
+            <text x={c.mx} y={c.my - 3} textAnchor="middle" fontSize={11.5} fontWeight={t.declared ? 600 : 500} fill="var(--ink)" stroke="var(--board-card)" strokeWidth={5} paintOrder="stroke" strokeLinejoin="round" className="pointer-events-none">
+              {t.label}
+            </text>
+            {notes.length > 0 && (
+              <g
+                transform={`translate(${c.mx}, ${c.my + 12})`}
+                className="cursor-help"
+                onMouseEnter={(e) => {
+                  const box = (e.currentTarget.ownerSVGElement?.parentElement as HTMLElement).getBoundingClientRect()
+                  const r = e.currentTarget.getBoundingClientRect()
+                  setTip({ tie: t, notes, x: r.left + r.width / 2 - box.left, y: r.bottom - box.top })
+                }}
+                onMouseLeave={() => setTip(null)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  pick(sel === t.key ? null : t)
+                }}
+              >
+                <circle r={8.5} fill="var(--amber)" stroke="var(--board-card)" strokeWidth={2} />
+                <text y={4} textAnchor="middle" fontSize={11.5} fontWeight={800} fill="#fff" className="pointer-events-none">
+                  !
+                </text>
+              </g>
+            )}
           </g>
         )
       })}
@@ -186,6 +210,22 @@ export default function RelationshipChart({ board, fresh, onTie, height = H, sel
         )
       })}
     </svg>
+    {tip && (
+      <div className="pointer-events-none absolute z-20 w-max max-w-[260px] -translate-x-1/2 rounded-md border border-line bg-surface px-3 py-2 text-[12px] shadow-lg" style={{ left: tip.x, top: tip.y + 6 }}>
+        <div className="mb-1 font-semibold text-ink">
+          {personName(tip.tie.a)} – {personName(tip.tie.b)}
+        </div>
+        <ul className="space-y-0.5 text-ink-2">
+          {tip.notes.map((n) => (
+            <li key={n} className="flex gap-1.5">
+              <span className="text-ink-3">•</span>
+              {n}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
+    </div>
   )
 }
 
