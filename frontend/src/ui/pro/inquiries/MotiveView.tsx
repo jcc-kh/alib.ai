@@ -17,80 +17,86 @@ export default function MotiveView() {
   const c = useCase()
   const loaded = c.board.loaded
   const all = useMemo(() => statementsFor(loaded), [loaded])
-  const [theme, setTheme] = useState<ThemeId | null>(null)
+  // one theme is always open: the list on the right is never the unfiltered pile
+  const [theme, setTheme] = useState<ThemeId>(THEMES[0].id)
   const [person, setPerson] = useState<PersonId | null>(null)
   const tagged = all.filter((s) => s.themes.length)
-  const shown = tagged.filter((s) => (!theme || s.themes.includes(theme)) && (!person || s.speaker === person))
+  const shown = tagged.filter((s) => s.themes.includes(theme) && (!person || s.speaker === person))
 
   return (
     <div className="space-y-3 p-4">
       <InquiryHeader id="motive" />
 
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-        {THEMES.map((th) => {
-          const xs = tagged.filter((s) => s.themes.includes(th.id))
-          const who = [...new Set(xs.map((s) => s.speaker))]
-          const on = theme === th.id
-          return (
-            <button
-              key={th.id}
-              onClick={() => setTheme(on ? null : th.id)}
-              className={`rounded-lg border bg-surface px-3 py-2.5 text-left transition ${on ? 'border-ink shadow-sm' : 'border-line hover:border-line-strong'} ${xs.length ? '' : 'opacity-50'}`}
-            >
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full" style={{ background: th.color }} />
-                <span className="text-[12.5px] font-semibold text-ink">{th.label}</span>
-              </div>
-              <div className="mt-0.5 text-[11px] leading-snug text-ink-3">{th.what}</div>
-              <div className="mt-2 flex items-center gap-2">
-                <span className="tnum text-[20px] font-semibold leading-none text-ink">{xs.length}</span>
-                <span className="flex -space-x-1.5">
-                  {who.map((p) => (
-                    <Portrait key={p} id={p} size={20} ring={false} />
-                  ))}
-                </span>
-              </div>
-            </button>
-          )
-        })}
-      </div>
-
       <div className="grid grid-cols-12 gap-3">
+        <Panel title="Tone over the week" className="col-span-12 lg:col-span-7" sub={`public posts · daily highest hostility score`}>
+          <ToneByPerson loaded={loaded} selected={person} onSelect={(p) => setPerson(person === p ? null : p)} />
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-ink-2">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: 'var(--serious)' }} /> hostile ({T} or more)
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: 'var(--warning)' }} /> sharper (0.4 to {T})
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: 'var(--ink-3)' }} /> neutral (below 0.4)
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-4 border-t border-dashed border-ink-3" /> flag line at {T}
+            </span>
+          </div>
+          <p className="mt-2 text-[11px] text-ink-3">
+            Scores from {HOSTILITY_MODEL}, 0 to 1; the line marks {T}. A change in someone’s tone is often more telling than the score itself. Pick a person to see, on the right, only what they wrote.
+          </p>
+        </Panel>
         <Panel
-          title={theme ? themeOf(theme).label : 'Everything that matched a theme'}
-          count={shown.length}
-          className="col-span-12 lg:col-span-8"
-          sub={person ? `by ${personName(person)}` : `${tagged.length} of ${all.length} statements matched`}
+          title="Matched a theme"
+          className="col-span-12 lg:col-span-5"
+          sub={`${tagged.length} of ${all.length} statements`}
           actions={
-            (theme || person) && (
-              <button
-                onClick={() => {
-                  setTheme(null)
-                  setPerson(null)
-                }}
-                className="rounded px-1.5 py-0.5 text-[11px] text-ink-2 hover:bg-sunken"
-              >
-                Clear filter
+            person && (
+              <button onClick={() => setPerson(null)} className="rounded px-1.5 py-0.5 text-[11px] text-ink-2 hover:bg-sunken">
+                Only {personName(person)} · show everyone
               </button>
             )
           }
           pad={false}
         >
+          {/* the themes are the filter: pick one, and the list below is its statements */}
+          <div role="tablist" aria-label="Theme" className="flex flex-wrap gap-1.5 border-b border-line px-3 pb-2.5 pt-3">
+            {THEMES.map((th) => {
+              // counts follow the person picked in Tone over the week, so a theme and its list always agree
+              const n = tagged.filter((s) => s.themes.includes(th.id) && (!person || s.speaker === person)).length
+              const on = theme === th.id
+              return (
+                <button key={th.id} role="tab" aria-selected={on} onClick={() => setTheme(th.id)} title={th.what} className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[12px] transition ${on ? 'border-ink bg-surface font-semibold text-ink shadow-sm' : 'border-line text-ink-2 hover:border-line-strong hover:text-ink'} ${n ? '' : 'opacity-50'}`}>
+                  <span className="h-2 w-2 rounded-full" style={{ background: th.color }} />
+                  {th.label}
+                  <span className="tnum text-ink-3">{n}</span>
+                </button>
+              )
+            })}
+          </div>
+          <div className="flex items-baseline gap-2 border-b border-line px-4 py-2">
+            <span className="tnum text-[20px] font-semibold leading-none text-ink">{shown.length}</span>
+            <span className="min-w-0 flex-1 text-[12px] leading-snug text-ink-2">
+              {shown.length === 1 ? 'statement' : 'statements'} {themeOf(theme).what}
+              {person ? `, by ${personName(person)}` : ''}
+            </span>
+            <span className="flex -space-x-1.5">
+              {[...new Set(shown.map((s) => s.speaker))].map((p) => (
+                <Portrait key={p} id={p} size={20} ring={false} />
+              ))}
+            </span>
+          </div>
           <ul className="divide-y divide-line">
             {shown.map((s) => (
               <StatementRow key={s.id} s={s} />
             ))}
-            {!shown.length && <li className="px-4 py-6 text-center text-[12px] text-ink-3">Nothing matched.</li>}
+            {!shown.length && <li className="px-4 py-6 text-center text-[12px] text-ink-3">{person ? `Nothing by ${personName(person)} matched this theme.` : 'Nothing matched this theme.'}</li>}
           </ul>
-          <p className="border-t border-line px-4 py-2 text-[11px] text-ink-3">Underlined words are what matched each theme. Themes come from fixed phrase rules, so a match is a pointer to read the statement, not a judgement.</p>
+          <p className="border-t border-line px-4 py-2 text-[11px] text-ink-3">Underlined words are what matched each theme. Themes come from fixed phrase rules, so a match is a pointer to read the statement, not a judgement. Themes cover private texts as well as public posts; the tone chart on the left covers public posts only, and a post that was scored shows its score here.</p>
         </Panel>
 
-        <Panel title="Tone over the week" className="col-span-12 lg:col-span-4" sub={`public posts · daily highest hostility score`}>
-          <ToneByPerson loaded={loaded} selected={person} onSelect={(p) => setPerson(person === p ? null : p)} />
-          <p className="mt-3 text-[11px] text-ink-3">
-            Scores from {HOSTILITY_MODEL}, 0 to 1; the line marks {T}. A change in someone’s tone is often more telling than the score itself.
-          </p>
-        </Panel>
       </div>
     </div>
   )
@@ -207,11 +213,17 @@ function ToneByPerson({ loaded, selected, onSelect }: { loaded: PersonId[]; sele
               <Portrait id={r.p} size={20} ring={false} label />
               <span className="tnum text-[10.5px] text-ink-3">{r.n} post{r.n === 1 ? '' : 's'}</span>
             </div>
-            <div className="relative mt-1 flex h-8 items-end gap-1">
-              <span className="absolute inset-x-0 border-t border-dashed border-ink-3/60" style={{ bottom: `${T * 100}%` }} />
+            <div className="relative mt-1 flex h-14 items-end gap-1">
+              <span className="absolute inset-x-0 border-t border-dashed border-ink-3/60" style={{ bottom: `${T * 68}%` }} />
               {r.days.map((x, i) => (
                 <span key={i} className="flex flex-1 flex-col items-center justify-end" style={{ height: '100%' }} title={`${DAYS[i]} Apr: ${x === null ? 'no posts' : x.toFixed(2)}`}>
-                  <span className="w-full rounded-t-[2px]" style={{ height: x === null ? 1 : `${Math.max(6, x * 100)}%`, background: x === null ? 'var(--line)' : x >= T ? 'var(--serious)' : x >= 0.4 ? 'var(--warning)' : 'var(--ink-3)' }} />
+                  {/* a coloured column says what its colour means and the score behind it */}
+                  {x !== null && x >= 0.4 && (
+                    <span className="tnum relative z-10 mb-0.5 whitespace-nowrap rounded-sm bg-surface px-1 text-[10px] leading-[13px] text-ink-2">
+                      <span className="font-semibold text-ink">{x >= T ? 'hostile' : 'sharper'}</span> {x.toFixed(2)}
+                    </span>
+                  )}
+                  <span className="w-full shrink-0 rounded-t-[2px]" style={{ height: x === null ? 1 : `${Math.max(4, x * 68)}%`, background: x === null ? 'var(--line)' : x >= T ? 'var(--serious)' : x >= 0.4 ? 'var(--warning)' : 'var(--ink-3)' }} />
                 </span>
               ))}
             </div>

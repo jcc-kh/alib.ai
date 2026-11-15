@@ -37,8 +37,8 @@ export const INQUIRIES: { id: InquiryId; label: string; question: string; method
     id: 'motive',
     label: 'Semantic analysis',
     question: 'What are people saying, to whom, and about whom?',
-    method: 'Posts, comments and texts between the people in the case, tagged by theme with fixed phrase rules; posts also scored by a hostility classifier',
-    answers: 'Themes across everything written: threats, grievances, plans to meet, money, pressure. Each statement shows the words that matched. On the right, how each person’s tone changed over the week. Words are leads for interview, not evidence of where anyone was.',
+    method: 'Posts, comments and texts between the people on the board, tagged by theme with fixed phrase rules; posts also scored by a hostility classifier',
+    answers: 'On the left, how each person’s tone changed over the week. On the right, what was written under each theme: threats, grievances, plans to meet, money, pressure. Each statement shows the words that matched. Words are leads for interview, not evidence of where anyone was.',
   },
 ]
 
@@ -50,13 +50,8 @@ export function InquiryHeader({ id, right }: { id: InquiryId; right?: ReactNode 
   const insights = c.board.incidents.filter((i) => i.inquiry === id)
   return (
     <div className="space-y-3">
-      <div className="flex items-start gap-4 rounded-lg border border-line bg-surface px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">{q.label}</div>
-          <h1 className="mt-0.5 text-[19px] font-semibold leading-snug text-ink">{q.question}</h1>
-          <p className="mt-1 max-w-3xl text-[12.5px] text-ink-2">{q.answers}</p>
-          <p className="mt-1 text-[11.5px] text-ink-3">Method: {q.method}</p>
-        </div>
+      <div className="flex items-center gap-4 px-1 pt-1">
+        <h1 className="min-w-0 flex-1 text-[19px] font-semibold leading-snug text-ink">{q.label}</h1>
         {right}
       </div>
       {insights.length > 0 && (

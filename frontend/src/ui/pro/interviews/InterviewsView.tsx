@@ -36,13 +36,10 @@ export default function InterviewsView() {
 
   return (
     <div className="space-y-3 p-4">
-      <div className="flex items-start gap-4 rounded-lg border border-line bg-surface px-4 py-3">
+      <div className="flex items-center gap-4 px-1 pt-1">
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">Interviews</div>
-          <h1 className="mt-0.5 text-[19px] font-semibold leading-snug text-ink">Verify interview transcripts</h1>
-          <p className="mt-1 max-w-3xl text-[12.5px] text-ink-2">
-            Each checkable statement the interviewee makes becomes a claim. Every claim is tested against the phone data examined so far, and each check shows what it looked at and what it found. Verdicts update when phones are added.
-          </p>
+          <h1 className="text-[19px] font-semibold leading-snug text-ink">Interviews</h1>
+          <p className="mt-0.5 text-[12.5px] leading-snug text-ink-2">Every checkable claim in a transcript is tested against the phone data.</p>
         </div>
         <Legend />
       </div>
