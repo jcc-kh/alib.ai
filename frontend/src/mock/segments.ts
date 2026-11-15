@@ -3,10 +3,12 @@
 // In the real system this is computed from location rows at ingest.
 
 import type { GapOutput, PersonId, Segment } from '../api/types'
-import { ALL_GAPS, ALL_PHONES, GPAUL, GAMY, HOME, PLACES, RAVI_END, SYNC_GAPS, VICTIM, ts } from './data'
+import { ALL_GAPS, ALL_PHONES, GPAUL, GAMY, HOME, RAVI_END, SPOTS, SYNC_GAPS, VICTIM, findPlace, ts } from './data'
 
 type Stay = [number, number, string] // [startMin, endMin, place] in minutes since local midnight
 const H = (h: number, m = 0) => h * 60 + m
+// The five unnamed spots where Paul's and Cara's phones meet (mock/data.ts MEET).
+const [S1, S2, S3, S4, S5] = SPOTS.map((p) => p.name)
 
 function day(person: PersonId, d: number): Stay[] {
   const home = HOME[person]
@@ -18,12 +20,12 @@ function day(person: PersonId, d: number): Stay[] {
     return [[0, H(8), home], [H(8, 25), H(12), 'Harbor Supply Co.'], [H(12, 30), H(16), 'Pier 9 Warehouse'], [H(16, 25), H(18, 30), 'Harbor Supply Co.'], [H(18, 50), 1440, home]]
   }
   if (person === 'paul') {
-    if (d === 13) return [[0, H(7, 50), home], [H(8, 10), H(8, 50), 'Dock Cafe'], [H(9, 5), H(17, 30), 'Harbor Supply Co.'], [H(17, 50), 1440, home]]
-    if (d === 14) return [[0, H(7, 40), home], [H(8), H(13, 40), 'Harbor Supply Co.'], [H(14), H(16), 'Pier 9 Warehouse'], [H(16, 20), H(17, 30), 'Harbor Supply Co.'], [H(17, 50), 1440, home]]
-    if (d === 15) return [[0, H(7, 30), home], [H(7, 50), H(8, 20), 'Dock Cafe'], [H(8, 35), H(17, 30), 'Harbor Supply Co.'], [H(17, 50), 1440, home]]
-    if (d === 16) return [[0, H(7, 40), home], [H(8), H(12, 15), 'Harbor Supply Co.'], [H(12, 30), H(13, 10), 'Dock Cafe'], [H(13, 25), H(17, 30), 'Harbor Supply Co.'], [H(17, 50), H(20, 45), home], [H(21, 10), H(21, 20), 'Harbor Rd lot'], [H(23, 30), 1440, home]]
+    if (d === 13) return [[0, H(7, 10), home], [H(7, 30), H(7, 50), S1], [H(8, 10), H(17, 30), 'Harbor Supply Co.'], [H(17, 50), 1440, home]]
+    if (d === 14) return [[0, H(7, 40), home], [H(8), H(13, 40), 'Harbor Supply Co.'], [H(14), H(16), 'Pier 9 Warehouse'], [H(16, 20), H(17, 30), 'Harbor Supply Co.'], [H(18), H(18, 20), S2], [H(18, 45), 1440, home]]
+    if (d === 15) return [[0, H(7, 40), home], [H(8), H(12, 20), 'Harbor Supply Co.'], [H(12, 40), H(13), S3], [H(13, 20), H(17, 30), 'Harbor Supply Co.'], [H(17, 50), 1440, home]]
+    if (d === 16) return [[0, H(7, 40), home], [H(8), H(12, 15), 'Harbor Supply Co.'], [H(12, 30), H(12, 50), S4], [H(13, 10), H(17, 30), 'Harbor Supply Co.'], [H(17, 50), H(20, 45), home], [H(21, 10), H(21, 20), 'Harbor Rd lot'], [H(23, 30), 1440, home]]
     if (d === 17) return [[0, H(7, 40), home], [H(8), H(17, 30), 'Harbor Supply Co.'], [H(17, 50), 1440, home]]
-    if (d === 18) return [[0, H(8, 40), home], [H(9), H(9, 50), 'Dock Cafe'], [H(10, 10), 1440, home]]
+    if (d === 18) return [[0, H(8, 40), home], [H(9), H(9, 20), S5], [H(9, 45), 1440, home]]
     return [[0, H(10), home], [H(10, 20), H(11, 30), 'Sunset Park'], [H(11, 50), 1440, home]]
   }
   if (person === 'amy') {
@@ -41,10 +43,11 @@ function day(person: PersonId, d: number): Stay[] {
     return [[0, 1440, home]]
   }
   // cara
-  if (d === 13) return [[0, H(7, 50), home], [H(8, 10), H(8, 50), 'Dock Cafe'], [H(9, 20), H(12), 'Pier 9 Warehouse'], [H(12, 15), 1440, home]]
-  if (d === 15) return [[0, H(7, 30), home], [H(7, 50), H(8, 20), 'Dock Cafe'], [H(8, 40), H(12, 40), home], [H(13), H(15, 10), 'Pier 9 Warehouse'], [H(15, 25), 1440, home]]
-  if (d === 16) return [[0, H(9, 40), home], [H(10), H(11, 30), 'Pier 9 Warehouse'], [H(11, 50), H(12, 15), home], [H(12, 30), H(13, 10), 'Dock Cafe'], [H(13, 30), 1440, home]]
-  if (d === 18) return [[0, H(8, 40), home], [H(9), H(9, 50), 'Dock Cafe'], [H(10, 10), 1440, home]]
+  if (d === 13) return [[0, H(7, 5), home], [H(7, 30), H(7, 50), S1], [H(8, 10), H(9), home], [H(9, 20), H(12), 'Pier 9 Warehouse'], [H(12, 15), 1440, home]]
+  if (d === 14) return [[0, H(17, 25), home], [H(18), H(18, 20), S2], [H(18, 50), 1440, home]]
+  if (d === 15) return [[0, H(12, 15), home], [H(12, 40), H(13), S3], [H(13, 30), H(15, 10), 'Pier 9 Warehouse'], [H(15, 25), 1440, home]]
+  if (d === 16) return [[0, H(9, 40), home], [H(10), H(11, 30), 'Pier 9 Warehouse'], [H(11, 50), H(12, 15), home], [H(12, 30), H(12, 50), S4], [H(13, 5), 1440, home]]
+  if (d === 18) return [[0, H(8, 40), home], [H(9), H(9, 20), S5], [H(9, 40), 1440, home]]
   return [[0, 1440, home]]
 }
 
@@ -136,4 +139,4 @@ for (const person of ALL_PHONES) {
   }
 }
 
-export const placeCoords = (name?: string) => PLACES.find((p) => p.name === name)
+export const placeCoords = (name?: string) => findPlace(name)

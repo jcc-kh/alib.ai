@@ -1,7 +1,7 @@
 // The opening briefing: stage ② triage output, shown as soon as the case-load run finishes.
 
 import type { Briefing, TimelineEvent } from '../api/types'
-import { CHAIN, GAMY, GPAUL, HOSTILE, KEN_NIGHT, CARA_GAP, MEET, MISSING, SYNC, SYNC_GAPS, TOD } from './data'
+import { GAMY, GPAUL, HOSTILE, KEN_NIGHT, CARA_GAP, MEET, MISSING, SYNC, SYNC_GAPS, TOD } from './data'
 import { LAST } from './derived'
 import { ANCHORS, DISMISSALS, INCIDENTS, SIGNALS } from './signals'
 
@@ -11,11 +11,9 @@ export function buildBriefing(): Briefing {
   const raw: Omit<TimelineEvent, 'id'>[] = [
     { owner: 'ken', t: HOSTILE.context!.t, kind: 'message', label: 'Text from Ravi ending his job', finding_id: f('INC-5') },
     ...HOSTILE.items.filter((i) => i.score >= HOSTILE.threshold).map((i) => ({ owner: 'ken', t: i.t, kind: 'trigger' as const, label: `Post about Ravi (${i.score.toFixed(2)})`, finding_id: f('INC-5') })),
-    { owner: 'paul', t: CHAIN.links[0].t, kind: 'transfer', label: '$4,800 → Cara', link_to: 'cara', finding_id: f('INC-4') },
-    { owner: 'cara', t: CHAIN.links[1].t, kind: 'transfer', label: '$4,320 → Paul', link_to: 'paul', finding_id: f('INC-4') },
     ...MEET.occasions.flatMap((o) => [
-      { owner: 'paul', t: o.start, end: o.end, kind: 'meeting' as const, label: "Dock Cafe with Cara's phone", link_to: 'cara', finding_id: f('INC-4', 2) },
-      { owner: 'cara', t: o.start, end: o.end, kind: 'meeting' as const, label: "Dock Cafe with Paul's phone", finding_id: f('INC-4', 2) },
+      { owner: 'paul', t: o.start, end: o.end, kind: 'meeting' as const, label: "With Cara's phone, unnamed spot", link_to: 'cara', finding_id: f('INC-4') },
+      { owner: 'cara', t: o.start, end: o.end, kind: 'meeting' as const, label: "With Paul's phone, unnamed spot", finding_id: f('INC-4') },
     ]),
     { owner: 'ravi', t: summon.t, kind: 'message', label: 'Text to Paul: "Pier 9, 9:30"', link_to: 'paul', finding_id: f('INC-1') },
     ...MISSING.items.filter((i) => i.channel === 'message').map((i) => ({ owner: 'ravi', t: i.t, kind: 'message' as const, label: `Text ${i.from === 'ravi' ? 'to' : 'from'} Amy`, finding_id: f('INC-3') })),

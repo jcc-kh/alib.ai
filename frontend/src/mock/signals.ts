@@ -3,7 +3,7 @@
 // rank_incidents() are code helpers; agents accept groupings, dismiss with reasons and word headlines.
 
 import type { Anchor, Dismissal, GapOutput, Incident, InquiryId, PersonId, Signal } from '../api/types'
-import { personName, AMY_POST, CARA_GAP, CHAIN, GAMY, GPAUL, HOSTILE, KEN_NIGHT, LUNCH_IDS, FRESHMART_IDS, MEET, MISSING, SYNC, SYNC_GAPS, TOD } from './data'
+import { personName, AMY_POST, CARA_GAP, GAMY, GPAUL, HOSTILE, KEN_NIGHT, LUNCH_IDS, FRESHMART_IDS, MEET, MISSING, SYNC, SYNC_GAPS, TOD } from './data'
 import { LAST, PRESENCE, SPACE } from './derived'
 import { SCENARIOS, SIGNAL_OF, scenarioFinding, type ScenarioId } from './findings'
 import { fmtKm, fmtTime } from '../lib/format'
@@ -30,8 +30,7 @@ export const SIGNALS: Signal[] = [
   })),
   { signal_id: 'sig_07', check: 'missing_messages', people: ['ravi', 'amy'], start: MISSING.items[0].t, end: MISSING.deletion_events[0].t, evidence_ids: ev('MISSING'), strength: 0.9, summary: `${MISSING.missing_count} texts on Ravi's phone missing from Amy's; thread deleted 17 Apr` },
   { signal_id: 'sig_08', check: 'location_gaps', people: ['amy'], start: GAMY.start, end: GAMY.end, evidence_ids: gapIds(GAMY), strength: 0.9, summary: `amy: no location data ${fmtTime(GAMY.start)}–${fmtTime(GAMY.end)} while the phone was in use (location_off)` },
-  { signal_id: 'sig_09', check: 'money_chains', people: ['paul', 'cara'], start: CHAIN.links[0].t, end: CHAIN.links[1].t, evidence_ids: ev('CHAIN'), strength: 0.95, summary: `$4,800 Paul → Cara, then $4,320 back ${CHAIN.gap_label} later` },
-  { signal_id: 'sig_10', check: 'silent_meetings', people: ['paul', 'cara'], start: MEET.occasions[0].start, end: MEET.occasions[MEET.occasions.length - 1].end, evidence_ids: ev('MEET'), strength: 1.0, summary: 'Phones within 100 m at Dock Cafe on 4 days, 0 contact rows' },
+  { signal_id: 'sig_10', check: 'silent_meetings', people: ['paul', 'cara'], start: MEET.occasions[0].start, end: MEET.occasions[MEET.occasions.length - 1].end, evidence_ids: ev('MEET'), strength: 1.0, summary: `Phones within 100 m on ${MEET.occasions.length} days at ${MEET.occasions.length} unnamed spots; 0 contact, payment or social rows` },
   { signal_id: 'sig_11', check: 'social_hostility', people: ['ken', 'ravi'], start: HOSTILE.items[0].t, end: HOSTILE.items[HOSTILE.items.length - 1].t, evidence_ids: ev('HOSTILE'), strength: 0.8, summary: `${HOSTILE.flagged} posts by Ken about Ravi scored ≥ ${HOSTILE.threshold}` },
   { signal_id: 'sig_12', check: 'activity_space', people: SPACE.spaces.filter((s) => s.scene_inside).map((s) => s.person), start: '2026-04-13T00:00:00-04:00', end: '2026-04-19T23:59:00-04:00', evidence_ids: ev('SPACE'), strength: 0.6, summary: 'Scene inside the routine area of 3 phones' },
   { signal_id: 'sig_13', check: 'location_gaps', people: ['ken'], start: KEN_NIGHT.start, end: KEN_NIGHT.end, evidence_ids: gapIds(KEN_NIGHT), strength: 0.2, summary: 'ken: no location data overnight 14→15 Apr (powered_off)' },
@@ -85,8 +84,8 @@ const DEFS: IncidentDef[] = [
     signal_ids: ['sig_04', 'sig_05', 'sig_06'],
     headline: 'Three phones deleted threads within 35 minutes of the news breaking',
     title: 'Threads deleted after the news',
-    facts: [['SYNC', `news alert ${fmtTime(SYNC.trigger!.t)}`], ['SYNC', `3 phones in ${SYNC.window.minutes} min`], ['SYNC', '2 then powered off']],
-    why: "The sweep found this cluster without being told about the news; the alert turned up afterwards as the latest message before it. Paul's and Amy's deletions removed their threads with Ravi; Cara's and Paul's removed their thread with each other.",
+    facts: [`news alert ${fmtTime(SYNC.trigger!.t)}`, `3 phones in ${SYNC.window.minutes} min`, '2 then powered off'],
+    why: "The sweep found this cluster without being told about the news; the alert turned up afterwards as the latest message before it. All three deletions removed the phone's thread with Ravi; Ravi's copies survive on his phone.",
     follow_ups: ['Who reacted to the news?', 'Which threads were deleted on 17 April?'],
     anchor_id: 'A1',
   },
@@ -105,13 +104,13 @@ const DEFS: IncidentDef[] = [
     id: 'INC-4',
     // Shown on the board's relationship chart (click the Paul–Cara line for the exchanges).
     inquiry: 'connections',
-    sids: ['CHAIN', 'MEET'],
-    signal_ids: ['sig_09', 'sig_10'],
-    headline: "Paul paid Cara $4,800 as an invoice and 90% came back the same afternoon; their phones met four times with no call or text on record",
-    title: 'Paul and Cara: money came back, meetings with no contact',
-    facts: [['CHAIN', '$4,800 out, $4,320 back'], ['MEET', '4 meetings at Dock Cafe'], ['MEET', '0 calls or texts']],
-    why: 'The "Novak invoices" named in Ravi\'s 18:05 text are Cara\'s. A payment that mostly returns to the payer within hours, between two people who meet but never call, is worth a request for the invoice itself.',
-    follow_ups: ['Do Paul and Cara know each other?', 'Where did the invoice money go?'],
+    sids: ['MEET'],
+    signal_ids: ['sig_10'],
+    headline: "Paul's and Cara's phones met on five days at five different unnamed spots, yet neither phone has a single call, text, contact, payment or post involving the other",
+    title: 'Paul and Cara: a link no record names',
+    facts: [`${MEET.occasions.length} meetings, ${MEET.occasions.length} places`, '20 min each, arriving separately', '0 rows linking them'],
+    why: 'Read phone by phone, Paul and Cara are strangers who each work with Ravi. The link appears only when their location tracks are compared: same unnamed roadside spots, same 20 minutes, five times. Ravi\'s 18:05 text names the "Novak invoices", and on 15 April he asked Paul for every Novak invoice since January.',
+    follow_ups: ['Do Paul and Cara know each other?', 'Why would they meet but never call?'],
   },
   {
     id: 'INC-5',

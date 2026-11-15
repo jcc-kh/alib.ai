@@ -3,11 +3,11 @@
 // statement always carries the same evidence, number traces and validator results.
 
 import type { CheckName, CheckOutput, Corroboration, DerivationStep, Finding, NumberTrace, PersonId, SubagentName, ValidatorCheck } from '../api/types'
-import { ALL_PHONES, CHAIN, COVERAGE_IDS, GAMY, GPAUL, HOSTILE, MEET, MISSING, NUMBERS, PEOPLE, ROWS, SYNC, coverageFor, haversine, personName } from './data'
+import { ALL_PHONES, COVERAGE_IDS, GAMY, GPAUL, HOSTILE, MEET, MISSING, NUMBERS, PEOPLE, ROWS, SYNC, coverageFor, haversine, personName } from './data'
 import { LAST, PRESENCE, SPACE } from './derived'
 import { fmtDateTime, fmtKm, fmtTime } from '../lib/format'
 
-export type ScenarioId = 'LAST' | 'GPAUL' | 'GAMY' | 'MISSING' | 'SYNC' | 'CHAIN' | 'MEET' | 'HOSTILE' | 'PRESENCE' | 'SPACE'
+export type ScenarioId = 'LAST' | 'GPAUL' | 'GAMY' | 'MISSING' | 'SYNC' | 'MEET' | 'HOSTILE' | 'PRESENCE' | 'SPACE'
 
 /** Sweep signal ids and the insight each scenario belongs to (see mock/signals.ts). */
 export const SIGNAL_OF: Record<ScenarioId, string[]> = {
@@ -17,12 +17,11 @@ export const SIGNAL_OF: Record<ScenarioId, string[]> = {
   SYNC: ['sig_04'],
   MISSING: ['sig_07'],
   GAMY: ['sig_08'],
-  CHAIN: ['sig_09'],
   MEET: ['sig_10'],
   HOSTILE: ['sig_11'],
   SPACE: ['sig_12'],
 }
-export const INCIDENT_OF: Record<ScenarioId, string> = { LAST: 'INC-1', GPAUL: 'INC-1', PRESENCE: 'INC-1', SYNC: 'INC-2', MISSING: 'INC-3', GAMY: 'INC-3', CHAIN: 'INC-4', MEET: 'INC-4', HOSTILE: 'INC-5', SPACE: 'INC-6' }
+export const INCIDENT_OF: Record<ScenarioId, string> = { LAST: 'INC-1', GPAUL: 'INC-1', PRESENCE: 'INC-1', SYNC: 'INC-2', MISSING: 'INC-3', GAMY: 'INC-3', MEET: 'INC-4', HOSTILE: 'INC-5', SPACE: 'INC-6' }
 
 interface ScenarioDef {
   check: CheckName
@@ -204,44 +203,23 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
     ],
   },
 
-  CHAIN: {
-    check: 'money_chains',
-    agent: 'financial-analyst',
-    route_reason: 'Transfers between case phones go to the financial analyst, which looks for money that moves on (or comes back) soon after.',
-    tools: ["money_chains(start='2026-04-13', end='2026-04-19', include_round_trips=true)"],
-    people: ['paul', 'cara'],
-    statement: `Paul's phone sent Cara $${CHAIN.links[0].amount.toLocaleString()} marked "${CHAIN.links[0].memo}" at ${fmtTime(CHAIN.links[0].t)} on 15 April, and Cara's phone sent $${CHAIN.links[1].amount.toLocaleString()} back to Paul ${CHAIN.gap_label} later.`,
-    output: CHAIN,
-    evidence: CHAIN.links.flatMap((l) => l.row_ids),
-    data: `Read every transaction row on all ${ALL_PHONES.length} phones and de-duplicated the copies of each transfer that appear on both phones.`,
-    compute: { detail: 'For every A→B transfer ≥ $500, look for a B→C transfer (C may be A) within the window and the amount band.', code: `gap = ${CHAIN.gap_minutes} min;  ratio = ${CHAIN.links[1].amount} / ${CHAIN.links[0].amount} = ${CHAIN.ratio}` },
-    rule: { detail: `Rule: second transfer within ${CHAIN.thresholds.window_h} h and ${CHAIN.thresholds.ratio_min * 100}–${CHAIN.thresholds.ratio_max * 100}% of the first. ${CHAIN.gap_minutes} min and ${CHAIN.ratio * 100}% → chain. Here C = A, so the money came back.`, code: `${CHAIN.gap_minutes} ≤ ${CHAIN.thresholds.window_h * 60}  ∧  ${CHAIN.thresholds.ratio_min} ≤ ${CHAIN.ratio} ≤ ${CHAIN.thresholds.ratio_max}` },
-    numbers: [
-      { text: `$${CHAIN.links[0].amount.toLocaleString()}`, field: 'money_chains.links[0].amount', value: String(CHAIN.links[0].amount) },
-      { text: fmtTime(CHAIN.links[0].t), field: 'money_chains.links[0].t', value: fmtDateTime(CHAIN.links[0].t) },
-      { text: `$${CHAIN.links[1].amount.toLocaleString()}`, field: 'money_chains.links[1].amount', value: String(CHAIN.links[1].amount) },
-      { text: CHAIN.gap_label, field: 'money_chains.gap_label', value: `${CHAIN.gap_minutes} min` },
-    ],
-    corroboration: [corr('$4,800 Paul → Cara, 11:05', { paul: 'present', cara: 'present' }), corr('$4,320 Cara → Paul, 15:40', { paul: 'present', cara: 'present' })],
-  },
-
   MEET: {
     check: 'silent_meetings',
     agent: 'relationship-mapper',
-    route_reason: 'Repeated meetings with no recorded contact are a relationship question, so the relationship mapper checks every contact channel against the location analyst’s co-location episodes.',
+    route_reason: 'Discovery flagged a Paul–Cara link made only of co-location, with nothing on any contact channel. That is a relationship question, so the relationship mapper checks every channel against the location analyst’s co-location episodes.',
     tools: ["contact_graph(people=['paul', 'cara'])", "silent_meetings(start='2026-04-13', end='2026-04-19')"],
     people: ['paul', 'cara'],
-    statement: `Paul's and Cara's phones were within ${MEET.thresholds.within_m} m of each other at Dock Cafe on ${MEET.occasions.length} separate days, and no call or text between them exists on any phone.`,
+    statement: `Paul's and Cara's phones were within ${MEET.thresholds.within_m} m of each other on ${MEET.occasions.length} separate days at ${MEET.occasions.length} different unnamed spots, and no call, text, saved contact, payment or social tie between them exists on any phone.`,
     output: MEET,
     evidence: MEET.occasions.flatMap((o) => o.row_ids),
-    data: `Paired every 10-minute location slot across all phone pairs, and searched every message and call on all ${ALL_PHONES.length} phones for any row between ${NUMBERS.paul} and ${NUMBERS.cara}.`,
-    compute: { detail: 'Group consecutive slots where the two phones are within range into episodes; an episode lasts (last − first) + 10 min.', code: `episode if haversine(paul, cara) ≤ ${MEET.thresholds.within_m} m for consecutive slots; contacts = COUNT(messages ∪ calls WHERE {from,to} = {paul, cara})` },
-    rule: { detail: `Rule: ≥ ${MEET.thresholds.min_occasions} episodes of ≥ ${MEET.thresholds.min_minutes} min with 0 contact rows. Found ${MEET.occasions.length} episodes and ${MEET.contact_rows_found} contact rows. Both phones did delete a WhatsApp thread with each other on 17 April.`, code: `episodes = ${MEET.occasions.length} ≥ ${MEET.thresholds.min_occasions}  ∧  contacts = ${MEET.contact_rows_found}` },
+    data: `Paired every 10-minute location slot across all phone pairs, and searched every message, call, contact, transaction and social row on all ${ALL_PHONES.length} phones for any row between ${NUMBERS.paul} and ${NUMBERS.cara} or their handles.`,
+    compute: { detail: 'Group consecutive slots where the two phones are within range into episodes; an episode lasts (last − first) + 10 min.', code: `episode if haversine(paul, cara) ≤ ${MEET.thresholds.within_m} m for consecutive slots; contacts = COUNT(messages ∪ calls ∪ contacts ∪ transactions ∪ social WHERE {from,to} = {paul, cara})` },
+    rule: { detail: `Rule: ≥ ${MEET.thresholds.min_occasions} episodes of ≥ ${MEET.thresholds.min_minutes} min with 0 contact rows. Found ${MEET.occasions.length} episodes and ${MEET.contact_rows_found} contact rows. None of the five spots is a named place, and no other pair of phones meets this way.`, code: `episodes = ${MEET.occasions.length} ≥ ${MEET.thresholds.min_occasions}  ∧  contacts = ${MEET.contact_rows_found}` },
     numbers: [
       { text: `${MEET.thresholds.within_m} m`, field: 'silent_meetings.thresholds.within_m', value: String(MEET.thresholds.within_m) },
       { text: `${MEET.occasions.length} separate days`, field: 'silent_meetings.occasions.length', value: String(MEET.occasions.length) },
     ],
-    corroboration: [...MEET.occasions.map((o) => corr(`Both phones at Dock Cafe, ${o.date} ${fmtTime(o.start)}`, { paul: 'present', cara: 'present' })), corr('Any call or text between them', { ravi: 'absent', paul: 'absent', amy: 'absent', ken: 'absent', cara: 'absent' })],
+    corroboration: [...MEET.occasions.map((o) => corr(`Both phones at an ${o.place}, ${o.date} ${fmtTime(o.start)}`, { paul: 'present', cara: 'present' })), corr('Any call, text, contact, payment or social tie between them', { ravi: 'absent', paul: 'absent', amy: 'absent', ken: 'absent', cara: 'absent' })],
   },
 
   HOSTILE: {
@@ -381,8 +359,7 @@ export function route(text: string): ScenarioId | null {
   if (/(last|final).*(contact|text|message|call)|ravi.*(text|message)|who did ravi/.test(t)) return 'LAST'
   if (/delet|missing|argu/.test(t) && /amy/.test(t)) return 'MISSING'
   if (/news|react|wipe|deleted|power(ed)? off|after the body/.test(t)) return 'SYNC'
-  if (/money|invoice|paid|transfer|\$/.test(t)) return 'CHAIN'
-  if (/cara/.test(t) && /(paul|know|meet|met)/.test(t)) return 'MEET'
+  if (/cara/.test(t) && /(paul|know|meet|met|money|paid)/.test(t)) return 'MEET'
   if (/ken|hostile|threat|post|social|grudge|motive/.test(t)) return 'HOSTILE'
   if (/routine|area|radius|usual|regular/.test(t)) return 'SPACE'
   return null

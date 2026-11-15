@@ -3,7 +3,7 @@
 // mock/signals.ts. In the real system this is GET /api/run/stream (SSE) from the deepagents run.
 
 import type { AgentEnvelope, Dismissal, EvidenceRow, FollowUp, PersonId, RunEvent, SubagentName, ToolCall } from '../api/types'
-import { ALL_PHONES, CHAIN, GAMY, GPAUL, HOSTILE, MEET, MISSING, ROWS, SYNC, VICTIM, personName } from './data'
+import { ALL_PHONES, GAMY, GPAUL, HOSTILE, MEET, MISSING, ROWS, SYNC, VICTIM, personName } from './data'
 import { LAST, PRESENCE, SPACE } from './derived'
 import { ANCHORS, DISMISSALS, INCIDENTS, SIGNALS, findingById } from './signals'
 import { fmtKm, fmtTime } from '../lib/format'
@@ -97,7 +97,7 @@ export function buildRunScript(range: [number, number] = [13, 19]): RunScript {
 
   // financial-analyst
   state('financial-analyst', 'running', start + 200)
-  let tf = call('financial-analyst', start + 200, 650, 'money_chains', 'window_h=24, ratio=0.8–1.0, min_amount=500, round_trips=true', of('transactions'), `paul → cara $${CHAIN.links[0].amount.toLocaleString()}, back $${CHAIN.links[1].amount.toLocaleString()} after ${CHAIN.gap_label}`)
+  let tf = call('financial-analyst', start + 200, 650, 'money_chains', 'window_h=24, ratio=0.8–1.0, min_amount=500, round_trips=true', of('transactions'), 'no chain: no transfer ≥ $500 between case phones')
   log('financial-analyst', tf, 'Dismissed: Paul → Amy $50 "lunch" (below $500 minimum)')
   const finEnd = tf + 100
 
@@ -159,10 +159,10 @@ export function buildRunScript(range: [number, number] = [13, 19]): RunScript {
     dismissed,
   })
   const envelopes: AgentEnvelope[] = [
-    env('relationship-mapper', 100, rmEnd, `People map: ${ALL_PHONES.length} people, 31 identifiers, 5 social handles. Paul and Cara: money and meetings, but no call or text.`, [], []),
-    env('location-analyst', start, locEnd, `Only Ravi's phone at the scene in the window; Paul's ${fmtKm(ph('paul').closest_m!)} away then off; Amy's location off ${GAMY.minutes} min; Pier 9 routine for Ken and Cara.`, ['sig_02', 'sig_03', 'sig_05', 'sig_06', 'sig_08', 'sig_10', 'sig_12', 'sig_13', 'sig_14'], f('INC-1:f2', 'INC-1:f3', 'INC-3:f2', 'INC-4:f2', 'INC-6:f1'), dis('overnight', '19 April', 'FreshMart')),
+    env('relationship-mapper', 100, rmEnd, `People map: ${ALL_PHONES.length} people, 31 identifiers, 5 social handles. Paul and Cara: no call, text, contact, payment or social tie on either phone.`, [], []),
+    env('location-analyst', start, locEnd, `Only Ravi's phone at the scene in the window; Paul's ${fmtKm(ph('paul').closest_m!)} away then off; Amy's location off ${GAMY.minutes} min; Pier 9 routine for Ken and Cara.`, ['sig_02', 'sig_03', 'sig_05', 'sig_06', 'sig_08', 'sig_10', 'sig_12', 'sig_13', 'sig_14'], f('INC-1:f2', 'INC-1:f3', 'INC-3:f2', 'INC-4:f1', 'INC-6:f1'), dis('overnight', '19 April', 'FreshMart')),
     env('comms-analyst', start + 150, comEnd, `Ravi's last outgoing activity ${fmtTime(LAST.last_active.t)}; his 18:05 text names Pier 9; ${MISSING.missing_count} texts with Amy missing from her phone.`, ['sig_01', 'sig_07'], f('INC-1:f1', 'INC-3:f1')),
-    env('financial-analyst', start + 200, finEnd, `$${CHAIN.links[0].amount.toLocaleString()} Paul → Cara as an invoice, 90% back within ${CHAIN.gap_label}.`, ['sig_09'], f('INC-4:f1'), dis('lunch')),
+    env('financial-analyst', start + 200, finEnd, 'No transfer of $500 or more between case phones; no money moves between Paul and Cara.', [], [], dis('lunch')),
     env('device-forensics', start + 300, devEnd, `3 phones deleted threads within ${SYNC.window.minutes} min after the 09:05 news alert; 2 powered off.`, ['sig_04'], f('INC-2:f1')),
     env('social-analyst', start + 250, socEnd, `${HOSTILE.flagged} hostile posts by Ken about Ravi; Ken's phone far from the scene all window.`, ['sig_11'], f('INC-5:f1'), dis('Done being lied to')),
     env('orchestrator', 0, tw + 100, `${SIGNALS.length} signals → ${INCIDENTS.length} insights, 1 anchor moment, ${DISMISSALS.length} dismissed; ${statements} statements validated.`, SIGNALS.map((s) => s.signal_id), INCIDENTS.flatMap((i) => i.findings), DISMISSALS),

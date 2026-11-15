@@ -13,8 +13,7 @@ export const PLANTS: { sid: ScenarioId; label: string }[] = [
   { sid: 'MISSING', label: 'Ravi–Amy texts deleted from Amy' },
   { sid: 'GAMY', label: "Amy's location off while in use" },
   { sid: 'SYNC', label: 'Threads deleted after the news' },
-  { sid: 'CHAIN', label: 'Invoice money sent back' },
-  { sid: 'MEET', label: 'Paul–Cara meetings, no contact' },
+  { sid: 'MEET', label: 'Paul–Cara: met 5 times, no record links them' },
   { sid: 'HOSTILE', label: "Ken's hostile posts" },
   { sid: 'SPACE', label: 'Scene inside routine areas' },
 ]
