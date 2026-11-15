@@ -5,7 +5,51 @@ import { personOf } from '../../../mock/data'
 import { fmtDate } from '../../../lib/format'
 import Portrait, { Unknown } from '../../../components/Portrait'
 
-/** "Add evidence source": the phones not yet examined, plus a drop zone for a Case Bundle. */
+/** Large action button on the board, shared by the three actions under the relationship chart. */
+export const ACTION_CLASS =
+  'group flex h-full w-full items-center gap-3 rounded-xl bg-ink px-4 py-4 text-left text-surface shadow-sm transition hover:-translate-y-px hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none'
+
+const ICONS = {
+  add: (
+    <>
+      <rect x="6" y="2.5" width="12" height="19" rx="2.5" />
+      <path d="M12 8.5v6M9 11.5h6" />
+    </>
+  ),
+  verify: (
+    <>
+      <path d="M8 3.5h8M8 3.5a1.5 1.5 0 0 0-1.5 1.5H5.5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-1A1.5 1.5 0 0 0 16 3.5" />
+      <path d="M8.5 13.5l2.5 2.5 4.5-5" />
+    </>
+  ),
+  ask: (
+    <>
+      <path d="M4 5.5h16v10H10l-4 3.5v-3.5H4z" />
+      <path d="M9.5 9.2a2.5 2.5 0 1 1 3.4 2.3c-.6.3-.9.7-.9 1.3M12 14.2v.1" />
+    </>
+  ),
+}
+
+export function ActionLabel({ icon, title, sub }: { icon: keyof typeof ICONS; title: string; sub: string }) {
+  return (
+    <>
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-surface/15">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          {ICONS[icon]}
+        </svg>
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[14.5px] font-semibold leading-tight">{title}</span>
+        <span className="mt-0.5 block truncate text-[11.5px] text-surface/70">{sub}</span>
+      </span>
+      <span className="text-[17px] transition-transform group-hover:translate-x-0.5 group-disabled:translate-x-0" aria-hidden>
+        →
+      </span>
+    </>
+  )
+}
+
+/** "Add new device data": the phones not yet examined, plus a drop zone for a Case Bundle. */
 export function AddSourceMenu() {
   const c = useCase()
   const [open, setOpen] = useState(false)
@@ -30,16 +74,16 @@ export function AddSourceMenu() {
   }
   const busy = !!c.ingesting
   return (
-    <div ref={ref} className="relative">
-      <button
-        disabled={busy || c.queue.length === 0}
-        onClick={() => setOpen((o) => !o)}
-        className="inline-flex h-8 items-center gap-1.5 rounded-md bg-ink px-3 text-[12.5px] font-medium text-surface transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        <span className="text-[15px] leading-none">+</span> {c.queue.length ? 'Add evidence source' : 'All phones added'}
+    <div ref={ref} className="relative h-full">
+      <button disabled={busy || c.queue.length === 0} onClick={() => setOpen((o) => !o)} className={ACTION_CLASS}>
+        <ActionLabel
+          icon="add"
+          title="Add new device data"
+          sub={busy ? `Adding ${exhibitOf(c.ingesting!.source)}…` : c.queue.length ? `${c.queue.length} phone${c.queue.length === 1 ? '' : 's'} not yet examined` : 'All phones added'}
+        />
       </button>
       {open && (
-        <div className="rise absolute right-0 top-10 z-40 w-[380px] rounded-lg border border-line bg-surface p-2 shadow-xl">
+        <div className="rise absolute bottom-full left-0 z-40 mb-2 w-[380px] rounded-lg border border-line bg-surface p-2 shadow-xl">
           <div className="px-2 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">Seized, not yet examined</div>
           {c.queue.map((id, k) => {
             const s = sourceOf(id)

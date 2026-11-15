@@ -284,6 +284,10 @@ export interface Finding {
   /** Copied from apply_verdict_rule; the validator rejects any other value. */
   verdict: Verdict
   statement: string
+  /** Short, fact-based heading for the finding page, e.g. "Paul – location missing". */
+  heading?: string
+  /** The statement broken into short points, one fact each. */
+  points?: string[]
   people: PersonId[]
   check: CheckName
   agent: SubagentName

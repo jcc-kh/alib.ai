@@ -6,10 +6,6 @@ export default function MessagesDiff({ out }: { out: MissingOutput }) {
   const cols = [out.person_a, out.person_b]
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted">
-        The thread between {personName(out.person_a)} and {personName(out.person_b)}, aligned by timestamp on both phones.{' '}
-        <span className="text-terra-soft">{out.missing_count} messages</span> exist on one side only.
-      </p>
       <div className="grid grid-cols-2 gap-x-4 gap-y-2">
         {cols.map((c) => (
           <div key={c} className="flex items-center gap-2 border-b border-line pb-2 text-xs text-muted">

@@ -5,7 +5,7 @@
 import type { CheckName, CheckOutput, Corroboration, DerivationStep, Finding, NumberTrace, PersonId, SubagentName, ValidatorCheck } from '../api/types'
 import { ALL_PHONES, COVERAGE_IDS, GAMY, GPAUL, HOSTILE, MEET, MISSING, NUMBERS, PEOPLE, ROWS, SYNC, coverageFor, haversine, personName } from './data'
 import { LAST, PRESENCE, SPACE } from './derived'
-import { fmtDateTime, fmtKm, fmtTime } from '../lib/format'
+import { fmtDate, fmtDateTime, fmtKm, fmtTime } from '../lib/format'
 
 export type ScenarioId = 'LAST' | 'GPAUL' | 'GAMY' | 'MISSING' | 'SYNC' | 'MEET' | 'HOSTILE' | 'PRESENCE' | 'SPACE'
 
@@ -21,7 +21,7 @@ export const SIGNAL_OF: Record<ScenarioId, string[]> = {
   HOSTILE: ['sig_11'],
   SPACE: ['sig_12'],
 }
-export const INCIDENT_OF: Record<ScenarioId, string> = { LAST: 'INC-1', GPAUL: 'INC-1', PRESENCE: 'INC-1', SYNC: 'INC-2', MISSING: 'INC-3', GAMY: 'INC-3', MEET: 'INC-4', HOSTILE: 'INC-5', SPACE: 'INC-6' }
+export const INCIDENT_OF: Record<ScenarioId, string> = { GPAUL: 'INC-1', SYNC: 'INC-2', MISSING: 'INC-3', MEET: 'INC-4', HOSTILE: 'INC-5', SPACE: 'INC-6', LAST: 'INC-7', PRESENCE: 'INC-8', GAMY: 'INC-9' }
 
 interface ScenarioDef {
   check: CheckName
@@ -30,6 +30,10 @@ interface ScenarioDef {
   tools: string[]
   people: PersonId[]
   statement: string
+  /** Who and what, in a few words: "Paul – location missing". */
+  heading: string
+  /** The statement as short points, one fact each. */
+  points: string[]
   output: CheckOutput
   evidence: string[]
   data: string
@@ -69,6 +73,16 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
     tools: [`last_contacts(person='ravi', start='2026-04-16T17:00', end='${LAST.window.end.slice(0, 16)}')`],
     people: ['ravi', 'paul', 'amy'],
     statement: `At ${fmtTime(summon.t)} on 16 April Ravi's phone texted Paul "I've seen the Novak invoices. Pier 9, 9:30 tonight. Come alone.", and its last outgoing activity was a text to Amy at ${fmtTime(LAST.last_active.t)}.`,
+    heading: 'Ravi – last texts and calls, 16 Apr',
+    points: (
+      [
+        [summon.t, `${fmtTime(summon.t)} text to Paul: "${summon.body}"${summon.on_counterpart === 'deleted' ? " (deleted from Paul's phone)" : ''}`],
+        ...LAST.items.filter((i) => i.table === 'calls').map((i) => [i.t, `${fmtTime(i.t)} ${i.label.charAt(0).toLowerCase()}${i.label.slice(1)}`]),
+        [LAST.last_active.t, `${fmtTime(LAST.last_active.t)} last outgoing: ${LAST.last_active.label.charAt(0).toLowerCase()}${LAST.last_active.label.slice(1)}`],
+      ] as [string, string][]
+    )
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([, p]) => p),
     output: LAST,
     evidence: LAST.items.map((i) => i.id),
     data: `Read every message and call on Ravi's phone from 17:00 on 16 April to ${fmtDateTime(LAST.window.end)}: ${LAST.items.length} rows. For each, looked for the same row on the other phone and for a thread_deleted event there.`,
@@ -92,6 +106,13 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
     tools: ["location_gaps(person='paul', start='2026-04-13', end='2026-04-19', min_gap_min=45)", "presence_window(scene='Pier 9 Warehouse', start='2026-04-16T21:00', end='2026-04-16T23:30')"],
     people: ['paul', 'ravi'],
     statement: `Paul's phone was ${fmtKm(paulCloseD)} from Pier 9 at ${fmtTime(paulCloseT)} on 16 April and was then powered off from ${fmtTime(ROWS_T(powerOff[0]))} to ${fmtTime(ROWS_T(powerOff[1]))}, covering most of the time-of-death window.`,
+    heading: 'Paul – location missing',
+    points: [
+      `Last fix ${fmtKm(paulCloseD)} from Pier 9 at ${fmtTime(paulCloseT)}, 16 Apr`,
+      `Phone powered off ${fmtTime(ROWS_T(powerOff[0]))}–${fmtTime(ROWS_T(powerOff[1]))}`,
+      `No location data for ${GPAUL.minutes} min`,
+      'Covers most of the time-of-death window (21:00–23:30)',
+    ],
     output: GPAUL,
     evidence: [...gapIds(GPAUL), ...ph('paul').slots.filter((s) => s.row_id).map((s) => s.row_id!)],
     data: `Read Paul's location rows in order and found ${GPAUL.minutes} minutes with none, between the rows at ${fmtTime(GPAUL.bounding.before.t)} and ${fmtTime(GPAUL.bounding.after.t)}. A power_off / power_on pair covers it.`,
@@ -122,6 +143,14 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
     tools: [`presence_window(scene='Pier 9 Warehouse', start='2026-04-16T21:00', end='2026-04-16T23:30', scene_m=${PRESENCE.thresholds.scene_m}, near_m=${PRESENCE.thresholds.near_m})`],
     people: ALL_PHONES,
     statement: `Between 21:00 and 23:30 on 16 April only Ravi's phone was at Pier 9; Ken's and Cara's phones stayed at least ${fmtKm(kenMin < caraMin ? kenMin : caraMin)} away in every slot, and Paul's and Amy's phones had no location data in ${ph('paul').counts.no_data} and ${ph('amy').counts.no_data} of the ${ph('paul').slots.length} slots.`,
+    heading: 'Pier 9, 21:00–23:30 – which phones were there',
+    points: [
+      "Ravi's phone: at Pier 9",
+      `Ken's phone: never closer than ${fmtKm(kenMin)}`,
+      `Cara's phone: never closer than ${fmtKm(caraMin)}`,
+      `Paul's phone: no location data in ${ph('paul').counts.no_data} of ${ph('paul').slots.length} slots`,
+      `Amy's phone: no location data in ${ph('amy').counts.no_data} of ${ph('amy').slots.length} slots`,
+    ],
     output: PRESENCE,
     evidence: PRESENCE.phones.flatMap((p) => p.slots.filter((s) => s.row_id).map((s) => s.row_id!)),
     data: `Read the location row at each 10-minute slot from 21:00 to 23:30 on all ${ALL_PHONES.length} phones (${PRESENCE.phones[0].slots.length} slots each). Where there is none, looked up the gap that covers it.`,
@@ -143,6 +172,12 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
     tools: ["synchronised_behaviour(start='2026-04-13', end='2026-04-19', window_min=60, min_phones=3)", "search_messages(before=window.start, limit=1, inbound=true)"],
     people: SYNC.phones,
     statement: `Paul's, Amy's and Cara's phones each deleted a thread within ${SYNC.window.minutes} minutes, starting ${SYNC.trigger!.minutes_before_window} minutes after a ${fmtTime(SYNC.trigger!.t)} news alert about a death at Pier 9, and Paul's and Cara's phones then powered off.`,
+    heading: 'Paul, Amy, Cara – threads deleted after news',
+    points: [
+      `${fmtTime(SYNC.trigger!.t)} ${fmtDate(SYNC.trigger!.t)}: news alert about a death at Pier 9`,
+      ...SYNC.events.filter((e) => e.event_type !== 'power_on').map((e) => `${fmtTime(e.t)} ${personName(e.device_owner)}'s phone: ${e.event_type === 'thread_deleted' ? 'thread deleted' : 'powered off'}`),
+      `${SYNC.phones.length} phones within ${SYNC.window.minutes} min, starting ${SYNC.trigger!.minutes_before_window} min after the alert`,
+    ],
     output: SYNC,
     evidence: [SYNC.trigger!.id, ...SYNC.events.map((e) => e.id)],
     data: `Read every thread_deleted, power_off and power_on event on all ${ALL_PHONES.length} phones, plus messages received in the 2 hours before any cluster.`,
@@ -167,6 +202,13 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
     tools: ["missing_messages(person_a='ravi', person_b='amy', start='2026-04-13', end='2026-04-19')"],
     people: ['ravi', 'amy'],
     statement: `${words[MISSING.missing_count]} texts between Ravi and Amy on the evening of 16 April are on Ravi's phone but missing from Amy's phone, which deleted that thread at ${fmtTime(MISSING.deletion_events[0].t)} on 17 April.`,
+    heading: 'Amy – texts with Ravi deleted',
+    points: [
+      `${MISSING.missing_count} texts with Ravi, evening of 16 Apr`,
+      "On Ravi's phone, missing from Amy's",
+      `Amy's phone deleted the thread at ${fmtTime(MISSING.deletion_events[0].t)}, ${fmtDate(MISSING.deletion_events[0].t)}`,
+      'Calls between them are intact on both phones',
+    ],
     output: MISSING,
     evidence: [...MISSING.items.flatMap((i) => [i.on_a, i.on_b]).filter((x): x is string => !!x), ...MISSING.deletion_events.map((e) => e.id)],
     data: "Read every message and call between Ravi's and Amy's numbers on both phones.",
@@ -186,6 +228,13 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
     tools: ["location_gaps(person='amy', start='2026-04-13', end='2026-04-19', min_gap_min=45)"],
     people: ['amy', 'ravi'],
     statement: `Amy's phone reported no location data from ${fmtTime(GAMY.start)} to ${fmtTime(GAMY.end)} on 16 April, while it called Ravi's phone twice, at ${fmtTime(GAMY.activity[0].t)} and ${fmtTime(GAMY.activity[1].t)}.`,
+    heading: 'Amy – location missing',
+    points: [
+      `No location data ${fmtTime(GAMY.start)}–${fmtTime(GAMY.end)}, 16 Apr (${GAMY.minutes} min)`,
+      'Phone was on and in use',
+      `Called Ravi at ${fmtTime(GAMY.activity[0].t)} and ${fmtTime(GAMY.activity[1].t)}`,
+      'Fixes before and after: home, 14 km from Pier 9',
+    ],
     output: GAMY,
     evidence: gapIds(GAMY),
     data: `Read Amy's location rows in order and found ${GAMY.minutes} minutes with none, between the rows at ${fmtTime(GAMY.bounding.before.t)} and ${fmtTime(GAMY.bounding.after.t)}. Then read every message, call, transfer and power event on her phone inside that window.`,
@@ -210,6 +259,12 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
     tools: ["contact_graph(people=['paul', 'cara'])", "silent_meetings(start='2026-04-13', end='2026-04-19')"],
     people: ['paul', 'cara'],
     statement: `Paul's and Cara's phones were within ${MEET.thresholds.within_m} m of each other on ${MEET.occasions.length} separate days at ${MEET.occasions.length} different unnamed spots, and no call, text, saved contact, payment or social tie between them exists on any phone.`,
+    heading: 'Paul & Cara – meet, never contact',
+    points: [
+      `Phones within ${MEET.thresholds.within_m} m on ${MEET.occasions.length} separate days`,
+      `${MEET.occasions.length} different unnamed spots`,
+      'No call, text, saved contact, payment or social tie on any phone',
+    ],
     output: MEET,
     evidence: MEET.occasions.flatMap((o) => o.row_ids),
     data: `Paired every 10-minute location slot across all phone pairs, and searched every message, call, contact, transaction and social row on all ${ALL_PHONES.length} phones for any row between ${NUMBERS.paul} and ${NUMBERS.cara} or their handles.`,
@@ -229,6 +284,13 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
     tools: [`social_hostility(actor='ken', target='ravi', threshold=${HOSTILE.threshold}, model='${HOSTILE.model}')`],
     people: ['ken', 'ravi'],
     statement: `After Ravi's text ending Ken's job on 14 April, Ken's Snapline account posted ${HOSTILE.flagged} items about Ravi that the classifier scored ${HOSTILE.threshold} or higher for hostility, including "${peak.text}" at ${fmtTime(peak.t)} on 16 April.`,
+    heading: 'Ken – hostile posts about Ravi',
+    points: [
+      "14 Apr: Ravi's text ended Ken's job",
+      `${HOSTILE.flagged} posts about Ravi scored ≥ ${HOSTILE.threshold} for hostility`,
+      `Strongest, ${fmtTime(peak.t)} ${fmtDate(peak.t)}: "${peak.text}"`,
+      `Ken's phone never closer than ${fmtKm(kenMin)} to Pier 9, 21:00–23:30`,
+    ],
     output: HOSTILE,
     evidence: [HOSTILE.context!.id, ...HOSTILE.items.map((i) => i.id)],
     data: `Read every post, comment and reply by ${PEOPLE.find((p) => p.person_id === 'ken')!.handle} on Snapline, 13–19 April, kept the ${HOSTILE.items.length} that name or reply to Ravi, and scored each one.`,
@@ -252,6 +314,12 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
     tools: [`activity_space(min_days=${SPACE.rule.min_days}, buffer_m=${SPACE.rule.buffer_m}, scene='Pier 9 Warehouse')`],
     people: ALL_PHONES,
     statement: `Pier 9 lies inside the routine areas of ${names(inside)} phones and outside ${names(outside)}, and Paul's phone stayed at Pier 9 on only ${sp('paul').scene_visits.length} day before the 16th.`,
+    heading: 'Pier 9 – whose routine area',
+    points: [
+      `Inside routine area: ${inside.map(personName).join(', ')}`,
+      `Outside routine area: ${outside.map(personName).join(', ')}`,
+      `Paul's phone stayed at Pier 9 on ${sp('paul').scene_visits.length} day before 16 Apr`,
+    ],
     output: SPACE,
     evidence: ALL_PHONES.flatMap(scenePoints),
     data: `Read every location row on all ${ALL_PHONES.length} phones (${SPACE.spaces.reduce((n, s) => n + s.fixes, 0).toLocaleString()} rows) and the stays table built from them.`,
@@ -303,6 +371,8 @@ export function scenarioFinding(sid: ScenarioId, id: string): Finding {
     status: 'current',
     verdict: 'confirmed',
     statement: sc.statement,
+    heading: sc.heading,
+    points: sc.points,
     people: sc.people,
     check: sc.check,
     agent: sc.agent,
@@ -329,6 +399,8 @@ export function cannotTellFinding(id: string, item: string): Finding {
     status: 'current',
     verdict: 'cannot_tell',
     statement,
+    heading: 'Outside phone coverage',
+    points: ['Phones hold data from 13 to 19 April 2026 only', 'This question falls outside that period'],
     people: ALL_PHONES,
     check: 'get_coverage',
     agent: 'device-forensics',

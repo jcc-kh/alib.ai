@@ -55,7 +55,6 @@ interface IncidentDef {
   sids: ScenarioId[]
   signal_ids: string[]
   headline: string
-  title: string
   /** Each fact names the scenario (finding) it comes from, so it is shown only once that finding is unlocked. */
   facts: [ScenarioId, string][]
   why: string
@@ -68,13 +67,32 @@ const DEFS: IncidentDef[] = [
   {
     id: 'INC-1',
     inquiry: 'window',
-    sids: ['LAST', 'GPAUL', 'PRESENCE'],
-    signal_ids: ['sig_01', 'sig_02', 'sig_03'],
-    headline: "Ravi's phone asked Paul to Pier 9 that night; Paul's phone came within a kilometre and then went off",
-    title: "Paul's phone went dark near Pier 9",
-    facts: [['LAST', '18:05 text: "Pier 9, 9:30"'], ['GPAUL', `${fmtKm(paulPh.closest_m!)} away at ${fmtTime(paulPh.closest_t!)}`], ['GPAUL', 'off 21:16–23:38']],
-    why: "The victim's own phone holds the invitation, which Paul's phone no longer has. Paul's phone is the only one besides the victim's to come within 1 km of the scene in the window, and it was switched off for most of it.",
-    follow_ups: ['Where was Paul between 21:16 and 23:38?', 'What did Ravi text Paul on 16 April?'],
+    sids: ['GPAUL'],
+    signal_ids: ['sig_02'],
+    headline: "Paul's phone came within a kilometre of Pier 9 and then went off for most of the time-of-death window",
+    facts: [['GPAUL', `${fmtKm(paulPh.closest_m!)} away at ${fmtTime(paulPh.closest_t!)}`], ['GPAUL', 'off 21:16–23:38']],
+    why: "Paul's phone is the only one besides the victim's to come within 1 km of the scene in the window, and it was switched off for most of it.",
+    follow_ups: ['Where was Paul between 21:16 and 23:38?'],
+  },
+  {
+    id: 'INC-7',
+    inquiry: 'window',
+    sids: ['LAST'],
+    signal_ids: ['sig_01'],
+    headline: "Ravi's phone asked Paul to Pier 9 at 9:30 that night; the text is gone from Paul's phone",
+    facts: [['LAST', '18:05 text to Paul'], ['LAST', "deleted from Paul's phone"], ['LAST', `last outgoing ${fmtTime(LAST.last_active.t)}`]],
+    why: "The victim's own phone holds the invitation, which Paul's phone no longer has.",
+    follow_ups: ['What did Ravi text Paul on 16 April?'],
+  },
+  {
+    id: 'INC-8',
+    inquiry: 'window',
+    sids: ['PRESENCE'],
+    signal_ids: ['sig_03'],
+    headline: "Only Ravi's phone was at Pier 9 in the time-of-death window; Paul's and Amy's phones have no location data for much of it",
+    facts: [['PRESENCE', `Paul: no data ${paulPh.counts.no_data}/${paulPh.slots.length} slots`], ['PRESENCE', `Amy: no data ${ph('amy').counts.no_data}/${ph('amy').slots.length} slots`]],
+    why: "No data is never read as presence or absence: Paul's and Amy's phones are unaccounted for in much of the window, not placed away from it.",
+    follow_ups: ['Who was near the scene in the time-of-death window?'],
   },
   {
     id: 'INC-2',
@@ -83,7 +101,6 @@ const DEFS: IncidentDef[] = [
     sids: ['SYNC'],
     signal_ids: ['sig_04', 'sig_05', 'sig_06'],
     headline: 'Three phones deleted threads within 35 minutes of the news breaking',
-    title: 'Threads deleted after the news',
     facts: [`news alert ${fmtTime(SYNC.trigger!.t)}`, `3 phones in ${SYNC.window.minutes} min`, '2 then powered off'],
     why: "The sweep found this cluster without being told about the news; the alert turned up afterwards as the latest message before it. All three deletions removed the phone's thread with Ravi; Ravi's copies survive on his phone.",
     follow_ups: ['Who reacted to the news?', 'Which threads were deleted on 17 April?'],
@@ -92,13 +109,22 @@ const DEFS: IncidentDef[] = [
   {
     id: 'INC-3',
     inquiry: 'window',
-    sids: ['MISSING', 'GAMY'],
-    signal_ids: ['sig_07', 'sig_08'],
-    headline: "Amy's texts with Ravi that evening are gone from her phone, and her phone reported no location for 70 minutes of the window",
-    title: 'Amy: texts deleted, location off in the window',
-    facts: [['MISSING', `${MISSING.missing_count} texts gone from her phone`], ['GAMY', `no location ${fmtTime(GAMY.start)}–${fmtTime(GAMY.end)}`], ['GAMY', '2 calls to Ravi']],
-    why: "Two checks agree on the same evening. Her bounding fixes are at home, 14 km from Pier 9, so the gap doesn't place her anywhere; it is a hole in the record during the window.",
-    follow_ups: ["Was Amy's location off while her phone was in use?", 'What did Ravi and Amy text on 16 April?'],
+    sids: ['MISSING'],
+    signal_ids: ['sig_07'],
+    headline: "Amy's texts with Ravi that evening are gone from her phone",
+    facts: [['MISSING', `${MISSING.missing_count} texts gone from her phone`], ['MISSING', `thread deleted ${fmtTime(MISSING.deletion_events[0].t)} 17 Apr`]],
+    why: "Ravi's phone keeps both sides of the conversation; Amy's phone deleted the thread the morning after.",
+    follow_ups: ['What did Ravi and Amy text on 16 April?'],
+  },
+  {
+    id: 'INC-9',
+    inquiry: 'window',
+    sids: ['GAMY'],
+    signal_ids: ['sig_08'],
+    headline: "Amy's phone reported no location for 70 minutes of the window while it was in use",
+    facts: [['GAMY', `no location ${fmtTime(GAMY.start)}–${fmtTime(GAMY.end)}`], ['GAMY', '2 calls to Ravi']],
+    why: "Her bounding fixes are at home, 14 km from Pier 9, so the gap doesn't place her anywhere; it is a hole in the record during the window.",
+    follow_ups: ["Was Amy's location off while her phone was in use?"],
   },
   {
     id: 'INC-4',
@@ -107,7 +133,6 @@ const DEFS: IncidentDef[] = [
     sids: ['MEET'],
     signal_ids: ['sig_10'],
     headline: "Paul's and Cara's phones met on five days at five different unnamed spots, yet neither phone has a single call, text, contact, payment or post involving the other",
-    title: 'Paul and Cara: a link no record names',
     facts: [`${MEET.occasions.length} meetings, ${MEET.occasions.length} places`, '20 min each, arriving separately', '0 rows linking them'],
     why: 'Read phone by phone, Paul and Cara are strangers who each work with Ravi. The link appears only when their location tracks are compared: same unnamed roadside spots, same 20 minutes, five times. Ravi\'s 18:05 text names the "Novak invoices", and on 15 April he asked Paul for every Novak invoice since January.',
     follow_ups: ['Do Paul and Cara know each other?', 'Why would they meet but never call?'],
@@ -118,7 +143,6 @@ const DEFS: IncidentDef[] = [
     sids: ['HOSTILE'],
     signal_ids: ['sig_11'],
     headline: "Ken posted hostile comments about Ravi after being let go, but his phone was at least 9 km from Pier 9 all evening",
-    title: 'Ken: hostile posts, but far away all evening',
     facts: [['HOSTILE', `${HOSTILE.flagged} posts ≥ ${HOSTILE.threshold}`], ['HOSTILE', 'after losing his job 14 Apr'], ['PRESENCE', `≥ ${fmtKm(kenMin)} away all window`]],
     why: 'A grievance is a lead for interview. The presence check, run alongside it, places his phone far from the scene in every slot with no gaps; motive alone does not put anyone at Pier 9.',
     follow_ups: ['Did anyone post threats about Ravi?', 'Where was Ken during the time-of-death window?'],
@@ -130,7 +154,6 @@ const DEFS: IncidentDef[] = [
     sids: ['SPACE'],
     signal_ids: ['sig_12'],
     headline: "Pier 9 is part of Ken's and Cara's routine, but not Paul's or Amy's",
-    title: 'Whose routine includes Pier 9',
     facts: [
       ['SPACE', `routine for ${SPACE.spaces.filter((s) => s.scene_inside && s.person !== 'ravi').map((s) => personName(s.person)).join(', ')}`],
       ['SPACE', `not for ${SPACE.spaces.filter((s) => !s.scene_inside).map((s) => personName(s.person)).join(', ')}`],
@@ -148,7 +171,7 @@ const MAPPED = new Set(Object.values(SIGNAL_OF).flat())
 /**
  * rank_incidents(): code. Sort by distinct checks, then distinct phones, then max strength.
  * Only findings in `unlocked` count (their phones are loaded); an insight with none is not shown.
- * Finding ids keep their position in the full insight (INC-1:f2 is always Paul's gap).
+ * Each insight holds one finding, so its finding id is always `${incident_id}:f1`.
  */
 export function incidentsFor(unlocked: Iterable<ScenarioId>): Incident[] {
   const on = new Set(unlocked)
@@ -175,7 +198,8 @@ export function incidentsFor(unlocked: Iterable<ScenarioId>): Incident[] {
     strength: r.strength,
     rank: i + 1,
     headline: r.d.headline,
-    title: r.d.title,
+    // The card title is the finding's own heading, so the board and the drawer read the same.
+    title: SCENARIOS[r.d.sids[0]].heading,
     facts: r.d.facts.filter(([sid]) => r.on.has(sid)).map(([, text]) => text),
     why_it_matters: r.d.why,
     rank_reason: `${r.n_checks} check${r.n_checks > 1 ? 's' : ''} agree (${r.checks.join(', ')}) across ${r.n_phones} phones; strongest signal ${r.strength.toFixed(2)}.`,

@@ -13,7 +13,7 @@ const HATCH = 'repeating-linear-gradient(45deg, var(--line-strong) 0 1.5px, tran
 const COL_MIN = 210
 
 /**
- * Time of death: one timeline of the week leading up to it. Each day is split into blocks of a few
+ * Timeline of events: one timeline of the week leading up to it. Each day is split into blocks of a few
  * hours; each column is a phone on the board. A cell says where that phone was (or that it was dark),
  * what it deleted, and who it was with; under each block, every exchange between the people.
  * Anything in the timeline opens its evidence.

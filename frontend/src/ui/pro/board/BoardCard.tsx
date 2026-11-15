@@ -8,6 +8,7 @@ export default function BoardCard({
   title,
   caption,
   onExpand,
+  expanded = false,
   lit = false,
   dim = false,
   flash,
@@ -19,6 +20,8 @@ export default function BoardCard({
   title: string
   caption?: ReactNode
   onExpand?: () => void
+  /** Switches the button to "Collapse". */
+  expanded?: boolean
   /** Outlined while a related insight note is hovered. */
   lit?: boolean
   /** Faded while an unrelated insight note is hovered. */
@@ -39,8 +42,11 @@ export default function BoardCard({
         <h3 className="text-[13px] font-semibold text-ink">{title}</h3>
         {caption && <span className="min-w-0 truncate text-[11.5px] text-ink-3">{caption}</span>}
         {onExpand && (
-          <button onClick={onExpand} className="ml-auto shrink-0 rounded-md px-2 py-0.5 text-[11.5px] text-ink-2 hover:bg-sunken hover:text-ink">
-            Expand ↗
+          <button onClick={onExpand} className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-md border border-line-strong px-2.5 py-1 text-[12px] font-medium text-ink hover:bg-sunken">
+            {expanded ? 'Collapse to summary' : 'Expand full network'}
+            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              {expanded ? <path d="M9.5 2.5v4h4M6.5 13.5v-4h-4M9.5 6.5l4.5-4.5M6.5 9.5L2 14" /> : <path d="M10 2h4v4M6 14H2v-4M14 2L9 7M2 14l5-5" />}
+            </svg>
           </button>
         )}
       </header>

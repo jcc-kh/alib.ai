@@ -7,22 +7,24 @@ import { DISMISSALS } from '../../../mock/signals'
 import { QUEUE, START, phoneLabel, sourceOf } from '../../../mock/sources'
 import { fmtDate, fmtTime } from '../../../lib/format'
 import Portrait, { Unknown } from '../../../components/Portrait'
-import RelationshipChart, { FLAG_STYLE, TIE_STYLE } from '../../../components/RelationshipChart'
+import RelationshipChart, { TIE_STYLE, type TieWeight } from '../../../components/RelationshipChart'
 import TieExchanges from '../../../components/TieExchanges'
+import NetworkView from '../../../components/NetworkView'
 import Scorecard from '../Scorecard'
 import BoardCard, { type CardId } from './BoardCard'
 import InsightNote from './InsightNote'
-import { AddSourceMenu, ChangeToast, IngestPanel } from './AddSource'
+import { ACTION_CLASS, ActionLabel, AddSourceMenu, ChangeToast, IngestPanel } from './AddSource'
 
 const FLASH: Record<CardId, number> = { relations: 0 }
 const NOTES_SHOWN = 4
 
-export default function BoardView({ open }: { open: (v: View) => void }) {
+export default function BoardView({ open, onAsk }: { open: (v: View) => void; onAsk: () => void }) {
   const c = useCase()
   const b = c.board
   const fresh = c.fresh
   const [tie, setTie] = useState<Tie | null>(null)
   const [allNotes, setAllNotes] = useState(false)
+  const [full, setFull] = useState(false)
   const flash = (id: CardId) => (fresh ? FLASH[id] : undefined)
 
 
@@ -39,50 +41,68 @@ export default function BoardView({ open }: { open: (v: View) => void }) {
       )}
 
       <div className="mt-4 grid grid-cols-12 gap-4">
-        {/* Row 1: relationships + insight notes */}
-        <BoardCard
-          id="relations"
-          className="col-span-12 xl:col-span-7"
-          title="Relationships"
-          caption={`${b.loaded.length} phones examined · ${b.ties.length} ties · click a line for every exchange`}
-          flash={flash('relations')}
-          footer={
-            <div className="flex min-h-9 flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-3.5 py-2 text-[11px] text-ink-2">
-              {(
-                <>
-                  {(Object.keys(TIE_STYLE) as (keyof typeof TIE_STYLE)[]).map((k) => (
-                    <span key={k} className="inline-flex items-center gap-1.5" title={TIE_STYLE[k].rule}>
-                      <svg width="24" height="8">
-                        <line x1="1" x2="23" y1="4" y2="4" stroke={TIE_STYLE[k].stroke} strokeWidth={Math.min(4, TIE_STYLE[k].width)} strokeDasharray={TIE_STYLE[k].dash} strokeLinecap="round" />
-                      </svg>
-                      {TIE_STYLE[k].label}
-                    </span>
-                  ))}
-                  <span className="text-line-strong">|</span>
-                  {Object.values(FLAG_STYLE).map((f) => (
-                    <span key={f!.label} className="inline-flex items-center gap-1">
-                      <span className="grid h-4 w-4 place-items-center rounded-full border text-[9px] font-bold" style={{ borderColor: f!.color, color: f!.color }}>
-                        {f!.glyph}
-                      </span>
-                      {f!.label}
-                    </span>
-                  ))}
-                </>
-              )}
-            </div>
-          }
-        >
-          <RelationshipChart board={b} fresh={fresh} onTie={setTie} height={440} selectedKey={tie?.key ?? null} />
-          {tie ? (
-            <div className="rise mt-2 h-[380px]">
-              <TieExchanges key={tie.key} tie={tie} onClose={() => setTie(null)} />
-            </div>
-          ) : (
-            <div className="mt-1 text-center text-[11.5px] text-ink-3">Click a line between two people to list every call, text, payment and meeting between them.</div>
-          )}
-        </BoardCard>
+        {/* Left: relationships, then the actions. Right: insight notes. */}
+        <div className={`col-span-12 flex flex-col gap-4 ${full ? '' : 'xl:col-span-7'}`}>
+          <BoardCard
+            id="relations"
+            title={full ? 'Full network' : 'Relationships'}
+            caption={full ? `${b.loaded.length} phones examined · one line per channel per pair · click a line for every interaction` : `${b.loaded.length} phones examined · ${b.ties.length} ties · click a line for every exchange`}
+            flash={flash('relations')}
+            expanded={full}
+            onExpand={() => {
+              setFull((f) => !f)
+              setTie(null)
+            }}
+            footer={
+              !full && <div className="flex min-h-9 flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-3.5 py-2 text-[11px] text-ink-2">
+                {(Object.keys(TIE_STYLE) as TieWeight[]).map((k) => (
+                  <span key={k} className="inline-flex items-center gap-1.5" title={TIE_STYLE[k].rule}>
+                    <svg width="24" height="8">
+                      <line x1="1" x2="23" y1="4" y2="4" stroke={TIE_STYLE[k].stroke} strokeWidth={TIE_STYLE[k].width} strokeDasharray={TIE_STYLE[k].dash} strokeLinecap="round" />
+                    </svg>
+                    {TIE_STYLE[k].label}
+                  </span>
+                ))}
+                <span className="text-line-strong">|</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="grid h-4 w-4 place-items-center rounded-full bg-amber text-[10px] font-extrabold text-white">!</span>
+                  something to note · hover for details
+                </span>
+              </div>
+            }
+          >
+            {full ? (
+              <NetworkView board={b} />
+            ) : (
+              <>
+                <RelationshipChart board={b} fresh={fresh} onTie={setTie} height={440} selectedKey={tie?.key ?? null} />
+                {tie ? (
+                  <div className="rise mt-2 h-[380px]">
+                    <TieExchanges key={tie.key} tie={tie} onClose={() => setTie(null)} />
+                  </div>
+                ) : (
+                  <div className="mt-1 text-center text-[11.5px] text-ink-3">Click a line between two people to list every call, text, payment and meeting between them.</div>
+                )}
+              </>
+            )}
+          </BoardCard>
 
-        <div className="col-span-12 flex flex-col gap-3 xl:col-span-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <AddSourceMenu />
+            <button onClick={() => open('interviews')} className={ACTION_CLASS}>
+              <ActionLabel
+                icon="verify"
+                title="Verify interview"
+                sub={c.reading ? 'Reading transcript…' : c.transcripts.length ? `${c.transcripts.length} transcript${c.transcripts.length === 1 ? '' : 's'} checked` : 'Check statements against the phones'}
+              />
+            </button>
+            <button onClick={onAsk} className={ACTION_CLASS}>
+              <ActionLabel icon="ask" title="Ask about this case" sub="Answers cite the source rows" />
+            </button>
+          </div>
+        </div>
+
+        <div className={`col-span-12 flex flex-col gap-3 ${full ? '' : 'xl:col-span-5'}`}>
           <div className="flex items-center gap-2 px-1">
             <h3 className="text-[13px] font-semibold text-ink">Insights</h3>
             <span className="tnum rounded bg-surface px-1.5 text-[11px] text-ink-2">{b.incidents.length}</span>
@@ -113,17 +133,21 @@ function CaseStrip() {
   return (
     <div className="board-card flex flex-wrap items-center gap-x-5 gap-y-3 rounded-lg border border-line px-4 py-3">
       <div className="flex items-center gap-3">
-        <Portrait id={VICTIM} size={40} />
-        <div className="text-[12.5px] leading-snug">
-          <div className="font-semibold text-ink">
-            {v.name} · found {fmtDate(FOUND_AT)} {fmtTime(FOUND_AT)} at {SCENE.name}
-          </div>
-          <div className="tnum text-ink-2">
-            Time of death {fmtDate(TOD.start)} {fmtTime(TOD.start)}–{fmtTime(TOD.end)} · medical examiner
-          </div>
-        </div>
+        <Portrait id={VICTIM} size={44} />
+        <dl className="tnum grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[12.5px] leading-snug">
+          <dt className="text-ink-3">Victim</dt>
+          <dd className="font-semibold text-ink">{v.name}</dd>
+          <dt className="text-ink-3">Found</dt>
+          <dd className="text-ink">
+            {fmtDate(FOUND_AT)} {fmtTime(FOUND_AT)} · {SCENE.name}
+          </dd>
+          <dt className="text-ink-3">Time of death</dt>
+          <dd className="text-ink">
+            {fmtDate(TOD.start)} {fmtTime(TOD.start)}–{fmtTime(TOD.end)}
+          </dd>
+        </dl>
       </div>
-      <div className="h-8 w-px bg-line" />
+      <div className="h-12 w-px bg-line" />
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
         <span className="mr-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">Evidence</span>
         {[...START, ...QUEUE].map((id) => {
@@ -145,7 +169,6 @@ function CaseStrip() {
           {c.board.rows.toLocaleString()} rows · {c.board.incidents.length} insight{c.board.incidents.length === 1 ? '' : 's'}
         </span>
       </div>
-      <AddSourceMenu />
     </div>
   )
 }
