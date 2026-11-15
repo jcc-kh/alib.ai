@@ -8,19 +8,19 @@ For the system overview, see [ARCHITECTURE.md](ARCHITECTURE.md) (revision 3). Fo
 
 ## 1. The lineage of a statement
 
-**Operating rule: agents never compute, and checks never conclude.** Every number comes from a check, and every verdict from a rule in code. Every judgement (merge, dismiss, follow up, wording) comes from an agent, and is logged.
+**Operating rule: discovery finds leads, code proves facts, agents never compute.** Every number comes from a check, and every verdict from a rule in code. Every judgement (dismiss, follow up, wording) comes from an agent, and is logged.
 
-Every sentence in a briefing, report or Ask answer has this lineage:
+Every sentence on the board, in a claim report or in an Ask answer has this lineage:
 
 ```
- source file line ─► stored row ─► integrity ─► check (sweep or targeted) ─► signal ─► incident ─► finding ─► statement ─► validator ─► report ─► UI
- (bundle, file,      (global id,   (ts_adj,      (code: rows in,             (signals   (triage:    (verdict   (one sentence (code rules)  (assembled  (Evidence · How we know
-  line, raw JSON)     provenance)   reliability)  numbers + ids out)          table)     grouped)    by rule)   by model)                   in code)    · Verify · Sources)
-       ▲                                                                                                                                              │
-       └──────────────────────────────── a reviewer can walk this chain backwards from any finding ───────────────────────────────────────────────────┘
+ source file line ─► stored row ─► integrity ─► check (on demand) ─► finding ─► statement ─► validator ─► board / report ─► UI
+ (bundle, file,      (global id,   (ts_adj,      (code: rows in,      (verdict    (one sentence (code rules)  (assembled       (Evidence · How we know
+  line, raw JSON)     provenance)   reliability)  numbers + ids out)   by rule)    by model)                   in code)         · Verify · Sources)
+       ▲                                                                                                                              │
+       └──────────────────────── a reviewer can walk this chain backwards from any finding ──────────────────────────────────────────┘
 ```
 
-A finding answers an **item**: one atomic claim parsed from the investigator's brief or from a person's statement, confirmed by the investigator before any targeted check runs (§6.2).
+A finding answers one of three things: a **claim** (an item parsed from a statement, a transcript or the investigator's own belief, and confirmed by the investigator before its check runs, §6.2), a **suggested question** from the board (§6.1), or a **lead** that a check confirmed (§6.4).
 
 A finding can also start as a **lead** from discovery, the topological network model (ARCHITECTURE.md §6.4). A lead has its own lineage, but it joins the chain above only through a check:
 
@@ -39,49 +39,47 @@ Each arrow is something an engineer can inspect:
 |---|---|---|
 | Raw row → corrected row | `clock_offsets` (per phone); checks read `ts_adj` through the `v_*` views, never raw `ts` | **How we know**, step "Data read" notes any offset applied |
 | Row → reliability | `reliability` windows (`ok` or `suspect`, with reasons) | Reliability badge on the finding and timeline |
-| Check output → signal | `signals` row: `check, people, start, end, evidence_ids, strength, output_json, reliability_flags` | **How we know**, step "Signal" |
-| Signals → incident | `incidents.signal_ids`; merge and split decisions logged by triage | **How we know**, step "Grouped with" |
+| Check call → stored result | `check_calls` row: `check, params_json, output_json, evidence_ids, excluded_ids, case_version` | **How we know**, step "Check called" |
+| Lead or issue → question | `questions` row: its origin, check and parameters | **How we know**, step "Question" |
 | Source file → row | `EvidenceRow.provenance` (bundle, sha256, file, line, record_id, raw) | **Sources** tab, expand a row |
 | Row → check input | The check's SQL is deterministic; its args are logged in `derivation.steps[kind=tool]` | **How we know**, step "Check called" |
 | Check input → output | Pure Python, which can be re-run with the same args | **How we know**, steps "Data read" and "Computation" |
 | Output → verdict | A named rule in `backend/checks/verdicts.py`, run by `apply_verdict_rule`; the subagent copies the result | **How we know**, step "Verdict" |
-| Brief or statement → item | `items` row, with `claimant` and `status` (`proposed`, `confirmed`, `edited`, `removed`) | **How we know**, step "Brief item" or "Statement" |
+| Statement or transcript → item | `items` row, with `claimant`, `source` and `status` (`proposed`, `confirmed`, `edited`, `removed`) | **How we know**, step "Claim" |
 | Output → statement numbers | `derivation.numbers[]` maps each number to a check-output field | **How we know**, "Where each number comes from" |
 | Statement → validator | `derivation.validator[]` | **How we know**, "Report validator" |
 | Statement ↔ raw rows | Recomputed in the browser by `frontend/src/lib/verify.ts` | **Verify** tab |
 | Finding → review | `reviews` row; a dispute supersedes the finding (`status`, `supersedes`) | **Verify** tab; "changed" marker |
+| Case version → change | `case_versions`; every insight, lead, question and finding records the version that produced it | "New" and "changed" markers after a source is added |
 
 ### Who does what: code or model
 
 | Step | Actor | Why |
 |---|---|---|
-| Ingest, normalise, resolve people | code (upstream, out of scope for this build) | Must be reproducible |
-| Estimate clock offsets; mark suspect windows (integrity pass) | **code** | Runs before every sweep; §3.12 |
-| Run every check over every pair on case load (sweep) | **code** | Produces `signals` with no model involved |
+| Validate, load and resolve a Case Bundle | **code** | Must be reproducible. Adapters from raw phone databases are out of scope |
+| Estimate clock offsets; mark suspect windows; compare phones (integrity) | **code** | Runs after every load, before discovery and any check; §3.12 |
 | Extract mentions (aliases, organisations, products, places) from text | model | Natural language. Each mention keeps its source row and exact quote; code drops any quote not found in its row |
 | Build the complex, propagate features, score cells, decompose flows | **code** | Fixed operators and a seeded isolation forest, so leads are reproducible |
-| Promote a lead to a finding | **code** | Only through a confirming check call (`promote_lead`); §6.5 |
-| Compute signal `strength` | **code** | Per-check rule, §3.0 |
-| Propose incident groupings and count agreeing checks and phones | **code** | `propose_incidents()` |
-| Find anchor moments (≥3 phones clustered) | **code** | `anchor_moments()` |
-| Accept, merge or split proposed incidents | model | Judgement. Logged. |
-| Dismiss a signal with an ordinary explanation | model | Judgement. Must cite the rule or the row that explains it. |
-| Request a follow-up from another subagent | model | Judgement. The hop is logged as a derivation step. |
-| Split a brief and statements into items, attribute each to its claimant, resolve names and dates | model | Natural language |
-| Approve, edit or remove items | **investigator** | `confirm_items` interrupt; no targeted check runs before it |
-| Match a brief item to existing signals | **code** proposes (`match_brief_item`), model confirms | Reuse beats re-running |
-| Label an incident's relevance to the brief | model | Judgement |
+| Rank insights | **code** | `rank_insights()`; §6.1 |
+| Run each top lead's proposed check | **code** | Confirmed leads are promoted (`promote_lead`); §6.4 |
+| Choose a suggested question's check and parameters | **code** | From the lead's kind; §6.1 |
+| Phrase a suggested question | model | Readability; passes the neutral-wording rules |
+| Dismiss a lead with an ordinary explanation | model | Judgement. Must cite the rule or the row that explains it |
+| Request a follow-up from another subagent | model | Judgement. The hop is logged as a derivation step |
+| Split statements or a transcript into claims, attribute each to its claimant, resolve names and dates | model | Natural language |
+| Approve, edit or remove claims | **investigator** | `confirm_items` interrupt; no check runs for a claim before it |
+| Match a claim to existing results | **code** proposes (`match_claim`), model confirms | Reuse beats re-running |
 | Run a check | **code** | No model touches data |
 | Compute any number | **code** | The model is forbidden from arithmetic |
-| Apply a verdict rule | **code** | `apply_verdict_rule()`. Thresholds are named parameters; the subagent copies the verdict into its `Finding`. |
+| Apply a verdict rule | **code** | `apply_verdict_rule()`. Thresholds are named parameters; the subagent copies the verdict into its `Finding` |
 | Look up reliability for the cited windows | **code** | `get_reliability()` |
 | Phrase one sentence from check output | model | Readability |
 | Validate the sentence | **code** | Rejects anything uncited, untraced, worded as an accusation, with a verdict that differs from the rule, or silent about a suspect window |
-| Sort incidents | **code** | `rank_incidents()`: relevance label (if a brief exists) → `n_checks` → `n_phones`. See §6. |
-| Pick briefing headlines | **code** | The sentence of the incident's strongest validated finding |
-| Assemble the report | **code** | `assemble_report()` from validated findings, items and incidents |
+| Pick insight headlines | **code** | The promoted finding's sentence, or a code template |
+| Assemble the claim report | **code** | `assemble_report()` from validated findings, items and insights |
 | Write the next-steps paragraph | model (orchestrator) | The only free text in the report; passes the same validator |
-| Rerun checks after a dispute | **code** | Every `check_calls` row that cited the disputed row; §5 |
+| Compare case versions after a new source | **code** | `case_diff()`; §6.6 |
+| Rerun checks after a dispute or a new source | **code** | Every `check_calls` row that cited the row, or whose claim touches the new rows; §5 |
 
 In the UI's derivation chain, code steps are drawn in blue and model steps in amber, so a reviewer can see exactly where judgement entered.
 
@@ -89,7 +87,7 @@ In the UI's derivation chain, code steps are drawn in blue and model steps in am
 
 ## 2. Provenance: from file to row
 
-Ingest (upstream of this build; ARCHITECTURE.md §3) assigns every row:
+Loading a Case Bundle (ARCHITECTURE.md §3) assigns every row:
 - a global id `<device_owner>:<type>:<n>`, for example `amy:evt:0149`
 - a `provenance` record:
 
@@ -121,33 +119,20 @@ Ingest (upstream of this build; ARCHITECTURE.md §3) assigns every row:
 
 ## 3. Each check: input, computation, rule, evidence
 
-### 3.0 From check result to signal
+### 3.0 How a check result is stored
 
-During the sweep, each result a check returns becomes one `signals` row:
+There is no up-front sweep (ARCHITECTURE.md §6). A check runs in the integrity layer (the cross-phone checks) or on demand: to confirm a lead, answer a suggested question, verify a claim, or answer a chat question. Every run is one `check_calls` row:
 
 ```jsonc
-{ "signal_id": "sig_0042", "check": "location_gaps", "people": ["ken"],
-  "start": "2026-04-15T14:00-04:00", "end": "2026-04-15T16:30-04:00",
+{ "call_id": "call_0042", "check": "location_gaps",
+  "params": { "person": "ken", "start": "2026-04-15", "end": "2026-04-15", "min_gap_min": 45 },
   "evidence_ids": ["ken:msg:3311", "ken:txn:0041", "ken:loc:2203", "ken:loc:2219"],
-  "strength": 0.9, "output_json": { … the check's full result … } }
+  "output_json": { … the check's full result … }, "case_version": 2 }
 ```
 
-`strength` is computed in code from a fixed rule per check, and is used only for ordering ties inside an incident:
+All thresholds are keyword arguments with documented defaults. Evidence ids are always the rows the computation actually used. No check cites a row "for context".
 
-| Check | Strength rule (0–1) |
-|---|---|
-| `missing_messages` | 0.6, +0.3 if a `thread_deleted` explains it |
-| `distance_between` | 0.8 if label contradicts a co-location claim or exceeds 5 km; else 0.3 |
-| `silent_meetings` | min(1, occasions / 4) |
-| `money_chains` | 0.5 + 0.5 × ratio |
-| `synchronised_behaviour` | min(1, phones / 4) + 0.2 if a trigger candidate exists |
-| `location_gaps` | `location_off` 0.9 · `powered_off` 0.4 · `unexplained` 0.2 |
-| `unresolved_identifiers` | min(1, case people contacted / 3) |
-| optional checks | 0.5 by default, documented with the check |
-
-All thresholds are keyword arguments with these defaults. Evidence ids are always the rows the computation actually used. No check cites a row "for context".
-
-Every check reads through the `v_*` views, so it sees clock-corrected timestamps (`ts_adj`) and never sees a disputed row. After the sweep, code sets each signal's `reliability_flags` to the suspect windows its evidence falls in. Every check invocation, in the sweep or targeted, is stored in `check_calls` (`check`, `params_json`, `output_json`, `evidence_ids`, `excluded_ids`), which is what a dispute reruns.
+Every check reads through the `v_*` views, so it sees clock-corrected timestamps (`ts_adj`) and never sees a disputed row. A finding that cites rows in a suspect window must say so (§4). `check_calls` is what a dispute or a new source reruns.
 
 ### 3.1 `missing_messages(a, b, start, end)`: scenario S1
 
@@ -210,7 +195,7 @@ Every check reads through the `v_*` views, so it sees clock-corrected timestamps
 | **Computes** | Walk the rows. A **stay** starts when consecutive points remain within `stay_radius_m` (150) of their running centroid for ≥ `min_stay_min` (10). Its place is the nearest named place within its radius, or "unnamed". A **travel** segment joins two stays. A **gap** is any interval between consecutive rows longer than `min_gap_min` (45); it is classified by `location_gaps`. |
 | **Output** | Ordered `segments[]`: `{kind, place?, from?, to?, start, end, gap_type?, evidence_ids}` |
 | **Stored** | `stays` table, built by the integrity pass on corrected timestamps. `distance_between` and `silent_meetings` read stays instead of raw slots. |
-| **Rule** | None. This check describes; it never raises a signal by itself. |
+| **Rule** | None. This check describes; it never pins anything to the board by itself. |
 | **Evidence** | The first and last location row of each stay or travel; for a gap, the rows on either side of it |
 | **Verify recomputes** | Segment boundaries from raw rows; every gap's length |
 
@@ -221,7 +206,7 @@ Every check reads through the `v_*` views, so it sees clock-corrected timestamps
 | **Reads** | `stays` gap segments for the phone; `device_events` (power), `messages`, `calls` and `transactions` on **that phone** inside each gap |
 | **Computes** | For each gap ≥ 45 min, check in this order: (1) a `power_off` … `power_on` pair covers it → `powered_off`; (2) any outgoing or incoming message, call or transfer falls inside it → `location_off`; (3) otherwise → `unexplained`. |
 | **Output** | `{start, end, minutes, gap_type, activity_ids[], bounding_location_ids[2], power_event_ids[]}` |
-| **Rule** | Raise `location_off` always. Raise `powered_off` or `unexplained` **only** if the gap overlaps another signal. On the demo case: Ken 15 Apr 14:00–16:30 is `location_off` and raised. Amy 16 Apr 09:10–10:00 is `unexplained` with no overlap, so it is **not** raised. Ken overnight 15→16 Apr is `powered_off` with no overlap, so it is not raised. The S7 power-offs are `powered_off` but overlap S7, so they are raised as part of that incident. |
+| **Rule** | Pin `location_off` always. Pin `powered_off` or `unexplained` **only** if the gap overlaps another insight. On the demo case: Ken 15 Apr 14:00–16:30 is `location_off` and pinned. Amy 16 Apr 09:10–10:00 is `unexplained` with no overlap, so it is **not** pinned. Ken overnight 15→16 Apr is `powered_off` with no overlap, so it is not pinned. The S7 power-offs are `powered_off` but overlap the S7 group, so they are shown as part of it. |
 | **Wording** | Always "no location data from X to Y". Never "turned off location to hide", never a claim about intent. For `location_off`: "…while the phone sent a message at 15:10 and a transfer at 15:40". |
 | **Evidence** | The two bounding location rows, every activity row inside the gap, and any power events |
 | **Verify recomputes** | Gap minutes from the bounding rows; that each activity row's timestamp is inside the gap; the gap type |
@@ -230,7 +215,7 @@ Every check reads through the `v_*` views, so it sees clock-corrected timestamps
 
 | Check | Reads | Rule | Evidence |
 |---|---|---|---|
-| `call_log_mismatch(a, b)` | `calls` on both phones (`ts_adj`) | Unmatched within ±2 s → signal | The one-sided call row(s) |
+| `call_log_mismatch(a, b)` | `calls` on both phones (`ts_adj`). Runs in the integrity layer | Unmatched within ±2 s → integrity issue | The one-sided call row(s) |
 | `transfer_after_meeting()` | `transactions`, shared `stays` | Transfer ≥ $500 between a pair within 6 h after a shared stay ends | Transfer rows + stay bounding rows |
 | `contact_went_quiet()` | `messages`, `calls` | ≥3 consecutive days with contact, then ≥2 days with none, inside coverage | Last contact rows + coverage rows |
 | `group_meetings()` *stretch* | shared `stays` on all phones | ≥3 phones within 150 m of each other for ≥20 min at once. A multi-way pattern, like `synchronised_behaviour`; not a set of pairwise meetings. | Stay bounding rows for every phone in the group |
@@ -239,7 +224,7 @@ Every check reads through the `v_*` views, so it sees clock-corrected timestamps
 
 ### 3.9 `get_coverage()`: cannot tell
 
-Returns the first and last row per phone. If a brief item or question names a period outside every phone's coverage, the verdict is **cannot tell**, and those boundary rows are cited. The model must use this verdict instead of guessing.
+Returns the first and last row per phone. If a claim or question names a period outside every phone's coverage, the verdict is **cannot tell**, and those boundary rows are cited. The model must use this verdict instead of guessing.
 
 ### 3.10 `contact_graph(people?)`: relations view
 
@@ -267,9 +252,9 @@ Each edge carries its own evidence ids. The graph is descriptive and produces no
 | **Evidence** | One row per phone per channel: the first and last contact with the identifier |
 | **Verify recomputes** | Distinct case people per identifier; that it resolves to no person or org |
 
-### 3.12 Integrity pass (stage ⓪, before any check)
+### 3.12 Integrity layer (after every load, before discovery and any check)
 
-All code. Its outputs are inputs to the checks, so a wrong offset or a missed suspect window changes findings; it is traced the same way.
+All code. Its outputs are inputs to discovery and the checks, so a wrong offset or a missed suspect window changes findings; it is traced the same way. It also runs the cross-phone checks (`missing_messages`, `call_log_mismatch`, `one_sided_transfers`, §3.1 and §3.8) after clock correction, and only over periods both phones cover; each disagreement becomes an integrity issue on the board with its rows.
 
 | Step | Reads | Computes | Output | Evidence |
 |---|---|---|---|---|
@@ -335,28 +320,25 @@ The Verify tab also records the investigator's own review ("I checked this, it h
 
 ---
 
-## 6. Triage, the briefing, and brief refinement
+## 6. The board, claims and questions
 
-### 6.1 Triage (stage ②, on case load, no brief)
+### 6.1 The board (on load, and after every new source)
 
-Triage starts only after `prepare_case()` has run the integrity pass and the sweep. `run_sweep()` refuses to run before the integrity pass.
+The board is built in code after the integrity layer and discovery (ARCHITECTURE.md §7.6). No agent is needed except to phrase.
 
+1. **Insights (code).** Integrity issues (for example "3 texts on Paul's phone are missing from Amy's") and the top leads are ranked by `rank_insights()`: kind weight, then score, then number of phones, then recency. On the demo case the three phones that deleted threads and powered off around 17 Apr 10:00 rank near the top as a group cell, with the audit message as the latest inbound message before it. No knowledge of the audit is needed: the group comes from the data.
+2. **Confirm top leads (code).** Each top lead's proposed check runs. If its verdict rule confirms the pattern, `promote_lead()` links them and a subagent phrases one sentence; otherwise the lead stays pinned as "pattern, not verified".
+3. **Dismiss (model, logged).** A lead with an ordinary explanation goes to `dismissed` with a `reason` and `rule` that point at a row or a threshold, for example "family group chat: same 3 members every day for the whole week". Dismissals are listed, never silently dropped.
+4. **Questions (code, phrased by a model).** Every open lead and integrity issue raises a suggested question. Code picks its check and parameters from the lead's kind (ARCHITECTURE.md §6.6); a model may rephrase the wording, which passes the neutral-wording rules. Clicking it runs `answer_question()`, and the finding's derivation starts with the question as a step. A lead with no matching check raises an open question with no run button.
+5. **Headlines (code).** An insight's headline is its promoted finding's sentence, or a code template with numbers from the cell ("3 phones, no pair unusual, active together on 4 days").
 
-1. **Propose (code).** `propose_incidents()` groups signals that share at least one person and overlap in time, padded by ±2 h. Each candidate carries `n_checks` (distinct checks) and `n_phones` (distinct device owners across its evidence).
-2. **Review (model, logged).** Agents accept, merge or split candidates. Every merge or split is written to the incident's derivation with a one-line reason.
-3. **Dismiss (model, logged).** A signal with an ordinary explanation goes to `dismissals` with `reason` and `rule`. The reason must point at a row or a threshold, for example "memo 'lunch' and $50 < $500 minimum". Dismissals are shown in "Checked and dismissed"; they are never silently dropped.
-4. **Anchors (code).** `anchor_moments(window_min=60, min_phones=3)` returns windows where signals from ≥3 phones cluster. On the demo case it returns 17 Apr 10:00–11:10 (S7 deletions and power-offs on 3 phones, plus the audit message as a trigger candidate). No knowledge of the audit is needed: the cluster comes from the data.
-5. **Rank (code).** `rank_incidents()` sorts by `n_checks`, then `n_phones`, then maximum `strength`. The top 5 form the briefing. `rank_reason` is generated from those numbers, for example "3 checks agree across 3 phones".
-6. **Headlines (code).** Each incident's `headline` is the sentence of its strongest validated finding, picked in code. `why_it_matters` is the code-generated `rank_reason`. No model writes free text for the briefing, so there is nothing new to validate.
+### 6.2 Verifying claims
 
-### 6.2 Parse, confirm and refine (stages ③–⑤)
-
-1. **Split (model).** The orchestrator splits the brief and each statement into atomic **items**. Each item is attributed to its claimant (`investigator` for the brief, the statement's `person_id` otherwise), with people and dates resolved, and these are logged.
-2. **Confirm (investigator).** The orchestrator calls `confirm_items(items)`. Because of `interrupt_on`, the run pauses and the API streams `items_proposed`. The investigator approves, edits or removes items, and the run resumes on the same `thread_id`. **No targeted check runs before this point**, and edited items are what get checked. The derivation records whether an item was edited.
-3. **Match first (code proposes, model confirms).** `match_brief_item(item)` returns signals and incidents sharing the item's people and overlapping its dates. If they settle the item, they are reused and no new check runs. The derivation shows "matched existing signal sig_…".
-4. **Targeted checks for gaps only.** If nothing matches, the routed subagent runs a check with item-specific parameters. If the item's dates fall outside coverage, the result is `cannot_tell`.
-5. **Re-rank.** The model labels each incident `high`, `medium` or `low` relevance to the brief, with the brief item quoted. `rank_incidents(relevance=…)` re-sorts in code.
-6. **Assemble (code).** `assemble_report()` places each item's verdict in Confirmed or Inconsistent (beliefs) or Answers (questions). Items from statements also go in **By person**: each claim with its verdict, shown as supported (`confirmed`), contradicted (`inconsistent`) or cannot tell. Incidents matched to no item go to "What you didn't ask about". Findings resting on a suspect window are listed under reliability notes. The orchestrator then writes the next-steps paragraph.
+1. **Split (model).** The orchestrator splits statements, the investigator's own beliefs, or (stretch) a transcript into atomic **claims**, each attributed to its claimant, with people and dates resolved, and logs them. For a transcript it first attributes each passage to a speaker.
+2. **Confirm (investigator).** The orchestrator calls `confirm_items(items)`. Because of `interrupt_on`, the run pauses and the API streams `items_proposed`. The investigator approves, edits or removes claims, and the run resumes on the same `thread_id`. **No check runs for a claim before this point**, and edited claims are what get checked.
+3. **Match first (code proposes, model confirms).** `match_claim(item)` returns integrity issues, answered questions, promoted leads and open leads sharing the claim's people and dates. If they settle it, they are reused. The derivation shows "matched existing result call_…".
+4. **Check.** Otherwise the routed subagent runs a check with claim-specific parameters. If the claim's dates fall outside coverage, the result is Can't tell.
+5. **Assemble (code).** `assemble_report()` lists every claim under the person who made it, with **Supported / Contradicted / Can't tell** (`confirmed`, `inconsistent`, `cannot_tell`). Board insights touching the claims but answering none are listed as related. Findings resting on a suspect window are listed under reliability notes. The orchestrator then writes the next-steps paragraph.
 
 ### 6.3 Follow-up chains
 
@@ -366,14 +348,14 @@ A subagent may set the optional `follow_up` field on a `Finding`: `{to: "<subage
 step 4  follow_up   location-analyst → financial-analyst
         "Activity on Ken's phone during the location gap 14:00–16:30?"
         get_events(person='ken', table='transactions', start='…14:00', end='…16:30')  →  ken:txn:0041 ($4,500 → Cara, 15:40),
-        which is link 2 of money_chains signal sig_0017 (S4)
+        which is link 2 of the money_chains result call_0017 (S4)
 step 5  follow_up   orchestrator → comms-analyst
         search_messages(person='ken', start='…14:00', end='…16:30')    →  ken:msg:3311 (15:10)
 ```
 
 The merged finding cites the evidence of every hop. It must stay one sentence, with every number traced. Chains are capped at 3 hops per finding.
 
-### 6.5 Leads from discovery
+### 6.4 Leads from discovery
 
 A lead is a hypothesis with its working shown, never a verdict.
 
@@ -389,10 +371,14 @@ A lead is a hypothesis with its working shown, never a verdict.
 
 **Why this is safe.** Discovery is free to find patterns that may not be real, because nothing it finds can become a verdict without a check. The validator enforces this: a finding with a `lead_id` must have a linked confirming check call.
 
-### 6.6 Timeline and dismissed lists
+### 6.5 Timeline and dismissed lists
 
-- The **week timeline** and the **location timeline** are drawn purely from `stays` and finding evidence. Each mark is a row id or a segment id, and clicking one opens its finding.
-- **Checked and dismissed** lists every dismissal with its reason and rule. This is how decoys stay visible without being flagged.
+- The **location timeline** is drawn purely from `stays` and finding evidence. Each mark is a row id or a segment id, and clicking one opens its finding.
+- **Checked and dismissed** lists every dismissed lead and integrity flag with its reason and rule. This is how decoys stay visible without being pinned.
+
+### 6.6 Adding a source
+
+When a Case Bundle is added (ARCHITECTURE.md §7.7), the load, integrity, discovery and board stages run again as a new case version. `case_diff()` then matches the old and new results by stable keys: a cell's members, kind and window; a check's name and parameters. Each insight, lead, question and finding is marked **new**, **changed** (same key, different numbers, evidence or verdict) or **withdrawn**. A changed finding is superseded exactly as after a dispute (`supersedes` set, the old one `changed`), and its derivation gains a step naming the source and case version that changed it. Every confirmed claim whose check calls touch the new rows is re-checked with the same parameters.
 
 ---
 
@@ -414,18 +400,16 @@ A lead is a hypothesis with its working shown, never a verdict.
 The TypeScript contract is [`frontend/src/api/types.ts`](frontend/src/api/types.ts). The relevant types are:
 - `Finding.derivation`: `{ steps, numbers, validator, corroboration }`
 - `EvidenceRow.provenance`: see §2
-- `Signal`: `{ signal_id, check, people, start, end, evidence_ids, strength, output }`
-- `Incident`: `{ incident_id, signal_ids, people, start, end, n_checks, n_phones, rank, headline, anchor_id? }`
-- `Anchor`: `{ anchor_id, start, end, phones, signal_ids }`
+- `Signal`, `Incident`, `Anchor`: kept in `types.ts` for the current mock only; the revision 4 board replaces them with insights, leads and questions
 - `Dismissal`: `{ signal_id, reason, rule }`
 - `Segment`: `{ kind: stay|travel|gap, person, place?, from?, to?, start, end, gap_type?, evidence_ids }`
-- `Briefing`: `{ anchors[], items[{ incident, finding, headline, why_it_matters, rank_reason, follow_ups }], timeline[], dismissed[] }`
+- `Briefing` (the board): `{ integrity_issues[], incidents[] (insights in the mock), leads[], questions[], timeline[], dismissed[], case_version }`
 - `DerivationStep.kind` gains `signal`, `grouped` and `follow_up`
 - `Answer`: `{ text, verdict, findings[], steps[], suggestions[] }`
 
 New in revision 3:
 - `Statement`: `{ statement_id, person_id, text }`
-- `Item`: `{ item_id, source: brief|statement, source_ref, claimant, kind: belief|question|claim, text, people, start, end, status }`
+- `Item`: `{ item_id, source: investigator|statement|transcript, source_ref, claimant, kind: claim|question, text, people, start, end, status }`
 - `ReliabilityWindow`: `{ device_id, person, start, end, status: ok|suspect, reasons[], evidence_ids }`; `ClockOffset`: `{ device_id, offset_s, n_pairs, spread_s }`
 - `Review`: `{ review_id, target, kind: checked|disputed, note, by, at }`
 - `Finding` gains `item_id`, `claimant`, `reliability_note?`, `status: current|changed|withdrawn`, `supersedes?`
@@ -433,6 +417,7 @@ New in revision 3:
 - `AgentEvent` gains `items_proposed` and `rerun`; `SubagentName` loses `report-writer`
 - `Lead`: `{ lead_id, kind, cell, score, drivers[], evidence_ids, proposed_check?, status: open|promoted|dismissed, promoted_finding_id? }`; `GraphCell`: `{ cell_id, rank, kind, members, start, end, evidence_ids }`
 - `Briefing` and `Report` gain `leads`; `Graph` gains `cells`; `Finding` gains `lead_id?`
+- Revision 4: `IntegrityIssue`: `{ issue_id, kind, phones, start, end, summary, evidence_ids }`; `SuggestedQuestion`: `{ question_id, text, origin, check?, status, finding_id? }`; `CaseDiff`: `{ from_version, to_version, source, added, changed, withdrawn, rechecked_claims }`; `Finding` gains `question_id?`
 
 `backend/schemas.py` must mirror these exactly.
 
@@ -446,6 +431,6 @@ New in revision 3:
 4. Write the verdict rule as code in `backend/checks/verdicts.py` so `apply_verdict_rule` can run it, and add it to §3 of this file.
 5. Add a `verify.ts` case that recomputes the key numbers from raw rows.
 6. Add an evidence view keyed by `check_output.kind`.
-7. Define how each result becomes a `signals` row, including its `strength` rule (§3.0).
+7. Say which lead kinds it can confirm, so suggested questions can use it (ARCHITECTURE.md §6.6).
 8. Add a unit test against the answer key, covering one planted positive and one decoy in the generator, and add the check to the precision and recall table in `eval/run_eval.py`.
 9. Give it to exactly one subagent, and add its `CheckName` to `types.ts` and `backend/schemas.py`.
