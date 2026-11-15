@@ -37,7 +37,10 @@ export default function InterviewsView() {
   return (
     <div className="space-y-3 p-4">
       <div className="flex items-center gap-4 px-1 pt-1">
-        <h1 className="min-w-0 flex-1 text-[19px] font-semibold leading-snug text-ink">Interviews</h1>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[19px] font-semibold leading-snug text-ink">Interviews</h1>
+          <p className="mt-0.5 text-[12.5px] leading-snug text-ink-2">Every checkable claim in a transcript is tested against the phone data.</p>
+        </div>
         <Legend />
       </div>
 
