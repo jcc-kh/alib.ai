@@ -45,7 +45,7 @@ export default function MotiveView() {
             </span>
           </div>
           <p className="mt-2 text-[11px] text-ink-3">
-            Scores from {HOSTILITY_MODEL}, 0 to 1; the line marks {T}. A change in someone’s tone is often more telling than the score itself.
+            Scores from {HOSTILITY_MODEL}, 0 to 1; the line marks {T}. A change in someone’s tone is often more telling than the score itself. Pick a person to see, on the right, only what they wrote.
           </p>
         </Panel>
         <Panel
@@ -94,7 +94,7 @@ export default function MotiveView() {
             ))}
             {!shown.length && <li className="px-4 py-6 text-center text-[12px] text-ink-3">{person ? `Nothing by ${personName(person)} matched this theme.` : 'Nothing matched this theme.'}</li>}
           </ul>
-          <p className="border-t border-line px-4 py-2 text-[11px] text-ink-3">Underlined words are what matched each theme. Themes come from fixed phrase rules, so a match is a pointer to read the statement, not a judgement.</p>
+          <p className="border-t border-line px-4 py-2 text-[11px] text-ink-3">Underlined words are what matched each theme. Themes come from fixed phrase rules, so a match is a pointer to read the statement, not a judgement. Themes cover private texts as well as public posts; the tone chart on the left covers public posts only, and a post that was scored shows its score here.</p>
         </Panel>
 
       </div>
