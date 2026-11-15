@@ -28,7 +28,8 @@ export default function MotiveView() {
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
         {THEMES.map((th) => {
-          const xs = tagged.filter((s) => s.themes.includes(th.id))
+          // counts follow the person picked in Tone over the week, so a card and the list it opens always agree
+          const xs = tagged.filter((s) => s.themes.includes(th.id) && (!person || s.speaker === person))
           const who = [...new Set(xs.map((s) => s.speaker))]
           const on = theme === th.id
           return (
