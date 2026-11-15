@@ -28,18 +28,18 @@ export const DECOYS: { label: string; signal_id: string | null; title: string }[
 ]
 
 export interface Scorecard {
-  plants: { label: string; recovered: boolean; incident?: string }[]
+  plants: { sid: ScenarioId; label: string; recovered: boolean; incident?: string }[]
   decoys: { label: string; raised: boolean; dismissed: boolean }[]
   /** Insights that no plant explains. */
   unexplained: string[]
 }
 
-export function scorecard(b: Briefing): Scorecard {
+export function scorecard(b: Pick<Briefing, 'incidents'>): Scorecard {
   const raisedSignals = new Set(b.incidents.flatMap((i) => i.signal_ids))
   // A plant counts as recovered only if its own signal ended up inside a raised insight.
   const plants = PLANTS.map((p) => {
     const inc = b.incidents.find((i) => SIGNAL_OF[p.sid].some((s) => i.signal_ids.includes(s)))
-    return { label: p.label, recovered: !!inc, incident: inc?.incident_id }
+    return { sid: p.sid, label: p.label, recovered: !!inc, incident: inc?.incident_id }
   })
   const decoys = DECOYS.map((d) => ({ label: d.label, raised: d.signal_id ? raisedSignals.has(d.signal_id) : false, dismissed: DISMISSALS.some((x) => x.title === d.title) }))
   const explained = new Set(plants.map((p) => p.incident))

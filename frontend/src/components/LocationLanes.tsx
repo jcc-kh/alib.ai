@@ -26,6 +26,7 @@ export default function LocationLanes({
   markers = [],
   rowH = 54,
   width = 1100,
+  fresh = [],
 }: {
   segments: Segment[]
   people: PersonId[]
@@ -36,6 +37,8 @@ export default function LocationLanes({
   markers?: LaneMarker[]
   rowH?: number
   width?: number
+  /** Phones just added: their lanes animate in. */
+  fresh?: PersonId[]
 }) {
   const LABEL = 70
   const TOP = 24
@@ -75,7 +78,7 @@ export default function LocationLanes({
         const mid = y + rowH / 2
         const segs = segments.filter((s) => s.person === p && caseMinutes(s.end) > t0 && caseMinutes(s.start) < t1)
         return (
-          <g key={p}>
+          <g key={p} className={fresh.includes(p) ? 'row-in' : undefined}>
             <text x={0} y={mid + 4} fontSize={12.5} fill={personColor(p)}>
               {personName(p)}
             </text>

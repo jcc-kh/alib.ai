@@ -2,7 +2,7 @@
 // orchestrator in Q&A mode (POST /api/ask, SSE). Here questions are routed by keyword.
 
 import type { Answer, PersonId } from '../api/types'
-import { GAMY, HOSTILE, MEET, MISSING, SYNC, personName } from './data'
+import { ALL_PHONES, CHAIN, GAMY, HOSTILE, MEET, MISSING, SYNC, personName } from './data'
 import { LAST, PRESENCE, SPACE } from './derived'
 import { fmtKm, fmtTime } from '../lib/format'
 import { SCENARIOS, cannotTellFinding, route, scenarioFinding, type ScenarioId } from './findings'
@@ -36,8 +36,27 @@ export const SUGGESTED_QUESTIONS = [
   'Did Paul and Ravi argue last year?',
 ]
 
-export function answerQuestion(q: string): { steps: string[]; answer: Answer } {
+export function answerQuestion(q: string, loaded: PersonId[] = ALL_PHONES): { steps: string[]; answer: Answer } {
   const sid = route(q)
+  const missing = sid ? SCENARIOS[sid].people.filter((p) => !loaded.includes(p)) : []
+  if (sid && missing.length) {
+    const names = missing.map((p) => `${personName(p)}'s`).join(' and ')
+    const steps = ['Parsed the question and resolved people and dates', `Routed to ${SCENARIOS[sid].agent}`, `${SCENARIOS[sid].check}() needs ${names} phone${missing.length > 1 ? 's' : ''}, not yet in the case → cannot tell yet`]
+    return {
+      steps,
+      answer: {
+        question: q,
+        text: `I can't tell yet. Answering this needs ${names} phone${missing.length > 1 ? 's' : ''}, which ${missing.length > 1 ? "haven't" : "hasn't"} been added to the case. Add ${missing.length > 1 ? 'them' : 'it'} as an evidence source and ask again.`,
+        verdict: 'cannot_tell',
+        findings: [],
+        steps,
+        suggestions: SUGGESTED_QUESTIONS.filter((s) => {
+          const r = route(s)
+          return r && SCENARIOS[r].people.every((p) => loaded.includes(p))
+        }).slice(0, 3),
+      },
+    }
+  }
   if (!sid) {
     const f = cannotTellFinding('q1', q)
     return {

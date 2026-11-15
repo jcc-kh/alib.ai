@@ -11,8 +11,8 @@ export const INGEST_STAGES: IngestStage[] = [
   { id: 'index', label: 'Index', detail: 'Build per-pair contact and 10-minute location indexes', status: 'pending' },
 ]
 
-const MODELS: Record<string, string> = { ravi: 'iPhone 13', paul: 'iPhone 15', amy: 'Pixel 8', ken: 'Galaxy S24', cara: 'iPhone 14' }
-const EXTRACTED: Record<string, string> = {
+export const MODELS: Record<string, string> = { ravi: 'iPhone 13', paul: 'iPhone 15', amy: 'Pixel 8', ken: 'Galaxy S24', cara: 'iPhone 14' }
+export const EXTRACTED: Record<string, string> = {
   ravi: '2026-04-17T15:20:00-04:00',
   paul: '2026-04-21T09:14:00-04:00',
   amy: '2026-04-21T10:02:00-04:00',

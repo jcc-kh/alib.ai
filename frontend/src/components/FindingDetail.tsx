@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import { getEvidence, type EvidenceByPhone, type Finding } from '../api'
-import { useCase } from '../state/caseStore'
+import { PLACES } from '../mock/data'
 import { Mono, PersonChip, Tabs, Title, VerdictBadge } from './ui'
-import DerivationView from './DerivationView'
-import VerifyView from './VerifyView'
 import SourcesView from './SourcesView'
+import { ReadableRows } from './FindingDrawer'
 import MessagesDiff from './evidence/MessagesDiff'
 import TrackMap from './evidence/TrackMap'
 import MoneyChain from './evidence/MoneyChain'
@@ -16,10 +15,9 @@ import { HostilityList, LastContactsList } from './evidence/SocialEvidence'
 import PresenceGrid from './PresenceGrid'
 import RadiusMap from './RadiusMap'
 
-type Tab = 'evidence' | 'how' | 'verify' | 'sources'
+type Tab = 'evidence' | 'sources'
 
 export default function FindingDetail({ finding }: { finding: Finding }) {
-  const { caseInfo } = useCase()
   const [tab, setTab] = useState<Tab>('evidence')
   const [rows, setRows] = useState<EvidenceByPhone | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -66,9 +64,7 @@ export default function FindingDetail({ finding }: { finding: Finding }) {
         onChange={setTab}
         tabs={[
           ['evidence', 'Evidence'],
-          ['how', 'How we know'],
-          ['verify', 'Verify'],
-          ['sources', 'Sources'],
+          ['sources', 'Sources (raw logs)'],
         ]}
       />
 
@@ -76,15 +72,14 @@ export default function FindingDetail({ finding }: { finding: Finding }) {
 
       <div className="rise" key={tab}>
         {tab === 'evidence' &&
-          caseInfo &&
           (o.kind === 'missing' ? (
             <MessagesDiff out={o} />
           ) : o.kind === 'distance' ? (
-            <TrackMap out={o} places={caseInfo.places} />
+            <TrackMap out={o} places={PLACES} />
           ) : o.kind === 'chain' ? (
             <MoneyChain out={o} />
           ) : o.kind === 'meetings' ? (
-            <MeetingsList out={o} places={caseInfo.places} />
+            <MeetingsList out={o} places={PLACES} />
           ) : o.kind === 'sync' ? (
             <SyncTimeline out={o} />
           ) : o.kind === 'gap' ? (
@@ -100,21 +95,12 @@ export default function FindingDetail({ finding }: { finding: Finding }) {
           ) : (
             <CoverageView out={o} />
           ))}
-        {tab === 'how' && <DerivationView finding={finding} />}
-        {tab === 'verify' && (rows ? <VerifyView finding={finding} rows={rows} /> : <Loading />)}
         {tab === 'sources' && (rows ? <SourcesView rows={rows} /> : <Loading />)}
       </div>
 
-      {tab === 'evidence' && (
-        <div className="flex gap-3 border-t border-line pt-4 text-xs text-faint">
-          <span>Want to check this yourself?</span>
-          <button onClick={() => setTab('how')} className="text-muted underline-offset-4 hover:underline">
-            See how we know
-          </button>
-          <span>·</span>
-          <button onClick={() => setTab('verify')} className="text-muted underline-offset-4 hover:underline">
-            Recompute from the raw rows
-          </button>
+      {tab === 'evidence' && rows && (
+        <div className="border-t border-line pt-4">
+          <ReadableRows rows={rows} />
         </div>
       )}
     </div>

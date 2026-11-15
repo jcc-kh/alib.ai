@@ -46,7 +46,8 @@ export function HostilityList({ out }: { out: HostilityOutput }) {
 }
 
 /** The victim's last messages and calls, and whether each still exists on the other phone. */
-export function LastContactsList({ out }: { out: LastContactsOutput }) {
+/** `loaded`: phones examined so far. A counterpart's copy is only compared once their phone is examined. */
+export function LastContactsList({ out, loaded }: { out: LastContactsOutput; loaded?: string[] }) {
   return (
     <div className="space-y-4">
       <div className="divide-y divide-line rounded-xl border border-line">
@@ -61,8 +62,8 @@ export function LastContactsList({ out }: { out: LastContactsOutput }) {
               </div>
               {i.body && <div className="text-fg">“{i.body}”</div>}
             </div>
-            <span className="shrink-0 text-[11px]" style={{ color: i.on_counterpart === 'deleted' ? 'var(--serious)' : 'var(--ink-3)' }}>
-              {i.on_counterpart === 'deleted' ? 'deleted on their phone' : i.on_counterpart === 'present' ? 'on both phones' : ''}
+            <span className="shrink-0 text-[11px]" style={{ color: i.on_counterpart === 'deleted' && (!loaded || loaded.includes(i.counterpart)) ? 'var(--serious)' : 'var(--ink-3)' }}>
+              {loaded && i.counterpart !== 'other' && !loaded.includes(i.counterpart) ? 'not cross-checked' : i.on_counterpart === 'deleted' ? 'deleted on their phone' : i.on_counterpart === 'present' ? 'on both phones' : ''}
             </span>
           </div>
         ))}

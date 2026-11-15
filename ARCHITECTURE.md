@@ -470,9 +470,15 @@ The Verify tab's "I checked this" / "I dispute this" are stored as `reviews` (`n
 
 The front end is built on mocks (React, Vite, TypeScript, Tailwind v4, react-leaflet, Recharts). It is not a constraint on backend design. One dashboard (`src/ui/pro`, route `#/pro/<view>`) over one case store (`src/state/caseStore.tsx`); the Noir case-file UI and the hypothesis-testing screen were removed.
 
-**Flow:** Cases → Ingest (name, bundle, date range) → Analyse (agent network, run log, per-agent timeline, envelopes) → **Briefing** → **lines of inquiry** → Ask.
+New UI the discovery contract implies: a **leads** section ("patterns, not verified") on the board and report, and **shaded group cells** in the relations graph so the higher-order structure discovery found is visible.
 
-**Briefing:** victim and case facts; the four persons of interest with portraits and each phone's status in the time-of-death window; the ranked insights, each tagged with its line of inquiry; the alibi grid at a glance; the scorecard against the answer key; dismissed signals.
+**Flow: a loop, not a pipeline.** The case is a set of loaded evidence sources. The home page is the **case board** (`#/pro/board`, `src/ui/pro/board/`), which is recomputed from the loaded sources (`computeBoard(loaded)` in `src/mock/sources.ts`). **Add evidence source** ingests one source with live progress, re-runs only the checks it affects, and marks what changed (`diffBoard`). There is no Ingest → Analyse → Briefing sequence.
+
+- **Gating.** A finding is unlocked once every phone it reads is loaded (`SCENARIOS[sid].people`). Insights are re-ranked from unlocked findings only (`incidentsFor(unlocked)`). A person stays off the board, and a seized phone is shown only by its exhibit number, until that phone is examined. Ask answers "can't tell yet" when the phone that would settle a question isn't loaded.
+- **Relationship ties** (board chart): one tie per pair from the loaded rows. Its level comes from calls and texts in the week: close (8 or more), regular (3–7), occasional (fewer, or a saved number), or hidden (co-located with no contact). The label is the relationship declared in the case file (`RELATIONS`), or what the rows show. Badges mark money, meetings without contact, deleted threads and hostile posts. Pairs with no tie show their **mutual connections** when a person is selected.
+- **Board cards:** relationships, insight notes (hover draws threads to the cards holding their evidence), waiting on evidence, routine areas, time-of-death window, location timeline, routes in the window, and routine vs that night. Each card expands to its line of inquiry.
+- **Demo order:** the board opens with Ravi's and Paul's phones; Amy's, Ken's and Cara's are added one at a time (1 → 2 → 3 → 6 insights).
+- **Real backend:** `POST /api/sources` (upload plus an SSE progress stream: stages, rows, checks re-run) and `GET /api/board`, mirrored by `addSource()` and `getBoard()` in `src/api/mock.ts`.
 
 **Lines of inquiry** (`src/ui/pro/inquiries/`, one page each; every page leads with its question, the method it borrows and the insights filed under it):
 
