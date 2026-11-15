@@ -50,13 +50,8 @@ export function InquiryHeader({ id, right }: { id: InquiryId; right?: ReactNode 
   const insights = c.board.incidents.filter((i) => i.inquiry === id)
   return (
     <div className="space-y-3">
-      <div className="flex items-start gap-4 rounded-lg border border-line bg-surface px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3">{q.label}</div>
-          <h1 className="mt-0.5 text-[19px] font-semibold leading-snug text-ink">{q.question}</h1>
-          <p className="mt-1 max-w-3xl text-[12.5px] text-ink-2">{q.answers}</p>
-          <p className="mt-1 text-[11.5px] text-ink-3">Method: {q.method}</p>
-        </div>
+      <div className="flex items-center gap-4 px-1 pt-1">
+        <h1 className="min-w-0 flex-1 text-[19px] font-semibold leading-snug text-ink">{q.label}</h1>
         {right}
       </div>
       {insights.length > 0 && (
