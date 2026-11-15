@@ -1,46 +1,15 @@
-// One case-flow store for the dashboard.
-// Stages: empty → ingesting → ingested → analysing → analysed.
+// One case store for the dashboard. There is no fixed pipeline: the case is a set of loaded evidence
+// sources, the board is recomputed from them, and adding a source shows what it changed.
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
-import {
-  analyseCase,
-  ask as askApi,
-  getCase,
-  ingest as ingestApi,
-  type AgentEnvelope,
-  type Answer,
-  type Briefing,
-  type CaseInfo,
-  type Finding,
-  type FollowUp,
-  type IngestReport,
-  type IngestStage,
-  type SubagentName,
-  type ToolCall,
-} from '../api'
-import { INGEST_STAGES } from '../mock/ingest'
-
-export type Stage = 'empty' | 'ingesting' | 'ingested' | 'analysing' | 'analysed'
-export const STAGE_ORDER: Stage[] = ['empty', 'ingesting', 'ingested', 'analysing', 'analysed']
-export const atLeast = (s: Stage, min: Stage) => STAGE_ORDER.indexOf(s) >= STAGE_ORDER.indexOf(min)
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { addSource as addSourceApi, ask as askApi, type Answer, type Board, type BoardDiff, type Finding, type PersonId, type SourceProgress } from '../api'
+import { QUEUE, START, computeBoard, diffBoard } from '../mock/sources'
+import { VICTIM } from '../mock/data'
+import { transcriptOf } from '../mock/interviews'
 
 export const DEMO_CASE_NAME = 'Death at Pier 9'
-
-export interface AgentLive {
-  status: 'idle' | 'running' | 'done'
-  current: string
-  calls: number
-}
-
-export interface RunState {
-  phase: 'idle' | 'sweep' | 'triage' | 'done'
-  elapsed_ms: number
-  agents: Record<SubagentName, AgentLive>
-  calls: ToolCall[]
-  hops: FollowUp[]
-  logs: { at_ms: number; agent: SubagentName; text: string }[]
-  envelopes: Partial<Record<SubagentName, AgentEnvelope>>
-}
+/** How long "new" markers stay on the board after a source is added. */
+const FRESH_MS = 15000
 
 export interface AskTurn {
   q: string
@@ -48,33 +17,50 @@ export interface AskTurn {
   answer: Answer | null
 }
 
-export const AGENTS: SubagentName[] = ['orchestrator', 'relationship-mapper', 'location-analyst', 'comms-analyst', 'financial-analyst', 'device-forensics', 'social-analyst']
-const idleAgents = () => Object.fromEntries(AGENTS.map((a) => [a, { status: 'idle', current: '', calls: 0 }])) as Record<SubagentName, AgentLive>
-const emptyRun = (): RunState => ({ phase: 'idle', elapsed_ms: 0, agents: idleAgents(), calls: [], hops: [], logs: [], envelopes: {} })
+export interface Ingesting extends SourceProgress {
+  source: PersonId
+}
+
+/** Progress of a transcript being read: the stage, how many claims are highlighted and how many are checked. */
+export interface Reading {
+  id: string
+  stage: number
+  shown: number
+  checked: number
+}
+/** Anything worth showing the evidence for: a readable summary plus the source rows behind it. */
+export interface EvidenceItem {
+  title: string
+  people: PersonId[]
+  /** Plain-language points: what the rows show. */
+  points: string[]
+  ids: string[]
+}
+
+export const READ_STAGES = ['Read transcript', 'Extract claims', 'Plan checks', 'Run checks', 'Score'] as const
 
 interface CaseStore {
-  stage: Stage
-  caseInfo: CaseInfo | null
-  ingestStages: IngestStage[]
-  ingestReport: IngestReport | null
-  run: RunState
-  briefing: Briefing | null
+  caseName: string
+  loaded: PersonId[]
+  /** Sources not yet added, in demo order. */
+  queue: PersonId[]
+  board: Board
+  ingesting: Ingesting | null
+  /** What the last added source changed; null once the markers have faded. */
+  fresh: BoardDiff | null
   finding: Finding | null
-  openedEnvelope: AgentEnvelope | null
   askTurns: AskTurn[]
   askBusy: boolean
-  caseName: string
-  /** Days of April (inclusive) the investigator chose to analyse. */
-  range: [number, number]
+  /** Transcripts that have been read and verified. */
+  transcripts: string[]
+  reading: Reading | null
   // actions
-  setCaseName: (n: string) => void
-  setRange: (r: [number, number]) => void
-  newCase: () => void
-  startIngest: (file?: File | null, fast?: boolean) => Promise<void>
-  startAnalysis: (speed?: number) => Promise<void>
-  fastForward: () => Promise<void>
+  verifyTranscript: (id: string) => Promise<void>
+  addSource: (id: PersonId) => Promise<void>
+  dismissFresh: () => void
   openFinding: (f: Finding | null) => void
-  openEnvelope: (e: AgentEnvelope | null) => void
+  evidence: EvidenceItem | null
+  openEvidence: (e: EvidenceItem | null) => void
   ask: (q: string) => Promise<void>
   reset: () => void
 }
@@ -82,78 +68,51 @@ interface CaseStore {
 const Ctx = createContext<CaseStore | null>(null)
 
 export function CaseProvider({ children }: { children: ReactNode }) {
-  const [stage, setStage] = useState<Stage>('empty')
-  const [caseInfo, setCaseInfo] = useState<CaseInfo | null>(null)
-  const [ingestStages, setIngestStages] = useState<IngestStage[]>(INGEST_STAGES)
-  const [ingestReport, setIngestReport] = useState<IngestReport | null>(null)
-  const [run, setRun] = useState<RunState>(emptyRun)
-  const [briefing, setBriefing] = useState<Briefing | null>(null)
+  const [loaded, setLoaded] = useState<PersonId[]>(START)
+  const board = useMemo(() => computeBoard(loaded), [loaded])
+  const [ingesting, setIngesting] = useState<Ingesting | null>(null)
+  const [fresh, setFresh] = useState<BoardDiff | null>(null)
   const [finding, setFinding] = useState<Finding | null>(null)
-  const [openedEnvelope, setOpenedEnvelope] = useState<AgentEnvelope | null>(null)
+  const [evidence, setEvidence] = useState<EvidenceItem | null>(null)
   const [askTurns, setAskTurns] = useState<AskTurn[]>([])
   const [askBusy, setAskBusy] = useState(false)
-  const runAbort = useRef<AbortController | null>(null)
-  const [caseName, setCaseName] = useState('')
-  const [range, setRangeState] = useState<[number, number]>([13, 19])
-  const rangeRef = useRef<[number, number]>([13, 19])
-  const setRange = useCallback((r: [number, number]) => {
-    rangeRef.current = r
-    setRangeState(r)
+  const [transcripts, setTranscripts] = useState<string[]>([])
+  const [reading, setReading] = useState<Reading | null>(null)
+  const readAbort = useRef<AbortController | null>(null)
+  const abort = useRef<AbortController | null>(null)
+  const freshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const loadedRef = useRef(loaded)
+  loadedRef.current = loaded
+
+  useEffect(() => () => {
+    abort.current?.abort()
+    if (freshTimer.current) clearTimeout(freshTimer.current)
   }, [])
 
-  const startIngest = useCallback(async (file?: File | null, fast = false) => {
-    setStage('ingesting')
-    setIngestReport(null)
-    const r = await ingestApi(file ?? null, setIngestStages, fast)
-    setIngestReport(r)
-    setCaseInfo(await getCase())
-    setStage('ingested')
+  const dismissFresh = useCallback(() => {
+    if (freshTimer.current) clearTimeout(freshTimer.current)
+    setFresh(null)
   }, [])
 
-  const startAnalysis = useCallback(async (speed = 1) => {
-    runAbort.current?.abort()
+  const addSource = useCallback(async (id: PersonId) => {
+    const before = loadedRef.current
+    if (before.includes(id)) return
+    abort.current?.abort()
     const ctrl = new AbortController()
-    runAbort.current = ctrl
-    setStage('analysing')
-    setRun(emptyRun())
-    const t0 = performance.now()
+    abort.current = ctrl
+    dismissFresh()
     try {
-      const b = await analyseCase(
-        (e) =>
-          setRun((r) => {
-            const next = { ...r, elapsed_ms: Number.isFinite(speed) ? (performance.now() - t0) * speed : r.elapsed_ms }
-            if (e.type === 'phase') next.phase = e.phase
-            if (e.type === 'agent') next.agents = { ...r.agents, [e.agent]: { ...r.agents[e.agent], status: e.status, current: e.status === 'done' ? 'finished' : r.agents[e.agent].current } }
-            if (e.type === 'tool') {
-              next.calls = [...r.calls, e.call]
-              const a = r.agents[e.call.agent]
-              next.agents = { ...r.agents, [e.call.agent]: { ...a, status: a.status === 'done' ? 'done' : 'running', current: `${e.call.check}(${e.call.args})`, calls: a.calls + 1 } }
-            }
-            if (e.type === 'follow_up') next.hops = [...r.hops, e.hop]
-            if (e.type === 'log') next.logs = [...r.logs, { at_ms: e.at_ms, agent: e.agent, text: e.text }]
-            if (e.type === 'envelope') next.envelopes = { ...r.envelopes, [e.envelope.agent]: e.envelope }
-            if (!Number.isFinite(speed)) {
-              const t = e.type === 'tool' ? e.call.start_ms + e.call.ms : e.type === 'follow_up' ? e.hop.at_ms : e.type === 'envelope' ? e.envelope.finished_ms : e.at_ms
-              next.elapsed_ms = Math.max(r.elapsed_ms, t)
-            }
-            return next
-          }),
-        speed,
-        ctrl.signal,
-        rangeRef.current,
-      )
-      setBriefing(b)
-      setStage('analysed')
+      await addSourceApi(id, before, (p) => setIngesting({ source: id, ...p }), ctrl.signal)
     } catch (err) {
-      if ((err as Error).name !== 'AbortError') throw err
+      if ((err as Error).name === 'AbortError') return
+      throw err
     }
-  }, [])
-
-  const fastForward = useCallback(async () => {
-    setCaseName((n) => n || DEMO_CASE_NAME)
-    await startIngest(null, true)
-    await startAnalysis(Infinity)
-  }, [startIngest, startAnalysis])
+    const after = [...before, id]
+    setFresh(diffBoard(computeBoard(before), computeBoard(after), id))
+    setLoaded(after)
+    setIngesting(null)
+    freshTimer.current = setTimeout(() => setFresh(null), FRESH_MS)
+  }, [dismissFresh])
 
   const ask = useCallback(async (q: string) => {
     const question = q.trim()
@@ -161,57 +120,91 @@ export function CaseProvider({ children }: { children: ReactNode }) {
     setAskBusy(true)
     setAskTurns((t) => [...t, { q: question, steps: [], answer: null }])
     const upd = (fn: (t: AskTurn) => AskTurn) => setAskTurns((all) => all.map((t, i) => (i === all.length - 1 ? fn(t) : t)))
-    await askApi(question, (e) => {
-      if (e.type === 'step') upd((t) => ({ ...t, steps: [...t.steps, e.text] }))
-      if (e.type === 'answer') upd((t) => ({ ...t, answer: e.answer }))
-    })
+    await askApi(
+      question,
+      (e) => {
+        if (e.type === 'step') upd((t) => ({ ...t, steps: [...t.steps, e.text] }))
+        if (e.type === 'answer') upd((t) => ({ ...t, answer: e.answer }))
+      },
+      loadedRef.current,
+    )
     setAskBusy(false)
   }, [])
 
-  const reset = useCallback(() => {
-    runAbort.current?.abort()
-    setStage('empty')
-    setIngestStages(INGEST_STAGES)
-    setIngestReport(null)
-    setRun(emptyRun())
-    setBriefing(null)
-    setAskTurns([])
+  const verifyTranscript = useCallback(async (id: string) => {
+    readAbort.current?.abort()
+    const ctrl = new AbortController()
+    readAbort.current = ctrl
+    const t = transcriptOf(id)
+    const wait = (ms: number) =>
+      new Promise<void>((res, rej) => {
+        const h = setTimeout(res, ms)
+        ctrl.signal.addEventListener('abort', () => {
+          clearTimeout(h)
+          rej(new DOMException('Aborted', 'AbortError'))
+        })
+      })
+    try {
+      let r: Reading = { id, stage: 0, shown: 0, checked: 0 }
+      setReading(r)
+      await wait(900)
+      r = { ...r, stage: 1 }
+      for (let k = 1; k <= t.claims.length; k++) {
+        setReading((r = { ...r, shown: k }))
+        await wait(420)
+      }
+      setReading((r = { ...r, stage: 2 }))
+      await wait(700)
+      setReading((r = { ...r, stage: 3 }))
+      for (let k = 1; k <= t.claims.length; k++) {
+        await wait(520)
+        setReading((r = { ...r, checked: k }))
+      }
+      setReading((r = { ...r, stage: 4 }))
+      await wait(500)
+      setTranscripts((x) => (x.includes(id) ? x : [...x, id]))
+      setReading(null)
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') throw err
+    }
   }, [])
 
-  const newCase = useCallback(() => {
-    reset()
-    setCaseName('')
-    setRange([13, 19])
-  }, [reset, setRange])
+  const reset = useCallback(() => {
+    readAbort.current?.abort()
+    setReading(null)
+    setTranscripts([])
+    abort.current?.abort()
+    dismissFresh()
+    setIngesting(null)
+    setLoaded(START)
+    setAskTurns([])
+    setFinding(null)
+  }, [dismissFresh])
+
+  const queue = useMemo(() => QUEUE.filter((p) => !loaded.includes(p)), [loaded])
 
   const value = useMemo<CaseStore>(
-    () => ({
-      stage,
-      caseInfo,
-      ingestStages,
-      ingestReport,
-      run,
-      briefing,
-      finding,
-      openedEnvelope,
-      askTurns,
-      askBusy,
-      caseName,
-      range,
-      setCaseName,
-      setRange,
-      newCase,
-      startIngest,
-      startAnalysis,
-      fastForward,
-      openFinding: setFinding,
-      openEnvelope: setOpenedEnvelope,
-      ask,
-      reset,
-    }),
-    [stage, caseInfo, ingestStages, ingestReport, run, briefing, finding, openedEnvelope, askTurns, askBusy, caseName, range, setRange, newCase, startIngest, startAnalysis, fastForward, ask, reset],
+    () => ({ caseName: DEMO_CASE_NAME, loaded, queue, board, ingesting, fresh, finding, evidence, askTurns, askBusy, transcripts, reading, addSource, dismissFresh, openFinding: (f: Finding | null) => {
+      setEvidence(null)
+      setFinding(f)
+    }, openEvidence: (e: EvidenceItem | null) => {
+      setFinding(null)
+      setEvidence(e)
+    }, ask, verifyTranscript, reset }),
+    [loaded, queue, board, ingesting, fresh, finding, evidence, askTurns, askBusy, transcripts, reading, addSource, dismissFresh, ask, verifyTranscript, reset],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+}
+
+/**
+ * Whether a person's identity can be shown. A person is identified once their phone has been examined
+ * (the victim always is). Before that they appear as a question mark with the first name other phones
+ * use for them, and a seized phone is shown only by its exhibit number.
+ */
+export function useKnown() {
+  const c = useContext(Ctx)
+  const loaded = c?.loaded
+  return useCallback((id: PersonId) => !loaded || id === VICTIM || loaded.includes(id), [loaded])
 }
 
 export function useCase() {

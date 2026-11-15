@@ -31,7 +31,7 @@ export function Legend({ people, hidden, toggle }: { people: PersonId[]; hidden?
 // ---------------------------------------------------------------------------------------------
 const EVE_START = caseMinutes('2026-04-16T18:00:00-04:00')
 const EVE_END = caseMinutes('2026-04-17T01:50:00-04:00')
-export function DistanceToScene({ height = 280 }: { height?: number }) {
+export function DistanceToScene({ height = 280, people = CASE_PEOPLE }: { height?: number; people?: PersonId[] }) {
   const [hidden, setHidden] = useState<Set<PersonId>>(new Set())
   const data = useMemo(() => {
     const byKey = new Map<string, number>()
@@ -42,15 +42,15 @@ export function DistanceToScene({ height = 280 }: { height?: number }) {
       byKey.set(`${r.device_owner}|${m}`, Math.max(5, Math.round(haversine(Number(r.fields.lat), Number(r.fields.lon), SCENE.lat, SCENE.lon))))
     }
     const out: Record<string, number | null>[] = []
-    for (let m = EVE_START; m <= EVE_END; m += 10) out.push({ m, ...Object.fromEntries(CASE_PEOPLE.map((p) => [p, byKey.get(`${p}|${m}`) ?? null])) })
+    for (let m = EVE_START; m <= EVE_END; m += 10) out.push({ m, ...Object.fromEntries(people.map((p) => [p, byKey.get(`${p}|${m}`) ?? null])) })
     return out
-  }, [])
+  }, [people])
   const toggle = (p: PersonId) => setHidden((s) => (s.has(p) ? new Set([...s].filter((x) => x !== p)) : new Set([...s, p])))
   const tick = (m: number) => `${String(Math.floor((m % 1440) / 60)).padStart(2, '0')}:00`
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <Legend people={CASE_PEOPLE} hidden={hidden} toggle={toggle} />
+        <Legend people={people} hidden={hidden} toggle={toggle} />
         <span className="text-[11px] text-ink-3">distance to {SCENE.name}, every 10 min · breaks = no location data</span>
       </div>
       <ResponsiveContainer width="100%" height={height}>
@@ -62,7 +62,7 @@ export function DistanceToScene({ height = 280 }: { height?: number }) {
           <ReferenceLine y={150} stroke="var(--serious)" strokeDasharray="4 3" label={{ value: 'at the scene (150 m)', position: 'insideBottomLeft', fill: 'var(--ink-2)', fontSize: 10.5 }} />
           <ReferenceLine y={2000} stroke="var(--ink-3)" strokeDasharray="2 4" label={{ value: 'near (2 km)', position: 'insideTopLeft', fill: 'var(--ink-3)', fontSize: 10.5 }} />
           <Tooltip {...chart.tooltip} labelFormatter={(m) => `16–17 Apr ${tick(Number(m)).slice(0, 2)}:${String(Number(m) % 60).padStart(2, '0')}`} formatter={(v, n) => [fmtKm(Number(v)), personName(n as PersonId)]} />
-          {CASE_PEOPLE.filter((p) => !hidden.has(p)).map((p) => (
+          {people.filter((p) => !hidden.has(p)).map((p) => (
             <Line key={p} type="linear" dataKey={p} stroke={personColor(p)} strokeWidth={p === 'ravi' ? 2.4 : 1.8} dot={false} connectNulls={false} isAnimationActive={false} />
           ))}
         </LineChart>
@@ -74,8 +74,8 @@ export function DistanceToScene({ height = 280 }: { height?: number }) {
 // ---------------------------------------------------------------------------------------------
 // Pattern of life: that night against a normal night, per phone (small multiples)
 // ---------------------------------------------------------------------------------------------
-export function NightProfiles({ night = 16 }: { night?: number }) {
-  const data = useMemo(() => CASE_PEOPLE.map((p) => ({ p, rows: nightProfile(p, night) })), [night])
+export function NightProfiles({ night = 16, people = CASE_PEOPLE, fresh = [], compact = false }: { night?: number; people?: PersonId[]; fresh?: PersonId[]; compact?: boolean }) {
+  const data = useMemo(() => people.map((p) => ({ p, rows: nightProfile(p, night) })), [night, people])
   const max = Math.max(1, ...data.flatMap((d) => d.rows.flatMap((r) => [r.night, r.max])))
   const todHours = [21, 22, 23]
   return (
@@ -84,9 +84,9 @@ export function NightProfiles({ night = 16 }: { night?: number }) {
         const nightTotal = rows.filter((r) => todHours.includes(r.hour)).reduce((a, r) => a + r.night, 0)
         const medTotal = rows.filter((r) => todHours.includes(r.hour)).reduce((a, r) => a + r.median, 0)
         return (
-          <div key={p} className="grid grid-cols-[8.5rem_1fr_9rem] items-end gap-3">
+          <div key={p} className={`grid grid-cols-[8.5rem_1fr_9rem] items-end gap-3 ${fresh.includes(p) ? 'row-in' : ''}`}>
             <Portrait id={p} size={24} label />
-            <div className="grid grid-cols-8 items-end gap-1" style={{ height: 46 }}>
+            <div className="grid grid-cols-8 items-end gap-1" style={{ height: compact ? 30 : 46 }}>
               {rows.map((r) => (
                 <div key={r.hour} className="relative h-full" title={`${String(r.hour).padStart(2, '0')}:00 · that night ${r.night} · usual ${r.median}`}>
                   {todHours.includes(r.hour) && <div className="absolute inset-0 rounded-sm bg-serious/10" />}
@@ -122,18 +122,18 @@ export function NightProfiles({ night = 16 }: { night?: number }) {
 // ---------------------------------------------------------------------------------------------
 // The week: hourly activity per phone, with location gaps shaded and the key moments marked
 // ---------------------------------------------------------------------------------------------
-export function ActivityChart({ height = 240 }: { height?: number }) {
+export function ActivityChart({ height = 240, people = CASE_PEOPLE }: { height?: number; people?: PersonId[] }) {
   const [hidden, setHidden] = useState<Set<PersonId>>(new Set(['amy', 'ken']))
   const data = useMemo(() => {
-    const series = Object.fromEntries(CASE_PEOPLE.map((p) => [p, hourlyActivity(p, ['messages', 'calls', 'social_interactions'])]))
-    return Array.from({ length: 168 }, (_, h) => ({ h, ...Object.fromEntries(CASE_PEOPLE.map((p) => [p, series[p][h]])) }))
-  }, [])
+    const series = Object.fromEntries(people.map((p) => [p, hourlyActivity(p, ['messages', 'calls', 'social_interactions'])]))
+    return Array.from({ length: 168 }, (_, h) => ({ h, ...Object.fromEntries(people.map((p) => [p, series[p][h]])) }))
+  }, [people])
   const toggle = (p: PersonId) => setHidden((s) => (s.has(p) ? new Set([...s].filter((x) => x !== p)) : new Set([...s, p])))
   const gaps = ALL_GAPS.filter((g) => g.raised && !hidden.has(g.person))
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <Legend people={CASE_PEOPLE} hidden={hidden} toggle={toggle} />
+        <Legend people={people} hidden={hidden} toggle={toggle} />
         <span className="text-[11px] text-ink-3">messages + calls + posts per hour · shaded = raised location gaps · click a name to show it</span>
       </div>
       <ResponsiveContainer width="100%" height={height}>
@@ -148,7 +148,7 @@ export function ActivityChart({ height = 240 }: { height?: number }) {
           <ReferenceLine x={caseMinutes(TOD.start) / 60} stroke="var(--serious)" strokeDasharray="3 3" label={{ value: 'Time of death 21:00–23:30', position: 'top', fill: 'var(--ink-2)', fontSize: 11 }} />
           <ReferenceLine x={caseMinutes(SYNC.trigger!.t) / 60} stroke="var(--ink-3)" strokeDasharray="2 3" label={{ value: 'News 17 Apr 09:05', position: 'insideTopRight', fill: 'var(--ink-3)', fontSize: 10.5 }} />
           <Tooltip {...chart.tooltip} labelFormatter={(h) => hourLabel(Number(h))} formatter={(v, n) => [v as number, personName(n as PersonId)]} />
-          {CASE_PEOPLE.filter((p) => !hidden.has(p)).map((p) => (
+          {people.filter((p) => !hidden.has(p)).map((p) => (
             <Line key={p} type="monotone" dataKey={p} stroke={personColor(p)} strokeWidth={1.6} dot={false} isAnimationActive={false} />
           ))}
         </LineChart>
@@ -160,13 +160,13 @@ export function ActivityChart({ height = 240 }: { height?: number }) {
 // ---------------------------------------------------------------------------------------------
 // Social: every post over the week, one row per person, coloured by hostility score
 // ---------------------------------------------------------------------------------------------
-export function HostilityTimeline({ onPick }: { onPick?: (id: string) => void }) {
-  const items = useMemo(() => socialItems(), [])
-  const byDay = useMemo(() => socialByDay(), [])
+export function HostilityTimeline({ onPick, people = CASE_PEOPLE }: { onPick?: (id: string) => void; people?: PersonId[] }) {
+  const items = useMemo(() => socialItems(), [people])
+  const byDay = useMemo(() => socialByDay(), [people])
   const W = 900
   const L = 140
   const row = 46
-  const H = CASE_PEOPLE.length * row + 26
+  const H = people.length * row + 26
   const x = (iso: string) => L + (caseMinutes(iso) / (7 * 1440)) * (W - L - 10)
   const [hover, setHover] = useState<(typeof items)[number] | null>(null)
   return (
@@ -183,7 +183,7 @@ export function HostilityTimeline({ onPick }: { onPick?: (id: string) => void })
           </Fragment>
         ))}
         <rect x={x(TOD.start)} width={Math.max(3, x(TOD.end) - x(TOD.start))} y={0} height={H - 20} fill="var(--serious)" opacity={0.15} />
-        {CASE_PEOPLE.map((p, i) => {
+        {people.map((p, i) => {
           const y = i * row + 22
           const total = byDay.find((b) => b.person === p)!.days.reduce((a, d) => a + d.posts, 0)
           return (
@@ -248,8 +248,8 @@ export function HostilityTimeline({ onPick }: { onPick?: (id: string) => void })
 }
 
 /** Hours at each place per phone (stays table), stacked; filtered by an optional window. */
-export function PlaceTime({ window }: { window?: [number, number] | null }) {
-  const dwell = useMemo(() => dwellByPlace(window ?? undefined), [window])
+export function PlaceTime({ window, people = CASE_PEOPLE }: { window?: [number, number] | null; people?: PersonId[] }) {
+  const dwell = useMemo(() => dwellByPlace(window ?? undefined), [window, people])
   const rows = Object.entries(dwell)
     .map(([place, by]) => ({ place, by, total: Object.values(by).reduce((a, b) => a + b, 0) }))
     .filter((r) => r.total > 0)
@@ -262,7 +262,7 @@ export function PlaceTime({ window }: { window?: [number, number] | null }) {
           <div key={r.place} className="grid grid-cols-[8.5rem_1fr_3.5rem] items-center gap-2 text-[11.5px]">
             <span className="truncate text-ink-2">{r.place}</span>
             <span className="flex h-3 overflow-hidden rounded-r-[3px]" style={{ width: `${(r.total / max) * 100}%` }}>
-              {CASE_PEOPLE.filter((p) => r.by[p] > 0).map((p, i) => (
+              {people.filter((p) => r.by[p] > 0).map((p, i) => (
                 <span key={p} title={`${personName(p)} · ${r.place}: ${(r.by[p] / 60).toFixed(1)} h`} className="h-full" style={{ width: `${(r.by[p] / r.total) * 100}%`, background: personColor(p), marginLeft: i ? 2 : 0 }} />
               ))}
             </span>
@@ -271,7 +271,7 @@ export function PlaceTime({ window }: { window?: [number, number] | null }) {
         ))}
       </div>
       <div className="mt-2 flex items-center justify-between">
-        <Legend people={CASE_PEOPLE} />
+        <Legend people={people} />
         <span className="text-[11px] text-ink-3">{window ? 'selected window' : 'whole week'} · from stays</span>
       </div>
     </div>

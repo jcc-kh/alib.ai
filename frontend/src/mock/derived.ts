@@ -130,7 +130,9 @@ export const LAST = lastContacts()
 // =====================================================================
 // contact_graph(): every tie between case phones, from the rows (copies on both phones counted once)
 // =====================================================================
-function graph(): Graph {
+/** contact_graph() over the rows of the loaded phones only. */
+export function graphFor(loaded: PersonId[] = ALL_PHONES): Graph {
+  const has = (p: PersonId) => loaded.includes(p)
   const key = (a: PersonId, b: PersonId) => [a, b].sort().join('|')
   type Acc = { ids: string[]; seen: Set<string>; times: string[] }
   const acc = new Map<string, Acc>()
@@ -145,6 +147,7 @@ function graph(): Graph {
     acc.set(k, e)
   }
   for (const r of rows()) {
+    if (!has(r.device_owner)) continue
     if (r.table === 'calls' || r.table === 'messages' || r.table === 'transactions') {
       const a = NUM_TO_PERSON.get(String(r.fields.from))
       const b = NUM_TO_PERSON.get(String(r.fields.to))
@@ -159,8 +162,9 @@ function graph(): Graph {
       if (b) add(r.device_owner, b, 'deleted_thread', r.id, r.id, r.timestamp)
     }
   }
-  for (const o of MEET.occasions) add(MEET.person_a, MEET.person_b, 'colocation', o.start, o.row_ids[0], o.start)
-  for (const o of MEET.occasions) acc.get(`${key(MEET.person_a, MEET.person_b)}|colocation`)!.ids.push(...o.row_ids.slice(1))
+  // Co-location needs both phones' location rows.
+  if (has(MEET.person_a) && has(MEET.person_b)) for (const o of MEET.occasions) add(MEET.person_a, MEET.person_b, 'colocation', o.start, o.row_ids[0], o.start)
+  if (has(MEET.person_a) && has(MEET.person_b)) for (const o of MEET.occasions) acc.get(`${key(MEET.person_a, MEET.person_b)}|colocation`)!.ids.push(...o.row_ids.slice(1))
   const edges: GraphEdge[] = []
   const LABEL: Record<string, (n: number) => string> = {
     call: (n) => `${n} call${n === 1 ? '' : 's'}`,
@@ -177,7 +181,7 @@ function graph(): Graph {
     edges.push({ source: a, target: b, channel, label: LABEL[channel](e.seen.size), count: e.seen.size, first: times[0], last: times[times.length - 1], evidence_ids: e.ids })
   }
   // Below-threshold co-location: shown faintly so the investigator sees what was set aside.
-  edges.push({ source: 'amy', target: 'ken', channel: 'colocation', label: 'together once at FreshMart (needs 2+)', weak: true, count: 1, first: ROWS.get(FRESHMART_IDS[0])!.timestamp, evidence_ids: FRESHMART_IDS })
+  if (has('amy') && has('ken')) edges.push({ source: 'amy', target: 'ken', channel: 'colocation', label: 'together once at FreshMart (needs 2+)', weak: true, count: 1, first: ROWS.get(FRESHMART_IDS[0])!.timestamp, evidence_ids: FRESHMART_IDS })
   return { nodes: PEOPLE.map((p) => ({ id: p.person_id, label: p.name, color: p.color })), edges, cells: [] }
 }
-export const GRAPH = graph()
+export const GRAPH = graphFor(ALL_PHONES)

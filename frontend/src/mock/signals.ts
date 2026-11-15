@@ -5,7 +5,7 @@
 import type { Anchor, Dismissal, GapOutput, Incident, InquiryId, PersonId, Signal } from '../api/types'
 import { personName, AMY_POST, CARA_GAP, CHAIN, GAMY, GPAUL, HOSTILE, KEN_NIGHT, LUNCH_IDS, FRESHMART_IDS, MEET, MISSING, SYNC, SYNC_GAPS, TOD } from './data'
 import { LAST, PRESENCE, SPACE } from './derived'
-import { SCENARIOS, scenarioFinding, type ScenarioId } from './findings'
+import { SCENARIOS, SIGNAL_OF, scenarioFinding, type ScenarioId } from './findings'
 import { fmtKm, fmtTime } from '../lib/format'
 
 const gapIds = (g: GapOutput) => [g.bounding.before.id, g.bounding.after.id, ...g.activity.map((a) => a.id), ...g.power_event_ids]
@@ -57,7 +57,8 @@ interface IncidentDef {
   signal_ids: string[]
   headline: string
   title: string
-  facts: string[]
+  /** Each fact names the scenario (finding) it comes from, so it is shown only once that finding is unlocked. */
+  facts: [ScenarioId, string][]
   why: string
   follow_ups: string[]
   anchor_id?: string
@@ -72,18 +73,19 @@ const DEFS: IncidentDef[] = [
     signal_ids: ['sig_01', 'sig_02', 'sig_03'],
     headline: "Ravi's phone asked Paul to Pier 9 that night; Paul's phone came within a kilometre and then went off",
     title: "Paul's phone went dark near Pier 9",
-    facts: ['18:05 text: "Pier 9, 9:30"', `${fmtKm(paulPh.closest_m!)} away at ${fmtTime(paulPh.closest_t!)}`, 'off 21:16–23:38'],
+    facts: [['LAST', '18:05 text: "Pier 9, 9:30"'], ['GPAUL', `${fmtKm(paulPh.closest_m!)} away at ${fmtTime(paulPh.closest_t!)}`], ['GPAUL', 'off 21:16–23:38']],
     why: "The victim's own phone holds the invitation, which Paul's phone no longer has. Paul's phone is the only one besides the victim's to come within 1 km of the scene in the window, and it was switched off for most of it.",
     follow_ups: ['Where was Paul between 21:16 and 23:38?', 'What did Ravi text Paul on 16 April?'],
   },
   {
     id: 'INC-2',
-    inquiry: 'changes',
+    // The deletions show in the time-of-death timeline, on the morning after.
+    inquiry: 'window',
     sids: ['SYNC'],
     signal_ids: ['sig_04', 'sig_05', 'sig_06'],
     headline: 'Three phones deleted threads within 35 minutes of the news breaking',
     title: 'Threads deleted after the news',
-    facts: [`news alert ${fmtTime(SYNC.trigger!.t)}`, `3 phones in ${SYNC.window.minutes} min`, '2 then powered off'],
+    facts: [['SYNC', `news alert ${fmtTime(SYNC.trigger!.t)}`], ['SYNC', `3 phones in ${SYNC.window.minutes} min`], ['SYNC', '2 then powered off']],
     why: "The sweep found this cluster without being told about the news; the alert turned up afterwards as the latest message before it. Paul's and Amy's deletions removed their threads with Ravi; Cara's and Paul's removed their thread with each other.",
     follow_ups: ['Who reacted to the news?', 'Which threads were deleted on 17 April?'],
     anchor_id: 'A1',
@@ -95,18 +97,19 @@ const DEFS: IncidentDef[] = [
     signal_ids: ['sig_07', 'sig_08'],
     headline: "Amy's texts with Ravi that evening are gone from her phone, and her phone reported no location for 70 minutes of the window",
     title: 'Amy: texts deleted, location off in the window',
-    facts: [`${MISSING.missing_count} texts gone from her phone`, `no location ${fmtTime(GAMY.start)}–${fmtTime(GAMY.end)}`, '2 calls to Ravi'],
+    facts: [['MISSING', `${MISSING.missing_count} texts gone from her phone`], ['GAMY', `no location ${fmtTime(GAMY.start)}–${fmtTime(GAMY.end)}`], ['GAMY', '2 calls to Ravi']],
     why: "Two checks agree on the same evening. Her bounding fixes are at home, 14 km from Pier 9, so the gap doesn't place her anywhere; it is a hole in the record during the window.",
     follow_ups: ["Was Amy's location off while her phone was in use?", 'What did Ravi and Amy text on 16 April?'],
   },
   {
     id: 'INC-4',
+    // Shown on the board's relationship chart (click the Paul–Cara line for the exchanges).
     inquiry: 'connections',
     sids: ['CHAIN', 'MEET'],
     signal_ids: ['sig_09', 'sig_10'],
     headline: "Paul paid Cara $4,800 as an invoice and 90% came back the same afternoon; their phones met four times with no call or text on record",
     title: 'Paul and Cara: money came back, meetings with no contact',
-    facts: ['$4,800 out, $4,320 back', '4 meetings at Dock Cafe', '0 calls or texts'],
+    facts: [['CHAIN', '$4,800 out, $4,320 back'], ['MEET', '4 meetings at Dock Cafe'], ['MEET', '0 calls or texts']],
     why: 'The "Novak invoices" named in Ravi\'s 18:05 text are Cara\'s. A payment that mostly returns to the payer within hours, between two people who meet but never call, is worth a request for the invoice itself.',
     follow_ups: ['Do Paul and Cara know each other?', 'Where did the invoice money go?'],
   },
@@ -117,21 +120,22 @@ const DEFS: IncidentDef[] = [
     signal_ids: ['sig_11'],
     headline: "Ken posted hostile comments about Ravi after being let go, but his phone was at least 9 km from Pier 9 all evening",
     title: 'Ken: hostile posts, but far away all evening',
-    facts: [`${HOSTILE.flagged} posts ≥ ${HOSTILE.threshold}`, 'after losing his job 14 Apr', `≥ ${fmtKm(kenMin)} away all window`],
+    facts: [['HOSTILE', `${HOSTILE.flagged} posts ≥ ${HOSTILE.threshold}`], ['HOSTILE', 'after losing his job 14 Apr'], ['PRESENCE', `≥ ${fmtKm(kenMin)} away all window`]],
     why: 'A grievance is a lead for interview. The presence check, run alongside it, places his phone far from the scene in every slot with no gaps; motive alone does not put anyone at Pier 9.',
     follow_ups: ['Did anyone post threats about Ravi?', 'Where was Ken during the time-of-death window?'],
   },
   {
     id: 'INC-6',
-    inquiry: 'radius',
+    // Routine-area context is shown beside each phone on the time-of-death view.
+    inquiry: 'window',
     sids: ['SPACE'],
     signal_ids: ['sig_12'],
     headline: "Pier 9 is part of Ken's and Cara's routine, but not Paul's or Amy's",
     title: 'Whose routine includes Pier 9',
     facts: [
-      `routine for ${SPACE.spaces.filter((s) => s.scene_inside && s.person !== 'ravi').map((s) => personName(s.person)).join(', ')}`,
-      `not for ${SPACE.spaces.filter((s) => !s.scene_inside).map((s) => personName(s.person)).join(', ')}`,
-      `rule: ${SPACE.rule.min_days}+ days, +${SPACE.rule.buffer_m} m`,
+      ['SPACE', `routine for ${SPACE.spaces.filter((s) => s.scene_inside && s.person !== 'ravi').map((s) => personName(s.person)).join(', ')}`],
+      ['SPACE', `not for ${SPACE.spaces.filter((s) => !s.scene_inside).map((s) => personName(s.person)).join(', ')}`],
+      ['SPACE', `rule: ${SPACE.rule.min_days}+ days, +${SPACE.rule.buffer_m} m`],
     ],
     why: "A visit to the scene means more from a phone that doesn't normally go there. Paul's phone stayed at Pier 9 on one day before the 16th; Amy's never did.",
     follow_ups: ["Whose usual area includes Pier 9?"],
@@ -140,21 +144,30 @@ const DEFS: IncidentDef[] = [
 
 const sigById = (id: string) => SIGNALS.find((s) => s.signal_id === id)!
 
-/** rank_incidents(): code. Sort by distinct checks, then distinct phones, then max strength. */
-function buildIncidents(): Incident[] {
-  const raw = DEFS.map((d) => {
-    const sigs = d.signal_ids.map(sigById)
+const MAPPED = new Set(Object.values(SIGNAL_OF).flat())
+
+/**
+ * rank_incidents(): code. Sort by distinct checks, then distinct phones, then max strength.
+ * Only findings in `unlocked` count (their phones are loaded); an insight with none is not shown.
+ * Finding ids keep their position in the full insight (INC-1:f2 is always Paul's gap).
+ */
+export function incidentsFor(unlocked: Iterable<ScenarioId>): Incident[] {
+  const on = new Set(unlocked)
+  const raw = DEFS.filter((d) => d.sids.some((sid) => on.has(sid))).map((d) => {
+    const keepSig = new Set(d.sids.filter((sid) => on.has(sid)).flatMap((sid) => SIGNAL_OF[sid]))
+    const sigs = d.signal_ids.filter((id) => keepSig.has(id) || !MAPPED.has(id)).map(sigById)
+    const sids = d.sids.filter((sid) => on.has(sid))
     const checks = new Set(sigs.map((s) => s.check))
-    const people = [...new Set(sigs.flatMap((s) => s.people).concat(d.sids.flatMap((sid) => SCENARIOS[sid].people)))]
+    const people = [...new Set(sigs.flatMap((s) => s.people).concat(sids.flatMap((sid) => SCENARIOS[sid].people)))]
     const starts = sigs.map((s) => s.start).sort()
     const ends = sigs.map((s) => s.end).sort()
-    return { d, n_checks: checks.size, n_phones: people.length, strength: Math.max(...sigs.map((s) => s.strength)), people, start: starts[0], end: ends[ends.length - 1], checks: [...checks] }
+    return { d, on, n_checks: checks.size, n_phones: people.length, strength: Math.max(...sigs.map((s) => s.strength)), people, start: starts[0], end: ends[ends.length - 1], checks: [...checks], signal_ids: sigs.map((s) => s.signal_id) }
   })
   raw.sort((a, b) => b.n_checks - a.n_checks || b.n_phones - a.n_phones || b.strength - a.strength)
   return raw.map((r, i) => ({
     incident_id: r.d.id,
     inquiry: r.d.inquiry,
-    signal_ids: r.d.signal_ids,
+    signal_ids: r.signal_ids,
     people: r.people,
     start: r.start,
     end: r.end,
@@ -164,16 +177,16 @@ function buildIncidents(): Incident[] {
     rank: i + 1,
     headline: r.d.headline,
     title: r.d.title,
-    facts: r.d.facts,
+    facts: r.d.facts.filter(([sid]) => r.on.has(sid)).map(([, text]) => text),
     why_it_matters: r.d.why,
     rank_reason: `${r.n_checks} check${r.n_checks > 1 ? 's' : ''} agree (${r.checks.join(', ')}) across ${r.n_phones} phones; strongest signal ${r.strength.toFixed(2)}.`,
     anchor_id: r.d.anchor_id,
-    findings: r.d.sids.map((sid, k) => scenarioFinding(sid, `${r.d.id}:f${k + 1}`)),
+    findings: r.d.sids.flatMap((sid, k) => (r.on.has(sid) ? [scenarioFinding(sid, `${r.d.id}:f${k + 1}`)] : [])),
     follow_ups: r.d.follow_ups,
   }))
 }
 
-export const INCIDENTS = buildIncidents()
+export const INCIDENTS = incidentsFor(Object.keys(SIGNAL_OF) as ScenarioId[])
 
 export const DISMISSALS: Dismissal[] = [
   { signal_id: 'sig_13', title: "Ken's phone off overnight, 14→15 April", reason: 'A power_off / power_on pair covers the gap, nothing else overlaps it, and it is days before the window. Phones are often switched off overnight.', rule: 'location_gaps: powered_off and not overlapping → not raised', by: 'code rule' },

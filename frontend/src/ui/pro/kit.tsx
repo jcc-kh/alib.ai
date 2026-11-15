@@ -2,6 +2,7 @@
 import type { ReactNode } from 'react'
 import type { PersonId, Verdict } from '../../api'
 import { personColor, personName } from '../../mock/data'
+import { Unknown } from '../../components/Portrait'
 
 export function Panel({
   title,
@@ -132,4 +133,23 @@ export const chart = {
     itemStyle: { color: 'var(--ink)', padding: 0 },
     cursor: { stroke: 'var(--ink-3)', strokeDasharray: '3 3' },
   },
+}
+
+/** Placeholder for a view whose check needs phones that are not examined yet. Does not say whose: owners are unknown until examined. */
+export function NeedsSources({ people, what = 'this view' }: { people: PersonId[]; what?: string }) {
+  const n = people.length
+  return (
+    <div className="flex min-h-24 items-center justify-center gap-3 rounded-md border border-dashed border-line-strong px-4 py-5 text-[12.5px] text-ink-2">
+      <span className="flex -space-x-2">
+        {people.map((p) => (
+          <span key={p} className="inline-block h-[26px] w-[26px]">
+            <Unknown size={26} />
+          </span>
+        ))}
+      </span>
+      <span>
+        {what[0].toUpperCase() + what.slice(1)} can’t run on the phones examined so far. It needs {n > 1 ? `${n} more phones` : 'one more phone'}; add evidence from the board.
+      </span>
+    </div>
+  )
 }

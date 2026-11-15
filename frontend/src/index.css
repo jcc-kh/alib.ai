@@ -17,6 +17,7 @@
   --color-accent: var(--accent);
   --color-good: var(--good);
   --color-serious: var(--serious);
+  --color-warning: var(--warning);
   --color-amber: var(--amber);
   --color-off: var(--off);
   /* aliases used by the shared finding/evidence components */
@@ -52,6 +53,7 @@
   --accent: #6250d6;
   --good: #0ca30c;
   --serious: #d03b3b;
+  --warning: #b7791f;
   --amber: #e87ba4;
   --violet: #6250d6;
   --off: #a8a6a0;
@@ -64,6 +66,11 @@
   --display-font: var(--ui-font);
   --mono-font: ui-monospace, "SF Mono", Menlo, monospace;
   --type-font: var(--mono-font);
+  --board: #e9e8e3;
+  --board-dot: rgb(0 0 0 / 0.085);
+  --board-card: var(--surface);
+  --card-shadow: 0 1px 0 rgb(0 0 0 / 0.04), 0 8px 18px -10px rgb(0 0 0 / 0.22);
+  --pin: #3d3c38;
 }
 
 [data-skin="pro"][data-theme="dark"] {
@@ -79,6 +86,7 @@
   --accent: #9085e9;
   --good: #0ca30c;
   --serious: #e66767;
+  --warning: #e0a84a;
   --amber: #d55181;
   --violet: #9085e9;
   --off: #5c5b57;
@@ -87,6 +95,11 @@
   --p-ken: #199e70;
   --p-cara: #c98500;
   --p-ravi: #d9d7d0;
+  --board: #111110;
+  --board-dot: rgb(255 255 255 / 0.055);
+  --board-card: var(--surface);
+  --card-shadow: 0 1px 0 rgb(0 0 0 / 0.3), 0 10px 22px -12px rgb(0 0 0 / 0.7);
+  --pin: #c3c2b7;
 }
 
 /* Noir: components render on paper (dossiers, index cards); the desk itself uses .noir-desk. */
@@ -166,3 +179,47 @@ body { background: var(--page); color: var(--ink); font-family: var(--ui-font); 
 .drop-in { animation: drop-in .45s cubic-bezier(.2,.9,.3,1.2) both; }
 @keyframes unlock { 0% { transform: translateY(0) } 40% { transform: translateY(-6px) } 100% { transform: translateY(0) } }
 .unlock { animation: unlock .5s ease-out; }
+
+/* ---------------- Case board ---------------- */
+.board-surface {
+  background-color: var(--board);
+  background-image: radial-gradient(var(--board-dot) 1px, transparent 1.3px);
+  background-size: 18px 18px;
+}
+.board-card { background: var(--board-card); box-shadow: var(--card-shadow); }
+.board-pin { width: 9px; height: 9px; border-radius: 9999px; background: var(--pin); box-shadow: 0 0 0 2.5px var(--board-card), 0 1px 3px rgb(0 0 0 / 0.35); }
+.board-pin.accent { background: var(--accent); }
+
+@keyframes card-flash { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent), var(--card-shadow) } 35% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 35%, transparent), var(--card-shadow) } 100% { box-shadow: 0 0 0 0 transparent, var(--card-shadow) } }
+.card-flash { animation: card-flash 1.6s ease-out both; }
+@keyframes note-drop { 0% { opacity: 0; transform: translateY(-22px) scale(0.97) } 70% { opacity: 1; transform: translateY(2px) } 100% { opacity: 1; transform: none } }
+.note-drop { animation: note-drop .55s cubic-bezier(.2,.8,.3,1.15) both; }
+@keyframes row-in { from { opacity: 0; transform: translateX(-10px) } to { opacity: 1; transform: none } }
+.row-in { animation: row-in .6s ease-out .35s both; transform-box: fill-box; }
+@keyframes fresh-path { 0% { opacity: 0 } 30% { opacity: 1; stroke-width: 6px } 100% { opacity: 1 } }
+.fresh-path { animation: fresh-path 1.4s ease-out .3s both; }
+@keyframes node-pop { 0% { transform: scale(0.6); opacity: 0.2 } 60% { transform: scale(1.08); opacity: 1 } 100% { transform: scale(1) } }
+.node-pop { animation: node-pop .6s cubic-bezier(.2,.8,.3,1.3) both; }
+@keyframes node-ring { 0% { opacity: 0.9; stroke-width: 3px } 100% { opacity: 0; stroke-width: 14px } }
+.node-ring { animation: node-ring 1.4s ease-out 3 both; }
+@keyframes tie-glow { 0% { opacity: 0 } 20% { opacity: 0.35 } 100% { opacity: 0 } }
+.tie-glow { animation: tie-glow 2.4s ease-out 2 both; }
+@keyframes thread { from { stroke-dashoffset: 1 } to { stroke-dashoffset: 0 } }
+.thread { stroke-dasharray: 1; animation: thread .45s ease-out both; }
+@keyframes bar-stripes { from { background-position: 0 0 } to { background-position: 28px 0 } }
+.bar-live { background-image: linear-gradient(45deg, rgb(255 255 255 / 0.18) 25%, transparent 25% 50%, rgb(255 255 255 / 0.18) 50% 75%, transparent 75%); background-size: 28px 28px; animation: bar-stripes .8s linear infinite; }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 12px) } to { opacity: 1; transform: translate(-50%, 0) } }
+.toast-in { animation: toast-in .3s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .card-flash, .note-drop, .row-in, .fresh-path, .node-pop, .node-ring, .tie-glow, .thread, .bar-live, .toast-in { animation: none !important; }
+}
+
+/* A claim highlight appearing as the transcript is read. */
+@keyframes mark-in {
+  from { opacity: 0.2; box-shadow: none; }
+  to { opacity: 1; }
+}
+.mark-in { animation: mark-in 0.35s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .mark-in { animation: none; }
+}

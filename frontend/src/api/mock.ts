@@ -7,6 +7,8 @@
 //   POST /api/ask (SSE)     -> ask
 //   GET  /api/timeline      -> getTimeline (stays: stay / travel / gap per person)
 //   GET  /api/signals       -> getSignals (every sweep hit)
+//   POST /api/sources (SSE) -> addSource (upload one evidence source; progress, then the board refreshes)
+//   GET  /api/board?loaded= -> getBoard
 
 import type { Answer, AskEvent, Briefing, CaseInfo, EvidenceByPhone, Graph, IngestReport, IngestStage, RunEvent, Segment, Signal } from './types'
 import { GRAPH } from '../mock/derived'
@@ -14,6 +16,9 @@ import { FOUND_AT, PEOPLE, PLACES, ROWS, SCENE, TOD, VICTIM } from '../mock/data
 import { INGEST_STAGES, buildIngestReport } from '../mock/ingest'
 import { buildBriefing, scopeBriefing } from '../mock/briefing'
 import { answerQuestion } from '../mock/ask'
+import { SCENARIOS } from '../mock/findings'
+import { computeBoard, exhibitOf, sourceOf, unlockedFor, type Board } from '../mock/sources'
+import type { PersonId, StageStatus } from './types'
 import { SEGMENTS } from '../mock/segments'
 import { SIGNALS } from '../mock/signals'
 import { buildRunScript, eventTime } from '../mock/run'
@@ -89,8 +94,8 @@ export async function getBriefing(): Promise<Briefing> {
   return buildBriefing()
 }
 
-export async function ask(question: string, onEvent: (e: AskEvent) => void): Promise<Answer> {
-  const { steps, answer } = answerQuestion(question)
+export async function ask(question: string, onEvent: (e: AskEvent) => void, loaded?: PersonId[]): Promise<Answer> {
+  const { steps, answer } = answerQuestion(question, loaded)
   for (const text of steps) {
     await sleep(450)
     onEvent({ type: 'step', text })
@@ -124,4 +129,65 @@ export async function analyseCase(onEvent: (e: RunEvent) => void, speed = 1, sig
     onEvent(e)
   }
   return scopeBriefing(buildBriefing(), range)
+}
+
+// ---------------------------------------------------------------------------------------------
+// Evidence sources: add one at a time; the board is recomputed from the loaded sources
+// ---------------------------------------------------------------------------------------------
+
+export interface SourceStage {
+  id: string
+  label: string
+  detail: string
+  status: StageStatus
+}
+export interface SourceProgress {
+  stages: SourceStage[]
+  /** 0–1 across all stages. */
+  pct: number
+  /** Rows read so far from the new source. */
+  rows: number
+}
+
+export async function getBoard(loaded: PersonId[]): Promise<Board> {
+  await sleep(80)
+  return computeBoard(loaded)
+}
+
+/** Ingest one source, then re-run the checks it affects. Calls onProgress throughout (about 4 s). */
+export async function addSource(id: PersonId, loaded: PersonId[], onProgress: (p: SourceProgress) => void, signal?: AbortSignal): Promise<void> {
+  const src = sourceOf(id)
+  const files = Object.values(src.tables).filter((n) => n > 0).length
+  const before = new Set(unlockedFor(loaded))
+  const fresh = unlockedFor([...loaded, id]).filter((sid) => !before.has(sid))
+  const checks = [...new Set(['identity_match', 'contact_graph', 'location_timeline', ...fresh.map((sid) => SCENARIOS[sid].check)])]
+  const stages: SourceStage[] = [
+    { id: 'load', label: 'Load', detail: `${files} JSONL files from ${exhibitOf(id)} (${src.model})`, status: 'pending' },
+    { id: 'validate', label: 'Validate', detail: `${src.rows.toLocaleString()} rows against Case Bundle v1`, status: 'pending' },
+    { id: 'normalise', label: 'Normalise', detail: 'Numbers to E.164, timestamps to ISO 8601, places geofenced', status: 'pending' },
+    { id: 'resolve', label: 'Identify owner', detail: 'Own number, accounts and saved name matched to people already in the case', status: 'pending' },
+    { id: 'store', label: 'Store', detail: 'Rows written to the case store with device_owner', status: 'pending' },
+    { id: 'checks', label: 'Re-run checks', detail: checks.join(' · '), status: 'pending' },
+    { id: 'board', label: 'Update board', detail: fresh.length ? `${fresh.length} new finding${fresh.length > 1 ? 's' : ''}` : 'No new findings; ties refreshed', status: 'pending' },
+  ]
+  const DUR: Record<string, number> = { load: 650, validate: 500, normalise: 450, resolve: 500, store: 450, checks: 1100, board: 350 }
+  const total = Object.values(DUR).reduce((a, b) => a + b, 0)
+  const rowStages = ['load', 'validate', 'normalise', 'resolve', 'store']
+  const rowSpan = rowStages.reduce((a, k) => a + DUR[k], 0)
+  let done = 0
+  const emit = (inStage: number) => {
+    const t = done + inStage
+    onProgress({ stages: stages.map((s) => ({ ...s })), pct: Math.min(1, t / total), rows: Math.round(src.rows * Math.min(1, t / rowSpan)) })
+  }
+  for (const s of stages) {
+    s.status = 'running'
+    const steps = 6
+    for (let k = 0; k < steps; k++) {
+      emit((DUR[s.id] * k) / steps)
+      await sleep(DUR[s.id] / steps, signal)
+    }
+    s.status = 'done'
+    done += DUR[s.id]
+    emit(0)
+  }
 }

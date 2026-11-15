@@ -22,9 +22,9 @@ export const INQUIRIES: { id: InquiryId; label: string; question: string; method
   {
     id: 'window',
     label: 'Time of death',
-    question: 'Where was every phone in the time-of-death window?',
-    method: 'Alibi grid and suspect-journey map over the medical examiner’s window',
-    answers: 'Every 10-minute slot from 21:00 to 23:30 on 16 April, for every phone, plus the victim’s last contacts.',
+    question: 'What was everyone doing in the days and hours before Ravi died?',
+    method: 'One timeline built from location fixes, device logs and the calls, texts and payments between the people on the board',
+    answers: 'Each day in blocks of a few hours: where each phone was, when it went dark, what it deleted, who it was with, and every exchange between them. The medical examiner’s window (21:00–23:30 on 16 April) is outlined in red.',
   },
   {
     id: 'changes',
@@ -35,10 +35,10 @@ export const INQUIRIES: { id: InquiryId; label: string; question: string; method
   },
   {
     id: 'motive',
-    label: 'Motive & tension',
-    question: 'Who had a grievance?',
-    method: 'Social media review for leakage and grievance, scored by a fixed classifier',
-    answers: 'Posts and comments by each person, scored for hostility, and who they were aimed at. Tension is a lead, never placement.',
+    label: 'Semantic analysis',
+    question: 'What are people saying, to whom, and about whom?',
+    method: 'Posts, comments and texts between the people on the board, tagged by theme with fixed phrase rules; posts also scored by a hostility classifier',
+    answers: 'Themes across everything written: threats, grievances, plans to meet, money, pressure. Each statement shows the words that matched. On the right, how each person’s tone changed over the week. Words are leads for interview, not evidence of where anyone was.',
   },
 ]
 
@@ -47,7 +47,7 @@ export const inquiryOf = (id: InquiryId) => INQUIRIES.find((q) => q.id === id)!
 export function InquiryHeader({ id, right }: { id: InquiryId; right?: ReactNode }) {
   const q = inquiryOf(id)
   const c = useCase()
-  const insights = c.briefing?.incidents.filter((i) => i.inquiry === id) ?? []
+  const insights = c.board.incidents.filter((i) => i.inquiry === id)
   return (
     <div className="space-y-3">
       <div className="flex items-start gap-4 rounded-lg border border-line bg-surface px-4 py-3">

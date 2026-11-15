@@ -100,6 +100,15 @@ export const POI: PersonId[] = ALL_PHONES.filter((p) => p !== VICTIM)
 export const personName = (id: PersonId) => PEOPLE.find((p) => p.person_id === id)?.name.split(' ')[0] ?? id
 export const personColor = (id: PersonId) => PEOPLE.find((p) => p.person_id === id)?.color ?? 'var(--ink-3)'
 export const personOf = (id: PersonId) => PEOPLE.find((p) => p.person_id === id)!
+/** Relationships declared in the case file (from interviews and records), keyed by sorted pair. */
+export const RELATIONS: Record<string, string> = {
+  'paul|ravi': 'Employer · bookkeeper',
+  'amy|ravi': 'Partners, estranged',
+  'ken|ravi': 'Employer · dismissed 14 Apr',
+  'cara|ravi': 'Supplier',
+  'ken|paul': 'Co-workers',
+}
+export const pairKey = (a: PersonId, b: PersonId) => [a, b].sort().join('|')
 export const HOME: Record<PersonId, string> = { ravi: 'Mehta residence', paul: 'Becker residence', amy: 'Brooks residence', ken: 'Walsh residence', cara: 'Novak residence' }
 
 export const TOD = { start: ts(16, 21, 0), end: ts(16, 23, 30) }
@@ -461,6 +470,38 @@ export const RAVI_DEAD_BATTERY = addRow('ravi', 'device_events', ts(17, 1, 52), 
 export const RAVI_END = ts(17, 1, 52)
 
 export const ALL_GAPS: GapOutput[] = [GPAUL, GAMY, KEN_NIGHT, CARA_GAP, ...SYNC_GAPS]
+
+// =====================================================================
+// GROUP  "Harbor crew" WhatsApp group: Ravi, Paul, Amy, Ken. Each member's phone holds a copy.
+// Used by the interview checks (Amy says she has never met Ken). Group messages are addressed to the
+// group, not to a person, so they add no person-to-person edges to the graph.
+// =====================================================================
+export const GROUP = { name: 'Harbor crew', app: 'WhatsApp', id: 'whatsapp:grp-harbor-crew', members: ['ravi', 'paul', 'amy', 'ken'] as PersonId[] }
+const groupDef: [number, number, number, PersonId, string][] = [
+  [13, 19, 2, 'ken', 'Drinks at the Anchor Friday?'],
+  [13, 19, 5, 'amy', "In. Ken you still owe me a round from last time 😄"],
+  [13, 19, 7, 'ken', 'Ha. Fair. First one’s on me.'],
+  [13, 19, 20, 'ravi', 'Count me in.'],
+  [15, 12, 41, 'paul', 'Ken, sorry about yesterday.'],
+  [15, 12, 44, 'ken', "Not your call. Ravi's."],
+  [15, 12, 50, 'amy', 'Ken, call me if you need anything.'],
+]
+export const GROUP_IDS: { sender: PersonId; t: string; body: string; ids: string[] }[] = groupDef.map(([d, h, m, sender, body]) => {
+  const t = ts(d, h, m)
+  const ids = GROUP.members.map((owner) =>
+    addRow(owner, 'messages', t, `${GROUP.name} · ${personName(sender)}: "${body}"`, {
+      thread_id: GROUP.id,
+      app: GROUP.app,
+      direction: owner === sender ? 'out' : 'in',
+      from: NUMBERS[sender],
+      to: `group:${GROUP.name}`,
+      group: GROUP.name,
+      members: GROUP.members.map((p) => NUMBERS[p]).join(','),
+      body,
+    }),
+  )
+  return { sender, t, body, ids }
+})
 
 // =====================================================================
 // Other planted ties: Paul → Amy $50 "lunch" (decoy), Amy and Ken at FreshMart once (decoy)
