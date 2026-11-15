@@ -222,25 +222,59 @@ export default function MapTimeline() {
     setT(m)
   }
 
-  // Playback runs through the quiet stretches and stops for a moment on each thing an insight rests on.
+  // Stretches of the week in which some phone is travelling, merged. Playback slows down for these.
+  const trips = useMemo(() => {
+    const out: [number, number][] = []
+    for (const p of loaded) {
+      const tr = tracks[p]
+      for (let k = 0; k + 1 < tr.length; k++) {
+        const a = tr[k]
+        const b = tr[k + 1]
+        // travelling means covering real ground: at least 150 m, at walking pace or faster
+        const d = haversine(a.lat, a.lon, b.lat, b.lon)
+        if (b.t - a.t > 15 || d < 150 || d / Math.max(0.5, b.t - a.t) < 60 || dark[p].some((g) => a.t >= g.from && a.t < g.to)) continue
+        out.push([a.t, b.t])
+      }
+    }
+    out.sort((x, y) => x[0] - y[0])
+    const merged: [number, number][] = []
+    for (const iv of out) {
+      const last = merged[merged.length - 1]
+      if (last && iv[0] <= last[1] + 2) last[1] = Math.max(last[1], iv[1])
+      else merged.push([iv[0], iv[1]])
+    }
+    return merged
+  }, [loaded, tracks, dark])
+
+  // Playback is paced like a story: quick through stretches where nothing moves, slower while someone
+  // is travelling, easing down into each moment an insight rests on, a short stop there, then easing away.
   useEffect(() => {
     if (!playing) return
     cancelAnimationFrame(glide.current)
     const stops = moments.map((m) => m.t)
+    const base = (span * speed) / RUN_SECONDS // case minutes per second
+    const cruise = base * 1.5
+    const walking = Math.min(base, Math.max(5 * speed, base * 0.3))
     let raf = 0
     let last = performance.now()
     let hold = 0
+    let rate = 0
     const step = (now: number) => {
       const dt = Math.min(0.1, (now - last) / 1000)
       last = now
       if (hold > 0) hold -= dt
       else {
         const prev = tRef.current
-        let next = prev + (dt * span * speed) / RUN_SECONDS
-        const hit = stops.find((m) => m > prev + 1e-6 && m <= next)
-        if (hit !== undefined) {
+        const hit = stops.find((m) => m > prev + 1e-6)
+        let want = trips.some(([a, b]) => prev >= a - 1 && prev <= b) ? walking : cruise
+        // slow into the next moment over the last half second or so
+        if (hit !== undefined) want = Math.min(want, Math.max(base * 0.12, (hit - prev) / 0.45))
+        rate += (want - rate) * (1 - Math.exp(-dt / 0.28))
+        let next = prev + rate * dt
+        if (hit !== undefined && next >= hit) {
           next = hit
           hold = HOLD_SECONDS / speed
+          rate = 0
         }
         if (next >= range.b) {
           put(range.b)
@@ -253,7 +287,7 @@ export default function MapTimeline() {
     }
     raf = requestAnimationFrame(step)
     return () => cancelAnimationFrame(raf)
-  }, [playing, range.b, span, speed, moments])
+  }, [playing, range.b, span, speed, moments, trips])
   useEffect(() => () => cancelAnimationFrame(glide.current), [])
 
   const pickRange = (a: number, b: number) => {
@@ -433,7 +467,7 @@ export default function MapTimeline() {
 
           {/* the moment that has just passed, captioned on the map */}
           {captioned && (
-            <button onClick={() => openMoment(captioned)} className="absolute bottom-4 left-4 z-[500] max-w-[min(34rem,72%)] rounded-md px-3.5 py-2.5 text-left shadow-lg transition hover:opacity-95" style={{ background: 'var(--ink)', color: 'var(--surface)' }} title="Open the evidence for this moment">
+            <button key={captioned.ids[0]} onClick={() => openMoment(captioned)} className="rise absolute bottom-4 left-4 z-[500] max-w-[min(34rem,72%)] rounded-md px-3.5 py-2.5 text-left shadow-lg transition hover:opacity-95" style={{ background: 'var(--ink)', color: 'var(--surface)' }} title="Open the evidence for this moment">
               <div className="flex items-baseline gap-2.5">
                 <span className="tnum text-[13px] font-semibold" style={{ color: captioned.serious ? 'color-mix(in srgb, var(--serious) 55%, var(--surface))' : undefined }}>
                   {clock(captioned.t)}
