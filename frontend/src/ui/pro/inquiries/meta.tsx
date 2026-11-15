@@ -38,7 +38,7 @@ export const INQUIRIES: { id: InquiryId; label: string; question: string; method
     label: 'Semantic analysis',
     question: 'What are people saying, to whom, and about whom?',
     method: 'Posts, comments and texts between the people on the board, tagged by theme with fixed phrase rules; posts also scored by a hostility classifier',
-    answers: 'Themes across everything written: threats, grievances, plans to meet, money, pressure. Each statement shows the words that matched. On the right, how each person’s tone changed over the week. Words are leads for interview, not evidence of where anyone was.',
+    answers: 'How each person’s tone in public posts changed over the week, post by post. Beside it, everything written that matched a theme: threats, grievances, plans to meet, money, pressure, with the words that matched. Words are leads for interview, not evidence of where anyone was.',
   },
 ]
 
