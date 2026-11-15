@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
-import { Circle, MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import { Circle, MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import type { PersonId } from '../../../api'
 import { ALL_GAPS, HOME, NUMBERS, ROWS, SCENE, TOD, findPlace, haversine, personColor, personName, personOf } from '../../../mock/data'
@@ -25,7 +25,11 @@ const PRESETS = [
   { label: 'Morning after', a: at(17, 6), b: at(17, 14) },
   { label: 'Whole week', a: 0, b: WEEK },
 ]
-const RUN_SECONDS = 40
+const RUN_SECONDS = 28
+/** Playback stops for this long on each moment an insight rests on, so it can be read. */
+const HOLD_SECONDS = 1.7
+const LANE_H = 26
+const HEAD_H = 34
 const MIN_SPAN = 120
 const LABEL_W = 104
 const STAGE_H = 520
@@ -142,12 +146,12 @@ function whereAt(track: Fix[], dark: Dark[], t: number): Where | null {
 
 const pins = new Map<string, L.DivIcon>()
 /** A phone on the map: its owner's portrait. With no location data it turns grey and says since when. */
-function pin(p: PersonId, dark: Dark | null) {
-  const key = `${p}|${dark ? dark.from : ''}`
+function pin(p: PersonId, dark: Dark | null, ping = '') {
+  const key = `${p}|${dark ? dark.from : ''}|${ping}`
   if (!pins.has(key)) {
     const ring = dark ? `outline:1.5px dashed var(--ink-2);outline-offset:2px;filter:grayscale(1);opacity:.85;` : `box-shadow:0 0 0 2px var(--surface),0 0 0 4px ${personColor(p)},0 3px 8px rgb(0 0 0 / .28);`
     const tag = dark ? `<div style="position:absolute;bottom:37px;left:50%;transform:translateX(-50%);white-space:nowrap;font:600 10.5px/1.5 system-ui;color:var(--serious);background:var(--surface);border-radius:3px;padding:0 5px;box-shadow:0 1px 3px rgb(0 0 0 / .2)">${personName(p)}, ${dark.short} since ${clock(dark.from)}</div>` : ''
-    pins.set(key, L.divIcon({ className: '', iconSize: [30, 30], iconAnchor: [15, 15], html: `<div style="position:relative;width:30px;height:30px"><div style="width:30px;height:30px;border-radius:50%;overflow:hidden;background:var(--sunken);${ring}"><img src="${personOf(p).portrait}" alt="" style="width:100%;height:100%;object-fit:cover"/></div>${tag}</div>` }))
+    pins.set(key, L.divIcon({ className: '', iconSize: [30, 30], iconAnchor: [15, 15], html: `<div style="position:relative;width:30px;height:30px"><div style="width:30px;height:30px;border-radius:50%;overflow:hidden;background:var(--sunken);${ring}"><img src="${personOf(p).portrait}" alt="" style="width:100%;height:100%;object-fit:cover"/></div>${ping ? `<div class="map-ping" style="border-color:${ping}"></div>` : ''}${tag}</div>` }))
   }
   return pins.get(key)!
 }
@@ -163,6 +167,14 @@ function useTheme() {
     return () => mo.disconnect()
   }, [])
   return theme
+}
+
+/** Hands the map object to the parent and tells it when the zoom changes. */
+function Bridge({ onMap, onZoom }: { onMap: (m: L.Map) => void; onZoom: () => void }) {
+  const map = useMap()
+  useEffect(() => onMap(map), [map, onMap])
+  useMapEvents({ zoomend: onZoom, resize: onZoom })
+  return null
 }
 
 function Fit({ bounds }: { bounds: [number, number][] }) {
@@ -200,35 +212,77 @@ export default function MapTimeline() {
   const pct = (m: number) => ((m - range.a) / span) * 100
   const clamp = (m: number) => Math.min(range.b, Math.max(range.a, m))
 
+  const tRef = useRef(t)
+  const glide = useRef(0)
+  const [map, setMap] = useState<L.Map | null>(null)
+  const [zoomTick, setZoomTick] = useState(0)
+  const bumpZoom = useCallback(() => setZoomTick((n) => n + 1), [])
+  const put = (m: number) => {
+    tRef.current = m
+    setT(m)
+  }
+
+  // Playback runs through the quiet stretches and stops for a moment on each thing an insight rests on.
   useEffect(() => {
     if (!playing) return
+    cancelAnimationFrame(glide.current)
+    const stops = moments.map((m) => m.t)
     let raf = 0
     let last = performance.now()
+    let hold = 0
     const step = (now: number) => {
-      const dt = (now - last) / 1000
+      const dt = Math.min(0.1, (now - last) / 1000)
       last = now
-      setT((prev) => {
-        const next = prev + (dt * span * speed) / RUN_SECONDS
-        if (next >= range.b) {
-          setPlaying(false)
-          return range.b
+      if (hold > 0) hold -= dt
+      else {
+        const prev = tRef.current
+        let next = prev + (dt * span * speed) / RUN_SECONDS
+        const hit = stops.find((m) => m > prev + 1e-6 && m <= next)
+        if (hit !== undefined) {
+          next = hit
+          hold = HOLD_SECONDS / speed
         }
-        return next
-      })
+        if (next >= range.b) {
+          put(range.b)
+          setPlaying(false)
+          return
+        }
+        put(next)
+      }
       raf = requestAnimationFrame(step)
     }
     raf = requestAnimationFrame(step)
     return () => cancelAnimationFrame(raf)
-  }, [playing, range.b, span, speed])
+  }, [playing, range.b, span, speed, moments])
+  useEffect(() => () => cancelAnimationFrame(glide.current), [])
 
   const pickRange = (a: number, b: number) => {
+    cancelAnimationFrame(glide.current)
     setRange({ a, b })
     setPlaying(false)
-    setT((prev) => (prev >= a && prev <= b ? prev : (moments.find((m) => m.t >= a && m.t <= b)?.t ?? a)))
+    const prev = tRef.current
+    put(prev >= a && prev <= b ? prev : (moments.find((m) => m.t >= a && m.t <= b)?.t ?? a))
   }
+  /** Dragging: the time follows the pointer exactly. */
   const seekTo = (m: number) => {
+    cancelAnimationFrame(glide.current)
     setPlaying(false)
-    setT(clamp(m))
+    put(clamp(m))
+  }
+  /** Jumping to a moment: the time runs there quickly, so the phones are seen to move rather than teleport. */
+  const glideTo = (m: number) => {
+    cancelAnimationFrame(glide.current)
+    setPlaying(false)
+    const from = tRef.current
+    const to = clamp(m)
+    if (Math.abs(to - from) < 0.01 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return put(to)
+    const t0 = performance.now()
+    const run = (now: number) => {
+      const k = Math.min(1, (now - t0) / 700)
+      put(k >= 1 ? to : from + (to - from) * (1 - Math.pow(1 - k, 3)))
+      if (k < 1) glide.current = requestAnimationFrame(run)
+    }
+    glide.current = requestAnimationFrame(run)
   }
 
   // ---- dragging: the time axis moves the playhead; the week bar moves or resizes the period
@@ -273,6 +327,30 @@ export default function MapTimeline() {
   const prevMoment = [...inRange].reverse().find((m) => m.t < t - 0.5)
   const nextMoment = inRange.find((m) => m.t > t + 0.5)
   const captioned = current && t - current.t <= Math.max(10, span * 0.09) ? current : null
+  const struck = current && t - current.t < 0.5 ? current : null
+  // Phones standing on the same spot are nudged apart on screen so every portrait can be seen.
+  const spots = useMemo(() => {
+    const out = {} as Record<PersonId, [number, number]>
+    const placed: L.Point[] = []
+    for (const p of loaded) {
+      const w = here[p]
+      if (!w) continue
+      const ll = G(w.lat, w.lon)
+      out[p] = ll
+      if (!map) continue
+      let pt = map.latLngToLayerPoint(ll)
+      for (const q of placed) {
+        const d = pt.distanceTo(q)
+        if (d >= 30) continue
+        const dir = d < 0.5 ? L.point(1, 0) : pt.subtract(q).divideBy(d)
+        pt = pt.add(dir.multiplyBy(30 - d))
+      }
+      placed.push(pt)
+      out[p] = [map.layerPointToLatLng(pt).lat, map.layerPointToLatLng(pt).lng]
+    }
+    return out
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, here, map, zoomTick])
   const linkWindow = Math.max(4, span / 90)
   const links = exchanges.filter((x) => x.t <= t && x.t > t - linkWindow && here[x.from] && here[x.to])
   const tod = { a: caseMinutes(TOD.start), b: caseMinutes(TOD.end) }
@@ -303,6 +381,15 @@ export default function MapTimeline() {
     if (w.dark) return { text: `${w.dark.why} since ${clock(w.dark.from)}. Last seen ${w.last.place ? (w.last.place === HOME[p] ? 'at home' : `at ${w.last.place}`) : 'on the move'}, ${clock(w.last.t)}`, far: fmtKm(d), bad: true }
     return { text: d < 150 ? 'At Pier 9, the scene' : !w.place ? 'On the move' : w.place === HOME[p] ? 'At home' : `At ${w.place}`, far: d < 150 ? '' : fmtKm(d), bad: false, scene: d < 150 }
   }
+  const list = useRef<HTMLOListElement>(null)
+  const currentKey = current?.ids[0]
+  useEffect(() => {
+    const box = list.current
+    const row = box?.querySelector<HTMLElement>('[data-on]')
+    if (!box || !row) return
+    const top = row.offsetTop - box.offsetTop
+    if (top < box.scrollTop || top + row.offsetHeight > box.scrollTop + box.clientHeight) box.scrollTo({ top: top - box.clientHeight / 2 + row.offsetHeight / 2, behavior: 'smooth' })
+  }, [currentKey])
   const openMoment = (m: Moment) => c.openEvidence({ title: `${clock(m.t)}, ${dow(m.t)} ${dayOf(m.t)} April`, people: m.people, points: [m.label, m.ids.length > 1 ? 'The same record is on both phones.' : 'This record is on one phone.'], ids: m.ids })
 
   return (
@@ -338,9 +425,10 @@ export default function MapTimeline() {
             {loaded.map((p) => {
               const w = here[p]
               if (!w) return null
-              return <Marker key={p} position={G(w.lat, w.lon)} icon={pin(p, w.dark)} zIndexOffset={w.dark ? 0 : 500} title={personName(p)} eventHandlers={{ click: () => c.openEvidence({ title: `${personName(p)}'s phone at ${clock(t)}, ${dow(t)} ${dayOf(t)} April`, people: [p], points: [`${status(p, w).text}.`], ids: w.ids }) }} />
+              return <Marker key={p} position={spots[p] ?? G(w.lat, w.lon)} icon={pin(p, w.dark, struck?.people.includes(p) ? (struck.serious ? 'var(--serious)' : 'var(--ink)') : '')} zIndexOffset={w.dark ? 0 : 500} title={personName(p)} eventHandlers={{ click: () => c.openEvidence({ title: `${personName(p)}'s phone at ${clock(t)}, ${dow(t)} ${dayOf(t)} April`, people: [p], points: [`${status(p, w).text}.`], ids: w.ids }) }} />
             })}
             <Fit bounds={bounds} />
+            <Bridge onMap={setMap} onZoom={bumpZoom} />
           </MapContainer>
 
           {/* the moment that has just passed, captioned on the map */}
@@ -397,12 +485,12 @@ export default function MapTimeline() {
           </ul>
           <div className="flex min-h-0 flex-1 flex-col pt-2.5">
             <div className="px-4 pb-1 text-[11.5px] text-ink-3">{inRange.length ? `${inRange.length} moments the insights rest on` : 'No insight rests on anything in this period'}</div>
-            <ol className="min-h-0 flex-1 overflow-auto pb-2">
+            <ol ref={list} className="min-h-0 flex-1 overflow-auto pb-2">
               {inRange.map((m) => {
                 const on = current === m
                 return (
                   <li key={m.ids[0]}>
-                    <button onClick={() => seekTo(m.t)} className={`flex w-full items-baseline gap-2.5 border-l-2 py-1 pl-3.5 pr-4 text-left text-[12px] leading-snug transition hover:bg-sunken ${on ? 'border-ink bg-sunken' : 'border-transparent'} ${m.t > t ? 'opacity-55' : ''}`}>
+                    <button data-on={on || undefined} onClick={() => glideTo(m.t)} className={`flex w-full items-baseline gap-2.5 border-l-2 py-1 pl-3.5 pr-4 text-left text-[12px] leading-snug transition hover:bg-sunken ${on ? 'border-ink bg-sunken' : 'border-transparent'} ${m.t > t ? 'opacity-55' : ''}`}>
                       <span className={`tnum w-9 shrink-0 text-[11.5px] ${m.serious ? 'font-semibold text-serious' : 'text-ink-3'}`}>{clock(m.t)}</span>
                       <span className="text-ink">{m.label}</span>
                     </button>
@@ -417,7 +505,7 @@ export default function MapTimeline() {
       {/* ---------------- time ---------------- */}
       <div className="border-t border-line px-4 pb-3 pt-3">
         <div className="mb-3 flex items-center gap-2">
-          <button onClick={() => (t >= range.b ? (setT(range.a), setPlaying(true)) : setPlaying((v) => !v))} aria-label={playing ? 'Pause' : 'Play'} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink text-surface hover:opacity-90">
+          <button onClick={() => (t >= range.b ? (put(range.a), setPlaying(true)) : setPlaying((v) => !v))} aria-label={playing ? 'Pause' : 'Play'} title={playing ? 'Pause' : 'Play this period. It stops briefly on each key moment'} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink text-surface hover:opacity-90">
             {playing ? (
               <svg width="11" height="12" viewBox="0 0 11 12" aria-hidden>
                 <rect width="3.6" height="12" fill="currentColor" />
@@ -429,10 +517,10 @@ export default function MapTimeline() {
               </svg>
             )}
           </button>
-          <button disabled={!prevMoment} onClick={() => prevMoment && seekTo(prevMoment.t)} className="rounded-md px-2 py-1 text-[12px] text-ink-2 hover:bg-sunken disabled:opacity-35">
+          <button disabled={!prevMoment} onClick={() => prevMoment && glideTo(prevMoment.t)} className="rounded-md px-2 py-1 text-[12px] text-ink-2 hover:bg-sunken disabled:opacity-35">
             Previous moment
           </button>
-          <button disabled={!nextMoment} onClick={() => nextMoment && seekTo(nextMoment.t)} className="rounded-md px-2 py-1 text-[12px] text-ink-2 hover:bg-sunken disabled:opacity-35">
+          <button disabled={!nextMoment} onClick={() => nextMoment && glideTo(nextMoment.t)} className="rounded-md px-2 py-1 text-[12px] text-ink-2 hover:bg-sunken disabled:opacity-35">
             Next moment
           </button>
           <button onClick={() => setSpeed((s) => (s === 1 ? 2 : s === 2 ? 0.5 : 1))} className="tnum rounded-md px-2 py-1 text-[12px] text-ink-2 hover:bg-sunken" title="Playback speed">
@@ -473,9 +561,12 @@ export default function MapTimeline() {
         </div>
 
         {/* the period, one lane per phone */}
-        <div className="relative mt-3 select-none">
-          <div className="flex h-5 items-center">
-            <div className="shrink-0 text-[11.5px] text-ink-3" style={{ width: LABEL_W }}>
+        <svg aria-hidden viewBox="0 0 100 12" preserveAspectRatio="none" className="block h-3" style={{ marginLeft: LABEL_W, width: `calc(100% - ${LABEL_W}px)` }}>
+          <polygon points={`${(range.a / WEEK) * 100},0 ${(range.b / WEEK) * 100},0 100,12 0,12`} fill="var(--ink)" opacity="0.1" />
+        </svg>
+        <div className="relative select-none">
+          <div className="flex items-end" style={{ height: HEAD_H }}>
+            <div className="shrink-0 pb-1 text-[11.5px] text-ink-3" style={{ width: LABEL_W }}>
               Moments
             </div>
             <div className="relative h-full min-w-0 flex-1">
@@ -562,14 +653,27 @@ export default function MapTimeline() {
             style={{ left: LABEL_W }}
           >
             {tod.b > range.a && tod.a < range.b && (
-              <div className="absolute bottom-0 top-5 border-x border-serious" style={{ left: `${Math.max(0, pct(tod.a))}%`, width: `${Math.min(100, pct(tod.b)) - Math.max(0, pct(tod.a))}%`, background: 'color-mix(in srgb, var(--serious) 7%, transparent)' }} />
+              <div className="absolute bottom-0 border-x border-serious" style={{ top: 15, left: `${Math.max(0, pct(tod.a))}%`, width: `${Math.min(100, pct(tod.b)) - Math.max(0, pct(tod.a))}%`, background: 'color-mix(in srgb, var(--serious) 7%, transparent)' }} />
             )}
-            {inRange.map((m) => (
-              <button key={m.ids[0]} onPointerDown={(e) => e.stopPropagation()} onClick={() => seekTo(m.t)} title={`${clock(m.t)} ${m.label}`} aria-label={`${clock(m.t)} ${m.label}`} className="group absolute bottom-0 top-[22px] w-3 -translate-x-1/2" style={{ left: `${pct(m.t)}%` }}>
-                <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 opacity-45 group-hover:opacity-100" style={{ background: m.serious ? 'var(--serious)' : 'var(--ink-2)' }} />
-                <span className="absolute -top-[9px] left-1/2 h-[7px] w-[7px] -translate-x-1/2 rotate-45 transition group-hover:scale-125" style={{ background: m.serious ? 'var(--serious)' : 'var(--ink-2)', outline: current === m ? '1.5px solid var(--ink)' : undefined, outlineOffset: 1.5 }} />
-              </button>
-            ))}
+            {/* what has not happened yet is faded */}
+            <div className="pointer-events-none absolute bottom-0 right-0" style={{ top: HEAD_H, left: `${Math.min(100, Math.max(0, pct(t)))}%`, background: 'color-mix(in srgb, var(--surface) 58%, transparent)' }} />
+            {inRange.map((m) => {
+              // a moment is marked on the lanes of the phones it involves; two phones are joined
+              const rows = m.people.map((p) => loaded.indexOf(p)).filter((k) => k >= 0)
+              const ys = rows.map((k) => HEAD_H + k * LANE_H + LANE_H / 2)
+              const tone = m.serious ? 'var(--serious)' : 'var(--ink)'
+              const on = current === m
+              const ahead = m.t > t
+              return (
+                <button key={m.ids[0]} onPointerDown={(e) => e.stopPropagation()} onClick={() => glideTo(m.t)} title={`${clock(m.t)} ${m.label}`} aria-label={`${clock(m.t)} ${m.label}`} className="group absolute inset-y-0 w-3 -translate-x-1/2 cursor-pointer" style={{ left: `${pct(m.t)}%`, opacity: ahead ? 0.5 : 1 }}>
+                  <span className="absolute left-1/2 w-px -translate-x-1/2" style={{ top: 26, height: Math.max(...ys, 26) - 26, background: tone, opacity: on ? 0.9 : 0.4 }} />
+                  <span className="absolute left-1/2 h-[7px] w-[7px] -translate-x-1/2 rotate-45 transition-transform group-hover:scale-125" style={{ top: 20, background: tone, transform: on ? 'translateX(-50%) rotate(45deg) scale(1.35)' : undefined }} />
+                  {ys.map((y) => (
+                    <span key={y} className="absolute left-1/2 h-[7px] w-[7px] -translate-x-1/2 rounded-full" style={{ top: y - 3.5, background: tone, boxShadow: '0 0 0 1.5px var(--surface)' }} />
+                  ))}
+                </button>
+              )
+            })}
             <div className="pointer-events-none absolute inset-y-0 w-px bg-ink" style={{ left: `${Math.min(100, Math.max(0, pct(t)))}%` }}>
               <div className="tnum absolute -bottom-[19px] left-1/2 z-10 -translate-x-1/2 rounded-sm bg-ink px-1 text-[10.5px] font-semibold leading-[15px] text-surface">{clock(t)}</div>
             </div>
