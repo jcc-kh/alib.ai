@@ -49,6 +49,7 @@
 
   /* front-end page cards */
   .page .pt { font-family: "Instrument Serif", serif; font-size: 21px; line-height: 1.1; }
+  .page .pt .tag { font-family: Inter, sans-serif; }
   .page .ep { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--faint); margin-top: 3px; }
   .page .pd { font-size: 12px; color: var(--muted); margin-top: 5px; line-height: 1.45; }
   .pills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
@@ -69,8 +70,8 @@
 
 <!-- Header -->
 <div class="abs" style="left:56px; top:34px;">
-  <div class="eyebrow">System architecture · revision 3</div>
-  <h1 style="margin-top:6px"><span>Alib</span><span style="color:#c8553a">.ai</span> · three layers and the screens they feed</h1>
+  <div class="eyebrow">System architecture · revision 4</div>
+  <h1 style="margin-top:6px"><span>Alib</span><span style="color:#c8553a">.ai</span> · three layers under a pinboard</h1>
   <div class="sub">Discovery finds the shape, code decides what is evidence, and the model routes and phrases. Every sentence cites the rows behind it.</div>
 </div>
 <div class="abs legend" style="right:56px; top:56px;">
@@ -85,33 +86,33 @@
   <div class="side">
     <div class="t" style="color:var(--fg)">Front end</div>
     <div class="s">React on mocks; <span class="k" style="font-size:11.5px">api/index.ts</span> swaps to FastAPI <span class="k" style="font-size:11.5px">/api</span>.</div>
-    <div class="never">Pills: the layer that feeds each screen. The Ingest page is a mock of upstream ingest.</div>
+    <div class="never">The pinboard is home; A, B and C start from it. Pills: the layer behind each screen.</div>
   </div>
   <div class="body" style="display:grid; grid-template-columns: repeat(6, 1fr); gap:12px; align-items:stretch;">
     <div class="box ui page">
-      <div class="pt">Briefing</div><div class="ep">GET /briefing</div>
-      <div class="pd">Opens on load: top incidents, anchor moments, timeline</div>
-      <div class="pills"><span class="pill p2">2 leads · incidents</span><span class="pill p1">1 signals</span></div>
+      <div class="pt">Pinboard <span class="tag ui" style="font-size:9px; vertical-align:4px">home</span></div><div class="ep">GET /board · /graph</div>
+      <div class="pd">The network front and centre: pins, string, shaded groups, data health</div>
+      <div class="pills"><span class="pill p2">2 network · leads</span><span class="pill p1">1 integrity</span></div>
     </div>
     <div class="box ui page">
-      <div class="pt">Relations graph</div><div class="ep">GET /graph · on Briefing</div>
-      <div class="pd">People, unknown numbers, edges by channel, shaded groups</div>
-      <div class="pills"><span class="pill p2">2 groups · edges</span></div>
+      <div class="pt">Add a source <span class="tag ui" style="font-size:9px; vertical-align:4px">A</span></div><div class="ep">POST /sources</div>
+      <div class="pd">Upload a Case Bundle; new and changed pins are highlighted</div>
+      <div class="pills"><span class="pill p1">1 load · integrity</span><span class="pill p2">2 rebuild · diff</span></div>
     </div>
     <div class="box ui page">
-      <div class="pt">Location timeline</div><div class="ep">GET /timeline</div>
-      <div class="pd">A lane per phone: stays, typed gaps, suspect windows</div>
-      <div class="pills"><span class="pill p1">1 stays · integrity</span></div>
+      <div class="pt">Verify claims <span class="tag ui" style="font-size:9px; vertical-align:4px">B</span></div><div class="ep">POST /verify</div>
+      <div class="pd">Statements or a transcript → Supported / Contradicted / Can't tell</div>
+      <div class="pills"><span class="pill p3">3 agents</span><span class="pill p1">1 checks</span></div>
     </div>
     <div class="box ui page">
-      <div class="pt">Investigate</div><div class="ep">POST /analyse</div>
-      <div class="pd">Brief + statements → confirm items → agent lanes → report</div>
-      <div class="pills"><span class="pill p3">3 run events · report</span></div>
-    </div>
-    <div class="box ui page">
-      <div class="pt">Ask</div><div class="ep">POST /ask</div>
-      <div class="pd">Any question; a cited answer or "cannot tell"</div>
+      <div class="pt">Ask <span class="tag ui" style="font-size:9px; vertical-align:4px">C</span></div><div class="ep">POST /ask</div>
+      <div class="pd">A chat about the case; cited answers or "can't tell"</div>
       <div class="pills"><span class="pill p3">3 orchestrator</span><span class="pill p1">1 checks</span></div>
+    </div>
+    <div class="box ui page">
+      <div class="pt">Questions <span class="tag ui" style="font-size:9px; vertical-align:4px">on the board</span></div><div class="ep">POST /questions/…/answer</div>
+      <div class="pd">Questions the network raises; one click runs the check behind each</div>
+      <div class="pills"><span class="pill p2">2 leads</span><span class="pill p1">1 check</span></div>
     </div>
     <div class="box ui page">
       <div class="pt">Finding detail</div><div class="ep">GET /evidence</div>
@@ -122,19 +123,19 @@
 </div>
 
 <!-- connector agents -> front end -->
-<div class="conn" style="top:368px;"><span class="ar" style="color:var(--ui)">↑</span>FastAPI: JSON for briefing, graph, timeline and evidence; SSE for runs, items to confirm, reruns and Ask</div>
+<div class="conn" style="top:368px;"><span class="ar" style="color:var(--ui)">↑</span>FastAPI: board, graph and evidence as JSON; SSE for new sources, claim checks, reruns and Ask</div>
 
 <!-- ===== Layer 3 · LangGraph agents ===== -->
 <div class="layer" style="top:402px; height:240px; border:1.5px solid color-mix(in srgb, var(--model) 60%, transparent);">
   <div class="side">
     <div class="t"><span class="n" style="color:var(--model)">3</span>Agents</div>
-    <div class="s">deepagents on LangGraph: one orchestrator, five domain subagents, a checkpointer for the human pause.</div>
+    <div class="s">deepagents on LangGraph: verify claims (B) and Ask (C). One orchestrator, five subagents, a checkpointer for the pause.</div>
     <div class="never"><b>Never</b> computes a number, counts rows or picks a verdict.</div>
   </div>
   <div class="body flow" style="grid-template-columns: 150px 1fr 236px 1fr 190px 1fr 250px 1fr 250px 1fr 220px;">
-    <div class="box plain"><div class="bt" style="font-size:14px">Brief +<br>statements</div><div class="bd">from the investigator</div></div>
+    <div class="box plain"><div class="bt" style="font-size:14px">Claims</div><div class="bd">statements, or an interview transcript (stretch)</div></div>
     <div class="arr">→</div>
-    <div class="box model"><div class="bt">orchestrator</div><div class="bd">stronger model<br>splits input into items, each with its claimant · triage · routes · follow-ups</div></div>
+    <div class="box model"><div class="bt">orchestrator</div><div class="bd">stronger model<br>splits claims and transcripts by claimant · routes checks · follow-ups · answers Ask</div></div>
     <div class="arr">→</div>
     <div class="box model" style="border-style:dashed"><div class="bt">⏸ confirm_items</div><div class="bd">LangGraph interrupt · investigator approves or edits items · resumes on <span class="k" style="font-size:11px">thread_id</span></div></div>
     <div class="arr">→</div>
@@ -151,12 +152,12 @@
     <div class="arr">→</div>
     <div class="box model"><div class="bt">Finding <span class="tag model">structured</span></div><div class="kl" style="margin-top:5px">item_id · check<br>verdict <span style="color:var(--faint)">(copied from rule)</span><br>sentence · evidence_ids<br>numbers[text, field]</div></div>
     <div class="arr">→</div>
-    <div class="box code"><div class="bt">Report <span class="tag code">code</span></div><div class="bd"><span class="k" style="font-size:11.5px">assemble_report()</span><br><span class="k" style="font-size:11.5px">validate_report()</span><br>by item · by person · reliability notes</div></div>
+    <div class="box code"><div class="bt">Report <span class="tag code">code</span></div><div class="bd"><span class="k" style="font-size:11.5px">assemble_report()</span><br><span class="k" style="font-size:11.5px">validate_report()</span><br>per claim, by person · reliability notes</div></div>
   </div>
 </div>
 
 <!-- connector 2 -> 3 -->
-<div class="conn" style="top:650px;"><span class="ar" style="color:var(--net)">↑</span>leads ("pattern, not verified"), the people map and incidents: what triage ranks and the orchestrator routes on</div>
+<div class="conn" style="top:650px;"><span class="ar" style="color:var(--net)">↑</span>leads, suggested questions and the people map: what the board pins and the agents check</div>
 
 <!-- ===== Layer 2 · Discovery (topological network model) ===== -->
 <div class="layer" style="top:684px; height:272px; border:1.5px solid color-mix(in srgb, var(--net) 55%, transparent);">
@@ -206,13 +207,13 @@
       <div class="box net"><div class="k">3 · propagate</div><div class="bd">Features passed across ranks with fixed Hodge operators: a TNN layer without training.</div></div>
       <div class="box net"><div class="k">4 · score → leads</div><div class="bd">Isolation forest, fixed seed. Each lead: rows, drivers, a proposed check.</div></div>
       <div class="box net"><div class="k">5 · flows · holes</div><div class="bd">Hodge decomposition finds money loops; missing faces find pairs who never talk.</div></div>
-      <div class="box plain"><div class="k" style="color:var(--net)">lead → check → finding</div><div class="bd">Unconfirmed: "pattern, not verified". Roadmap: a trained TNN on generator cases.</div></div>
+      <div class="box plain"><div class="k" style="color:var(--net)">lead → question → check</div><div class="bd">Each lead raises a question with a check behind it; unconfirmed leads stay "pattern, not verified".</div></div>
     </div>
   </div>
 </div>
 
 <!-- connector 1 -> 2 -->
-<div class="conn" style="top:964px;"><span class="ar" style="color:var(--code)">↑</span>corrected rows, suspect windows and signals feed discovery · each lead's proposed check runs here, through the agents</div>
+<div class="conn" style="top:964px;"><span class="ar" style="color:var(--code)">↑</span>integrity runs first: corrected rows, suspect windows and data issues feed discovery · checks run here on demand, for leads, questions and claims</div>
 
 <!-- ===== Layer 1 · Deterministic checks ===== -->
 <div class="layer" style="top:998px; height:244px; border:1.5px solid color-mix(in srgb, var(--code) 60%, transparent);">
@@ -221,7 +222,7 @@
     <div class="s">Pure Python over SQLite. One fixed question each; every number in the report comes from here.</div>
   </div>
   <div class="body flow" style="grid-template-columns: 230px 34px 1fr 34px 230px;">
-    <div class="box code"><div class="bt">Integrity pass</div><div class="bd">runs first, every time</div><div class="kl" style="margin-top:4px">clock offset<br>impossible travel<br>GPS vs Wi-Fi/cell</div><div class="bd" style="margin-top:2px">→ corrected times, suspect windows</div></div>
+    <div class="box code"><div class="bt">Integrity layer</div><div class="bd">first, after every load</div><div class="kl" style="margin-top:3px; line-height:1.55">clock offset<br>impossible travel<br>GPS vs Wi-Fi/cell<br>missing texts; one-sided<br>calls and transfers</div><div class="bd" style="margin-top:2px">→ data health on the board</div></div>
     <div class="arr">→</div>
     <div class="box code" style="display:grid; grid-template-columns: repeat(5, 1fr); gap:14px; padding:14px 16px;">
       <div class="grp"><div class="gt">Location</div><div class="kl" style="color:var(--fg)">location_timeline<br>location_gaps<br>distance_between<br>silent_meetings</div></div>
@@ -231,7 +232,7 @@
       <div class="grp"><div class="gt" style="color:var(--net)">Relationships</div><div class="kl" style="color:var(--fg)">identity_match<br>contact_graph<br>unresolved_<br>&nbsp;&nbsp;identifiers</div></div>
     </div>
     <div class="arr">→</div>
-    <div class="box code"><div class="bt">Signals + verdicts</div><div class="bd">The sweep runs every check over every pair → <span class="k" style="font-size:11.5px">signals</span>.<br><span class="k" style="font-size:11.5px">verdicts.py</span>: one rule per check, run by <span class="k" style="font-size:11.5px">apply_verdict_rule</span>.</div></div>
+    <div class="box code"><div class="bt">On demand + verdicts</div><div class="bd">No up-front sweep: checks run to confirm a lead, answer a question or verify a claim.<br><span class="k" style="font-size:11.5px">verdicts.py</span>: Supported / Contradicted / Can't tell.</div></div>
   </div>
 </div>
 

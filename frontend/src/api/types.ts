@@ -57,6 +57,7 @@ export interface IncidentFacts {
   summary: string
 }
 
+/** The revision 2 three-part brief. Kept only while the mock UI uses it; revision 4 replaces it with claims. */
 export interface Brief {
   believe: string[]
   confused: string[]
@@ -75,14 +76,15 @@ export type ItemStatus = 'proposed' | 'confirmed' | 'edited' | 'removed'
 /** Who made a claim: the investigator (brief) or a person in the case (statement). */
 export type Claimant = PersonId | 'investigator'
 
-/** One atomic claim or question parsed from the brief or a statement (stage ③), confirmed by the investigator (stage ④). */
+/** One atomic claim parsed from statements or a transcript (stage ④), confirmed by the investigator (stage ⑤). */
 export interface Item {
   item_id: string
-  source: 'brief' | 'statement'
-  /** The statement_id, or the brief box ('believe' | 'confused' | 'unknown'). */
+  source: 'investigator' | 'statement' | 'transcript'
+  /** The statement_id, or the transcript passage it came from. */
   source_ref: string
   claimant: Claimant
-  kind: 'belief' | 'question' | 'claim'
+  /** A question is routed to Ask rather than checked as a claim. */
+  kind: 'claim' | 'question'
   text: string
   people: PersonId[]
   start: string | null
@@ -90,10 +92,70 @@ export interface Item {
   status: ItemStatus
 }
 
+/** POST /api/verify: claims to check. A transcript (stretch) is split into claims per speaker. */
 export interface AnalyseRequest {
-  brief: Brief
   statements: Statement[]
+  transcript?: { text: string; speakers?: PersonId[] }
 }
+
+/** Display labels for verdicts. */
+export const VERDICT_LABEL = { confirmed: 'Supported', inconsistent: 'Contradicted', cannot_tell: "Can't tell" } as const
+
+// ---------- Board (revision 4) ----------
+
+export type IntegrityIssueKind =
+  | 'missing_message'
+  | 'one_sided_call'
+  | 'one_sided_transfer'
+  | 'clock_skew'
+  | 'impossible_travel'
+  | 'source_disagreement'
+
+/** A place where the data can't be taken at face value, or where two phones disagree. */
+export interface IntegrityIssue {
+  issue_id: string
+  kind: IntegrityIssueKind
+  phones: PersonId[]
+  start: string
+  end: string
+  summary: string
+  evidence_ids: string[]
+  /** The check call that found it (cross-phone issues), if any. */
+  call_id?: string
+}
+
+/** A question the network raises, with the check that answers it. */
+export interface SuggestedQuestion {
+  question_id: string
+  text: string
+  origin: { kind: 'lead'; lead_id: string } | { kind: 'issue'; issue_id: string }
+  /** Absent when no check can answer it ("open question"). */
+  check?: { check: string; params: Record<string, unknown>; agent: SubagentName }
+  status: 'open' | 'answered' | 'no_check'
+  finding_id?: string
+}
+
+export type ChangeMark = 'new' | 'changed' | 'withdrawn'
+
+/** What a newly added source changed on the board. */
+export interface CaseDiff {
+  from_version: number
+  to_version: number
+  source: { bundle: string; devices: string[] }
+  summary: string
+  insights: { id: string; mark: ChangeMark }[]
+  leads: { id: string; mark: ChangeMark }[]
+  questions: { id: string; mark: ChangeMark }[]
+  findings: { id: string; mark: ChangeMark; supersedes?: string }[]
+  /** Claims re-checked because their checks touch the new rows, and whether the verdict moved. */
+  rechecked_claims: { item_id: string; before: Verdict; after: Verdict }[]
+}
+
+/** SSE events from POST /api/sources. */
+export type SourceEvent =
+  | { type: 'stage'; stage: 'load' | 'integrity' | 'discovery' | 'board'; status: StageStatus; detail?: string }
+  | { type: 'error'; message: string; file?: string; line?: number }
+  | { type: 'diff'; diff: CaseDiff }
 
 // ---------- Integrity pass (stage ⓪) ----------
 
@@ -235,6 +297,8 @@ export interface Finding {
   supersedes?: string
   /** Set when this finding confirms a discovery lead. */
   lead_id?: string
+  /** Set when this finding answers a suggested question from the board. */
+  question_id?: string
 }
 
 // ---------- Transparency: how a finding was derived ----------
@@ -624,6 +688,11 @@ export interface Briefing {
   signals_total: number
   /** Top leads from discovery: promoted ones link to their findings; open ones are "pattern, not verified". */
   leads: Lead[]
+  /** Revision 4 board: data problems found by the integrity layer. */
+  integrity_issues: IntegrityIssue[]
+  /** Revision 4 board: questions this case raises. */
+  questions: SuggestedQuestion[]
+  case_version: number
 }
 
 /** Location timeline segment (the `stays` table). */
