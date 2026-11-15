@@ -224,6 +224,6 @@ body { background: var(--page); color: var(--ink); font-family: var(--ui-font); 
   .mark-in { animation: none; }
 }
 
-/* Map over time: text set straight on the map, with a halo so it reads over tracks and markers. */
-.leaflet-tooltip.map-note { background: transparent; border: none; box-shadow: none; padding: 0; color: var(--ink-2); font-size: 11px; font-weight: 500; text-shadow: 0 0 3px var(--sunken), 0 0 3px var(--sunken), 0 0 3px var(--sunken); }
+/* Map over time: text set straight on the map, with a halo so it reads over the base map and tracks. */
+.leaflet-tooltip.map-note { background: transparent; border: none; box-shadow: none; padding: 0; color: var(--ink); font-size: 11px; font-weight: 500; text-shadow: 0 0 2px var(--surface), 0 0 2px var(--surface), 0 0 4px var(--surface), 0 0 4px var(--surface); }
 .leaflet-tooltip.map-note::before { display: none; }
