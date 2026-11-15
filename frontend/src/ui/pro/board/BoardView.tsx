@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Tie } from '../../../api'
 import type { View } from '../ProApp'
 import { useCase, useKnown } from '../../../state/caseStore'
@@ -27,6 +27,11 @@ export default function BoardView({ open, onAsk }: { open: (v: View) => void; on
   const [allNotes, setAllNotes] = useState(false)
   const [full, setFull] = useState(false)
   const [runMin, setRunMin] = useState(false)
+  // The subagents sheet opens while the agents run and folds to its bar once they are done.
+  useEffect(() => {
+    if (c.runStage === 'running') setRunMin(false)
+    if (c.runStage === 'done') setRunMin(true)
+  }, [c.runStage])
   const sheet = c.runFor && c.runStage !== 'idle' ? (runMin ? SHEET_MIN : SHEET_OPEN) : null
   const flash = (id: CardId) => (fresh ? FLASH[id] : undefined)
 

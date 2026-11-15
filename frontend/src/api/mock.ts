@@ -155,7 +155,7 @@ export async function getBoard(loaded: PersonId[]): Promise<Board> {
 }
 
 /**
- * Ingest one source, then re-run the checks it affects. Calls onProgress throughout (about 4 s).
+ * Ingest one source, then re-run the checks it affects. Calls onProgress throughout (about 1 s, plus the subagent re-run).
  * `rerun`, if given, plays the subagent run during the "Re-run checks" stage instead of a fixed wait.
  */
 export async function addSource(id: PersonId, loaded: PersonId[], onProgress: (p: SourceProgress) => void, signal?: AbortSignal, rerun?: () => Promise<void>): Promise<void> {
@@ -173,7 +173,8 @@ export async function addSource(id: PersonId, loaded: PersonId[], onProgress: (p
     { id: 'checks', label: 'Re-run subagents', detail: checks.join(' · '), status: 'pending' },
     { id: 'board', label: 'Update board', detail: fresh.length ? `${fresh.length} new finding${fresh.length > 1 ? 's' : ''}` : 'No new findings; ties refreshed', status: 'pending' },
   ]
-  const DUR: Record<string, number> = { load: 650, validate: 500, normalise: 450, resolve: 500, store: 450, checks: 1100, board: 350 }
+  // Ingest stages are quick; the time goes to the subagent re-run in the 'checks' stage.
+  const DUR: Record<string, number> = { load: 220, validate: 160, normalise: 140, resolve: 180, store: 140, checks: 1100, board: 160 }
   const total = Object.values(DUR).reduce((a, b) => a + b, 0)
   const rowStages = ['load', 'validate', 'normalise', 'resolve', 'store']
   const rowSpan = rowStages.reduce((a, k) => a + DUR[k], 0)
@@ -185,8 +186,14 @@ export async function addSource(id: PersonId, loaded: PersonId[], onProgress: (p
   for (const s of stages) {
     s.status = 'running'
     if (s.id === 'checks' && rerun) {
-      emit(0)
-      await rerun()
+      // The bar keeps creeping forward while the agents run, then completes the stage.
+      let finished = false
+      const run = rerun().finally(() => (finished = true))
+      for (let k = 0; !finished; k++) {
+        emit(DUR.checks * (1 - Math.pow(0.88, k)))
+        await sleep(200, signal)
+      }
+      await run
       s.status = 'done'
       done += DUR[s.id]
       emit(0)
