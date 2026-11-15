@@ -1,5 +1,4 @@
-import { DEMO_CASE_NAME, atLeast, useCase } from '../../state/caseStore'
-import { Btn } from './kit'
+import { DEMO_CASE_NAME, useCase } from '../../state/caseStore'
 
 /** Archived cases shown for context; only the Pier 9 case has data in this mock. */
 const ARCHIVE = [
@@ -8,21 +7,8 @@ const ARCHIVE = [
   { name: 'Riverside van collision', phones: 4, range: '8–9 Jan 2026', status: 'Closed', insights: 2, updated: '21 Jan' },
 ]
 
-export default function CasesView({ open, theme, toggleTheme }: { open: (v: 'ingest' | 'review' | 'analyse') => void; theme: 'light' | 'dark'; toggleTheme: () => void }) {
+export default function CasesView({ open, theme, toggleTheme }: { open: (v: 'board') => void; theme: 'light' | 'dark'; toggleTheme: () => void }) {
   const c = useCase()
-  const current = c.stage !== 'empty' && c.caseName && c.caseName !== DEMO_CASE_NAME
-  const demoLoaded = c.caseName === DEMO_CASE_NAME && atLeast(c.stage, 'analysed')
-  const stageLabel = atLeast(c.stage, 'analysed') ? 'Analysed' : c.stage === 'analysing' ? 'Analysing' : 'Data loaded'
-
-  const openDemo = async () => {
-    if (!demoLoaded) {
-      c.newCase()
-      c.setCaseName(DEMO_CASE_NAME)
-      await c.fastForward()
-    }
-    open('review')
-  }
-
   return (
     <div className="flex h-full flex-col bg-page text-ink">
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line bg-surface px-6">
@@ -36,16 +22,6 @@ export default function CasesView({ open, theme, toggleTheme }: { open: (v: 'ing
       <main className="mx-auto w-full max-w-[1100px] flex-1 overflow-y-auto px-6 py-8">
         <div className="flex items-center">
           <h1 className="text-[20px] font-semibold">Cases</h1>
-          <Btn
-            kind="primary"
-            className="ml-auto h-8 px-3 text-[13px]"
-            onClick={() => {
-              c.newCase()
-              open('ingest')
-            }}
-          >
-            + Create new case
-          </Btn>
         </div>
 
         <div className="mt-5 overflow-hidden rounded-lg border border-line bg-surface">
@@ -61,18 +37,15 @@ export default function CasesView({ open, theme, toggleTheme }: { open: (v: 'ing
               </tr>
             </thead>
             <tbody>
-              {current && (
-                <Row
-                  name={c.caseName}
-                  phones={c.ingestReport?.devices.length ?? '—'}
-                  range={`${c.range[0]}–${c.range[1]} Apr 2026`}
-                  insights={c.briefing?.incidents.length ?? '—'}
-                  status={stageLabel}
-                  updated="now"
-                  onClick={() => open(atLeast(c.stage, 'analysed') ? 'review' : c.stage === 'analysing' ? 'analyse' : 'ingest')}
-                />
-              )}
-              <Row name={DEMO_CASE_NAME} phones={5} range="13–19 Apr 2026" insights={6} status="Analysed" updated="21 Apr" onClick={openDemo} />
+              <Row
+                name={DEMO_CASE_NAME}
+                phones={`${c.loaded.length} of 5`}
+                range="13–19 Apr 2026"
+                insights={c.board.incidents.length}
+                status="Active"
+                updated="now"
+                onClick={() => open('board')}
+              />
               {ARCHIVE.map((a) => (
                 <Row key={a.name} name={a.name} phones={a.phones} range={a.range} insights={a.insights} status={a.status} updated={a.updated} />
               ))}
@@ -94,7 +67,7 @@ function Row({ name, phones, range, insights, status, updated, onClick }: { name
       <td className="tnum px-3 py-2.5">{insights}</td>
       <td className="px-3 py-2.5">
         <span className={`inline-flex items-center gap-1.5 text-[12px] ${status === 'Closed' ? 'text-ink-3' : 'text-ink'}`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${status === 'Closed' ? 'bg-line-strong' : status === 'Analysed' ? 'bg-good' : 'bg-accent'}`} />
+          <span className={`h-1.5 w-1.5 rounded-full ${status === 'Closed' ? 'bg-line-strong' : status === 'Active' ? 'bg-good' : 'bg-accent'}`} />
           {status}
         </span>
       </td>

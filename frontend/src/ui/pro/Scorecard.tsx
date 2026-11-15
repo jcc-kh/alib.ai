@@ -1,33 +1,29 @@
 import { useMemo } from 'react'
 import { useCase } from '../../state/caseStore'
 import { scorecard } from '../../mock/answerKey'
+import { SCENARIOS, type ScenarioId } from '../../mock/findings'
+import { personName } from '../../mock/data'
 import { Mono, Panel } from './kit'
 
 /** Sweep graded against the synthetic case's answer key: plants recovered, decoys wrongly raised. */
 export default function Scorecard() {
   const c = useCase()
-  const s = useMemo(() => (c.briefing ? scorecard(c.briefing) : null), [c.briefing])
-  if (!s) return null
-  if (c.range[0] > 13 || c.range[1] < 19)
-    return (
-      <Panel title="Scorecard" sub="vs answer key">
-        <div className="text-[12px] text-ink-3">The answer key covers 13–19 Apr. Analyse the whole week to grade the run.</div>
-      </Panel>
-    )
+  const s = useMemo(() => scorecard(c.board), [c.board])
+  const needs = (sid: ScenarioId) => SCENARIOS[sid].people.filter((p) => !c.loaded.includes(p))
   const rec = s.plants.filter((p) => p.recovered).length
   const raised = s.decoys.filter((d) => d.raised).length
   return (
     <Panel title="Scorecard" sub="vs answer key">
       <div className="grid grid-cols-2 gap-3">
-        <Stat value={`${rec} / ${s.plants.length}`} label="plants recovered" ok={rec === s.plants.length} />
+        <Stat value={`${rec} / ${s.plants.length}`} label="plants recovered" ok={s.plants.every((p) => p.recovered || needs(p.sid).length > 0)} />
         <Stat value={`${raised} / ${s.decoys.length}`} label="decoys raised" ok={raised === 0} />
       </div>
       <ul className="mt-3 space-y-1 text-[12px]">
         {s.plants.map((p) => (
           <li key={p.label} className="flex items-center gap-2">
-            <span className={p.recovered ? 'text-good' : 'text-serious'}>{p.recovered ? '✓' : '✕'}</span>
+            <span className={p.recovered ? 'text-good' : needs(p.sid).length ? 'text-ink-3' : 'text-serious'}>{p.recovered ? '✓' : needs(p.sid).length ? '○' : '✕'}</span>
             <span className="text-ink">{p.label}</span>
-            <Mono className="ml-auto text-ink-3">{p.incident ? `insight ${c.briefing!.incidents.find((i) => i.incident_id === p.incident)?.rank}` : 'missed'}</Mono>
+            <Mono className="ml-auto text-ink-3">{p.incident ? `insight ${c.board.incidents.find((i) => i.incident_id === p.incident)?.rank}` : needs(p.sid).length ? `needs ${needs(p.sid).map(personName).join(', ')}` : 'missed'}</Mono>
           </li>
         ))}
         {s.decoys.map((d) => (

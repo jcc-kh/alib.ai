@@ -16,6 +16,8 @@ export default function RadiusMap({
   tracks,
   height = 420,
   focus,
+  fresh = [],
+  circles = true,
 }: {
   space: SpaceOutput
   show: PersonId[]
@@ -23,16 +25,21 @@ export default function RadiusMap({
   tracks?: Partial<Record<PersonId, string[]>>
   height?: number
   focus?: PersonId | null
+  /** Phones just added: their circles animate in. */
+  fresh?: PersonId[]
+  /** false: tracks only (no routine circles); the view fits the tracks. */
+  circles?: boolean
 }) {
-  const spaces = space.spaces.filter((s) => show.includes(s.person))
-  const bounds = spaces.flatMap((s) => {
+  const spaces = circles ? space.spaces.filter((s) => show.includes(s.person)) : []
+  const trackPts = Object.values(tracks ?? {}).flat().map((id) => ROWS.get(id!)).filter(Boolean).map((r) => [Number(r!.fields.lat), Number(r!.fields.lon)] as [number, number])
+  const bounds = circles ? spaces.flatMap((s) => {
     const dLat = s.radius_m / 111320
     const dLon = s.radius_m / 84000
     return [
       [s.anchor.lat - dLat, s.anchor.lon - dLon],
       [s.anchor.lat + dLat, s.anchor.lon + dLon],
     ] as [number, number][]
-  })
+  }) : trackPts.length ? [...trackPts, [space.scene.lat, space.scene.lon] as [number, number]] : []
   const labelled = [...new Set(spaces.map((s) => s.anchor.name))]
   return (
     <PlainMap
@@ -49,7 +56,7 @@ export default function RadiusMap({
             key={s.person}
             center={[s.anchor.lat, s.anchor.lon]}
             radius={s.radius_m}
-            pathOptions={{ color: personColor(s.person), weight: on ? 2 : 1, opacity: on ? 0.95 : 0.35, fillColor: personColor(s.person), fillOpacity: on ? (s.person === space.victim ? 0.1 : 0.07) : 0.02, dashArray: s.person === space.victim ? '6 4' : undefined }}
+            pathOptions={{ className: fresh.includes(s.person) ? 'fresh-path' : undefined, color: personColor(s.person), weight: on ? 2 : 1, opacity: on ? 0.95 : 0.35, fillColor: personColor(s.person), fillOpacity: on ? (s.person === space.victim ? 0.1 : 0.07) : 0.02, dashArray: s.person === space.victim ? '6 4' : undefined }}
           >
             <Tooltip sticky>
               {personName(s.person)}: routine area {fmtKm(s.radius_m)} from {s.anchor.name}. Scene {s.scene_inside ? 'inside' : 'outside'} ({fmtKm(s.scene_distance_m)}).
@@ -69,7 +76,7 @@ export default function RadiusMap({
           const last = pts[pts.length - 1]
           return (
             <Fragment key={`t-${p}`}>
-              <Polyline positions={pts.map((x) => x.ll)} pathOptions={{ color: personColor(p), weight: 2.5, opacity: 0.9 }} />
+              <Polyline positions={pts.map((x) => x.ll)} pathOptions={{ className: fresh.includes(p) ? 'fresh-path' : undefined, color: personColor(p), weight: 2.5, opacity: 0.9 }} />
               {pts.map((x, i) => (
                 <CircleMarker key={i} center={x.ll} radius={2.5} pathOptions={{ color: personColor(p), weight: 1, fillColor: personColor(p), fillOpacity: 1 }}>
                   <Tooltip>{`${personName(p)} ${fmtTime(x.t)}`}</Tooltip>

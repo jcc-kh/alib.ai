@@ -37,11 +37,12 @@ On case load:
 3. **Discovery (network model).** Alongside the sweep, the whole case is organised into a combinatorial complex: people, numbers, accounts, places and things mentioned in messages, linked in pairs **and** in groups. Fixed topological operators spread information across those levels, and an unsupervised scorer ranks the most unusual structures: a relay through three phones, money going round in a circle, a group that keeps acting together, two people connected through others who never contact each other. Each becomes a **lead**, with its rows and a proposed check. No training and no labels; the same seed gives the same leads.
 4. **Triage (agents).** Signals are grouped into incidents, and incidents are ranked by how many checks agree and how many phones are involved. Signals with an ordinary explanation are dismissed, with the reason recorded. Moments where three or more phones act together are flagged as anchors. Each top lead's proposed check is run: confirmed leads become findings, the rest stay labelled "pattern, not verified". The result is an **opening briefing**, on screen before you type anything.
 
-After the briefing:
+Then it's a loop, not a pipeline. Investigators keep finding new evidence sources, so:
 
-5. **Lines of inquiry.** Each insight and confirmed lead is filed under the question it answers (connections, routine areas, the time-of-death window, what changed, motive). Each question has its own page with the visual police use for it.
-6. **Ask.** Free-form questions go to the same orchestrator; answers cite findings or say "can't tell".
-7. **Review.** If you dispute a data row, it is excluded, every check that cited it reruns, and findings that changed are marked.
+5. **Add a source, refine the board.** Each new source (another phone, for now) is ingested on its own, and only the checks it affects re-run. Everything on the **case board** is recomputed from the loaded sources: people whose phone isn't in yet appear as ghost nodes, a check runs once all the phones it needs are loaded, and what changed is marked on the board.
+6. **Lines of inquiry.** Each insight and confirmed lead is filed under the question it answers (connections, routine areas, the time-of-death window, what changed, motive). Each question has its own page with the visual police use for it.
+7. **Ask.** Free-form questions go to the same orchestrator; answers cite findings or say "can't tell" (including "can't tell yet" when the phone that would settle it hasn't been added).
+8. **Review.** If you dispute a data row, it is excluded, every check that cited it reruns, and findings that changed are marked.
 
 > The mock no longer includes hypothesis testing (parsing statements into claims and grading each one). [ARCHITECTURE.md](ARCHITECTURE.md) stages ③–⑤ still describe it as designed in revision 3; the team should decide whether to keep it in the backend.
 
@@ -140,29 +141,28 @@ npm run dev
 
 Open http://localhost:5173 in Chrome on a laptop-size screen.
 
-The dashboard opens on the case list at http://localhost:5173/#/pro/. Deep links such as `#/pro/review` (briefing), `#/pro/window` or `#/pro/connections` load the completed demo case automatically.
+The dashboard opens on the case board at http://localhost:5173/#/pro/board, with two of the five seized phones already examined (Ravi's, recovered at the scene, and Paul's). Drill-down pages are `#/pro/connections`, `#/pro/radius`, `#/pro/window`, `#/pro/changes` and `#/pro/motive`; the case list is `#/pro/cases`.
 
 ### Click-path
 
-0. **Cases.** Open **Death at Pier 9** to jump to its briefing, or click **+ Create new case**.
-1. **Ingest.** Name the case, click **Load sample bundle**, then pick the days to analyse. Counts per phone are computed from the rows.
-2. **Analyse.** Watch the sweep and triage live: an agent network (bundle → orchestrator → people map → location, messages, money, device and social agents → triage → write-up → **Main findings**), a run log, and a timeline of what each agent did. Click a finished agent to open its envelope (`findings/*.json`).
-3. **Briefing.** The victim, the time-of-death facts, the four persons of interest with their phones' status in the window, the six insights (each linked to its line of inquiry), the alibi grid at a glance, and the scorecard against the answer key.
-4. **Lines of inquiry** (left rail):
-   - **Who is connected, and how?** Link chart with portraits; filter by channel; click days on the strip to set the time window; click a link for every interaction behind it.
-   - **Whose routine area includes the scene?** Routine-area circles on a map, overlap with the victim's area, and distance to the scene through the evening.
-   - **Where was every phone in the time-of-death window?** Alibi grid, each phone's journey on the map, the location timeline for that night, and the victim's last contacts.
-   - **What broke from routine?** That night against a normal night, the post-news deletions, the week's activity, and every location gap with why it was or wasn't raised.
-   - **Who had a grievance?** Every post on a timeline coloured by hostility score, the flagged posts, and each account's status in the window.
-5. **Ask.** Try `Who was near the scene in the time-of-death window?` or `Did Paul and Ravi argue last year?` (the second returns can't tell).
+1. **The board.** One page, pinned cards on a board:
+   - **Relationships:** portraits as nodes, one line per tie, styled by strength (close, regular, occasional, hidden). Lines are labelled with the relationship from the case file or what the rows show, with badges for money, meetings without contact, deleted threads and hostile posts. People and lines appear only once that person's phone is examined. Click a person to see their ties; **click a line for every exchange between the two** (calls, texts, payments, times together, deletions, posts), filterable by kind, with which phones hold each copy.
+   - **Insights:** ranked notes, each with an **Evidence** button.
+   - **Unidentified until examined.** A person whose phone hasn't been examined shows as **?** with the first name other phones use (e.g. "Cara"); seized phones show only as **Phone 3/4/5**, and nothing says whose phone a waiting check needs. Adding a phone reveals its owner ("Phone 3 identified as Amy Brooks").
+2. **Add evidence source** (top right). Pick the next phone (Amy, then Ken, then Cara), or drop any file. A progress bar runs through load, validate, normalise, resolve, store, re-run checks and update board. Then the new data drops in: the ghost turns solid, changed ties glow, new rows and circles slide in, and new or strengthened insights land with a **NEW** or **+ evidence** tag. A toast sums up what changed. The insight count goes 1 → 2 → 3 → 6.
+3. **Expand ↗** on any card opens its line of inquiry (also in the top bar):
+   - **Time of death:** one timeline of the week. Each day is split into blocks (morning, afternoon, evening; on 16 April also the time-of-death window and late night; then the morning after). One column per phone: where it was, who it was with, when it went dark and where it was last seen, what it deleted. Under each block, every call, text and payment between the people on the board. 13–15 April are collapsed to a one-line summary. A key above it uses the same chips; hide people to widen the columns (columns never go below 210 px; the timeline scrolls sideways instead). Click any entry for its evidence.
+   - **Semantic analysis:** everything people on the board wrote (posts, comments, texts, group chats) tagged into five themes: threats or ill-wishing, grievance or blame, arranging to meet, money and accounts, pressure or distress. Click a theme to see its statements, with the matched words underlined. On the right, each person's tone over the week (daily hostility score of their posts) with a one-line read of how it changed; click a person to filter.
+4. **Interviews** (top bar). Three transcripts (Paul, Amy, Ken). Verifying one reads it, highlights each checkable claim (opinions are dotted, not checked), then tests every claim against the examined phones. Click a claim for its breakdown: each check's method, what it found, source rows, and a step-by-step table of how the score was reached (start at 50%, each check shifts the odds ×10 / ×2 or ÷10 / ÷2, then the verdict rule and the confidence sum): **VERIFIED**, **UNVERIFIED** (can't conclude) or **DISPROVEN**. The **Model confidence** scorecard shows counts, mean confidence, checks run, every claim on a 0–100% scale, and agreement with the answer key. Verdicts recompute when phones are added (e.g. Paul's "I only deal with her over email" is unverified until Cara's phone is added, then disproven). Logic: `frontend/src/mock/interviews.ts`.
+5. **Ask.** Try `Who was near the scene in the time-of-death window?`, or `Do Paul and Cara know each other?` before Cara's phone is added (it answers "can't tell yet").
 
-Every insight opens the finding drawer: Evidence · How we know · Verify (recompute from raw rows) · Sources (file, line, raw JSON). Toggle light/dark with ☾ in the top bar.
+**Reset demo** in the top bar returns to the two-phone start and clears verified transcripts and Ask. **Evidence** opens a drawer with two tabs: **Evidence** (what the rows show, in plain words) and **Sources (raw logs)** (file, line, raw JSON). It works for insights and for anything in the time-of-death timeline, every semantic-analysis statement and every interview check. Toggle light/dark with ☾ in the top bar.
 
 ## Status
 
 | Part | State |
 |---|---|
-| UI: Ingest, Briefing, Investigate, Ask drawer, finding drawer, all evidence views | ✅ Built (mock data) |
+| UI: case board (relationship chart, insight notes with threads, maps, alibi grid, timelines), add-evidence-source loop, drill-down pages, Ask drawer, finding drawer, all evidence views | ✅ Built (mock data) |
 | Transparency: derivation chain, number tracing, validator, corroboration matrix | ✅ Built (mock data) |
 | Fact-check: in-browser recomputation from raw rows; row provenance | ✅ Built (works on any rows from `/api/evidence`) |
 | API contract (`frontend/src/api/types.ts`) | ✅ Defined |
@@ -170,6 +170,7 @@ Every insight opens the finding drawer: Evidence · How we know · Verify (recom
 | Revision 2: sweep → triage → brief refines; signals, incidents, anchors, dismissals; location timeline and typed gaps; follow-up chaining | ✅ Built in the mock |
 | UI revamp: guided flow, Pro dashboard (light/dark), live agent network + envelopes, charts from computed rows | ✅ Built in the mock |
 | Pivot to insight discovery: murder case (5 phones incl. the victim's), lines of inquiry (link chart, routine-area map, alibi grid, pattern of life, social hostility), 4 new checks, social-analyst, generated portraits | ✅ Built in the mock; Noir UI and hypothesis testing removed |
+| Case board: sources added one at a time, board recomputed from loaded phones, ghost nodes, relationship ties and mutual connections, drop-in animation of what changed; replaces the Ingest → Analyse → Briefing flow | ✅ Built in the mock (`src/mock/sources.ts`, `src/ui/pro/board/`) |
 | Background data: full week of messages, calls, locations, transactions per phone (seeded), counts computed | ✅ Built in the mock (`src/mock/background.ts`) |
 | Revision 3: integrity pass, topological discovery and leads, statements, item confirmation, disputes that rerun checks, report assembled in code, hardened validator, multi-seed evaluation | ✅ Designed in [ARCHITECTURE.md](ARCHITECTURE.md); not yet in the mock |
 | Synthetic data generator and answer key (gap plant G1 and its decoy, planted clock skew and spoofed GPS, a burner number, innocent noise, statements) | ⏳ Next |
@@ -203,14 +204,14 @@ frontend/src/
   api/index.ts, mock.ts    swap point: mock today, FastAPI later (incl. analyseCase run stream)
   mock/                    planted case (data.ts), seeded background week (background.ts), stays (segments.ts),
                            presence / activity space / last contacts / contact graph (derived.ts),
-                           findings (findings.ts), signals/insights (signals.ts), run script (run.ts),
+                           findings (findings.ts), signals/insights (signals.ts), sources and the board (sources.ts),
                            answer key and scorecard (answerKey.ts)
   lib/                     aggregates.ts (chart series), verify.ts (in-browser recompute), format.ts
-  state/caseStore.tsx      the case-flow store
+  state/caseStore.tsx      the case store: loaded sources, board, add-source progress, what changed
   components/              finding detail (4 tabs), evidence views, location lanes, portraits,
-                           relationship graph, radius map, presence (alibi) grid
-  ui/pro/                  dashboard: shell, steps/* (ingest, analyse, briefing, ask),
-                           inquiries/* (one page per line of inquiry), charts, envelope drawer, Ask panel
+                           relationship chart and exchange list (board), presence (time-of-death) bars
+  ui/pro/                  dashboard: shell, board/* (case board, cards, insight notes, threads, add source),
+                           inquiries/* (one page per line of inquiry), charts, Ask panel
 frontend/public/portraits/ GAN-generated faces (public domain) + CREDITS.md
 ```
 

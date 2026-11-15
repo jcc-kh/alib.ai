@@ -40,6 +40,8 @@ export default function RelationshipGraph({
   selected,
   onSelect,
   height = 470,
+  people = PEOPLE.map((p) => p.person_id),
+  ghosts = [],
 }: {
   graph: Graph
   from: string
@@ -48,6 +50,10 @@ export default function RelationshipGraph({
   selected: EdgeView | null
   onSelect: (e: EdgeView | null) => void
   height?: number
+  /** People to draw (loaded phones plus ghosts). */
+  people?: PersonId[]
+  /** People referenced by loaded phones whose own phone is not loaded. */
+  ghosts?: PersonId[]
 }) {
   const [hover, setHover] = useState<string | null>(null)
   const edges = useMemo(() => edgesInWindow(graph, from, to).filter((e) => channels.has(e.channel)), [graph, from, to, channels])
@@ -61,7 +67,7 @@ export default function RelationshipGraph({
   return (
     <svg viewBox={`0 0 ${W} ${height}`} className="w-full" onClick={() => onSelect(null)}>
       <defs>
-        {PEOPLE.map((p) => (
+        {PEOPLE.filter((p) => people.includes(p.person_id)).map((p) => (
           <clipPath key={p.person_id} id={`clip-${p.person_id}`}>
             <circle cx={POS[p.person_id][0]} cy={POS[p.person_id][1]} r={p.is_victim ? 40 : 34} />
           </clipPath>
@@ -116,19 +122,26 @@ export default function RelationshipGraph({
           )
         }),
       )}
-      {PEOPLE.map((p) => {
+      {PEOPLE.filter((p) => people.includes(p.person_id)).map((p) => {
         const [x, y] = POS[p.person_id]
+        const ghost = ghosts.includes(p.person_id)
         const r = p.is_victim ? 40 : 34
         const degree = edges.filter((e) => e.source === p.person_id || e.target === p.person_id).length
         return (
           <g key={p.person_id}>
-            <circle cx={x} cy={y} r={r + 4} fill="var(--surface)" stroke={personColor(p.person_id)} strokeWidth={3} />
-            <image href={p.portrait} x={x - r} y={y - r} width={r * 2} height={r * 2} clipPath={`url(#clip-${p.person_id})`} preserveAspectRatio="xMidYMid slice" style={{ filter: p.is_victim ? 'grayscale(0.85)' : undefined }} />
-            <text x={x} y={y + r + 20} textAnchor="middle" fontSize={13} fontWeight={600} fill="var(--ink)" stroke="var(--surface)" strokeWidth={5} paintOrder="stroke" strokeLinejoin="round">
-              {p.name}
+            <circle cx={x} cy={y} r={r + 4} fill="var(--surface)" stroke={ghost ? 'var(--line-strong)' : personColor(p.person_id)} strokeWidth={ghost ? 1.6 : 3} strokeDasharray={ghost ? '4 3' : undefined} />
+            {ghost ? (
+              <text x={x} y={y + r * 0.36} textAnchor="middle" fontSize={r} fontWeight={600} fill="var(--ink-3)">
+                ?
+              </text>
+            ) : (
+              <image href={p.portrait} x={x - r} y={y - r} width={r * 2} height={r * 2} clipPath={`url(#clip-${p.person_id})`} preserveAspectRatio="xMidYMid slice" style={{ filter: p.is_victim ? 'grayscale(0.85)' : undefined }} />
+            )}
+            <text x={x} y={y + r + 20} textAnchor="middle" fontSize={13} fontWeight={600} fill={ghost ? 'var(--ink-3)' : 'var(--ink)'} stroke="var(--surface)" strokeWidth={5} paintOrder="stroke" strokeLinejoin="round">
+              {ghost ? personName(p.person_id) : p.name}
             </text>
             <text x={x} y={y + r + 35} textAnchor="middle" fontSize={11} fill="var(--ink-3)" stroke="var(--surface)" strokeWidth={5} paintOrder="stroke" strokeLinejoin="round">
-              {p.is_victim ? 'victim' : `${degree} link types`}
+              {ghost ? 'not identified' : p.is_victim ? 'victim' : `${degree} link types`}
             </text>
           </g>
         )
