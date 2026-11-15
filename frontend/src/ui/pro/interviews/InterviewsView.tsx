@@ -340,142 +340,24 @@ function CheckRow({ ch, i, hidden, running }: { ch: CheckResult; i: number; hidd
   )
 }
 
-/** Odds as a ratio a person can read: "3 : 1 for" or "1 : 10 against". */
-function oddsText(p: number) {
-  const o = p / (1 - p)
-  const r = (x: number) => (x >= 10 ? Math.round(x) : Math.round(x * 10) / 10)
-  if (Math.abs(o - 1) < 0.01) return 'even, 1 : 1'
-  return o > 1 ? `${r(o)} : 1 for` : `1 : ${r(1 / o)} against`
-}
-
-/** A 0–100% track with the verdict zones, the previous position (hollow) and the new one (solid). */
-function Track({ p, prev, color }: { p: number; prev?: number; color: string }) {
-  const lo = SCORING.disproven_at * 100
-  const hi = SCORING.verified_at * 100
-  return (
-    <span className="relative block h-3 w-full rounded-sm">
-      <span className="absolute inset-y-0 left-0 rounded-l-sm" style={{ width: `${lo}%`, background: VERDICT_STYLE.disproven.bg }} />
-      <span className="absolute inset-y-0" style={{ left: `${lo}%`, width: `${hi - lo}%`, background: 'var(--sunken)' }} />
-      <span className="absolute inset-y-0 right-0 rounded-r-sm" style={{ width: `${100 - hi}%`, background: VERDICT_STYLE.verified.bg }} />
-      {prev !== undefined && Math.abs(prev - p) > 0.005 && (
-        <>
-          <span className="absolute top-1/2 h-px -translate-y-1/2" style={{ left: `${Math.min(prev, p) * 100}%`, width: `${Math.abs(prev - p) * 100}%`, background: color }} />
-          <span className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-surface" style={{ left: `${prev * 100}%`, borderColor: 'var(--ink-3)' }} />
-        </>
-      )}
-      <span className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: `${p * 100}%`, background: color, boxShadow: '0 0 0 2px var(--surface)' }} />
-    </span>
-  )
-}
-
-/**
- * How the confidence was worked out, one row per check: start undecided at 50%, each check shifts
- * the odds by a fixed amount, the verdict rule is applied, and confidence is read off the result.
- */
+/** The claim's verdict and confidence. */
 function Conclusion({ r }: { r: ClaimResult }) {
   const s = VERDICT_STYLE[r.verdict]
-  const clamp = (x: number) => Math.min(SCORING.cap, Math.max(1 - SCORING.cap, x))
-  let odds = SCORING.prior / (1 - SCORING.prior)
-  let prev = SCORING.prior
-  const steps = r.checks.map((ch, i) => {
-    const f = SCORING.factor[ch.strength]
-    const o = ch.result.outcome
-    const before = prev
-    if (o === 'supports') odds *= f
-    if (o === 'contradicts') odds /= f
-    const p = clamp(odds / (1 + odds))
-    prev = p
-    const effect =
-      o === 'supports' ? `odds × ${f}` : o === 'contradicts' ? `odds ÷ ${f}` : o === 'blocked' ? 'couldn’t run: no change' : 'no change'
-    return { i, ch, o, before, p, effect }
-  })
-  const final = r.p_true
-  const capped = Math.abs(final - odds / (1 + odds)) > 0.001
-  const lo = pct(SCORING.disproven_at)
-  const hi = pct(SCORING.verified_at)
-  const rule =
-    r.verdict === 'verified'
-      ? `${pct(final)} is at or above ${hi}, and a strong check supports it.`
-      : r.verdict === 'disproven'
-        ? `${pct(final)} is at or below ${lo}, and a strong check contradicts it.`
-        : r.ran === 0
-          ? 'No check could run on the phones examined so far, so it stays at 50%.'
-          : final > SCORING.disproven_at && final < SCORING.verified_at
-            ? `${pct(final)} is between ${lo} and ${hi}: not enough either way.`
-            : `${pct(final)} is past the line, but no strong check decided it, only weak ones.`
-  const conf =
-    r.verdict === 'verified'
-      ? `Confidence = chance the claim is true = ${pct(final)}`
-      : r.verdict === 'disproven'
-        ? `Confidence = chance the claim is false = 100% − ${pct(final)} = ${pct(1 - final)}`
-        : `No confidence score: the evidence ${confText(r)} (${pct(final)} chance true)`
+  const pending = r.checks.length - r.ran
   return (
-    <div className="border-t border-line">
-      <div className="flex items-center gap-2 px-4 pt-3">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-2">How the score was reached</span>
-        <span className="text-[11px] text-ink-3">chance the claim is true, after each check</span>
-      </div>
-      <table className="mt-1.5 w-full text-[12px]">
-        <tbody>
-          <tr className="border-b border-line">
-            <td className="w-8 py-1.5 pl-4 text-ink-3">0</td>
-            <td className="py-1.5 pr-3 text-ink-2">Before any check: no evidence either way</td>
-            <td className="w-36 py-1.5 pr-3 text-ink-3">start</td>
-            <td className="w-[32%] py-1.5 pr-3">
-              <Track p={SCORING.prior} color="var(--ink-3)" />
-            </td>
-            <td className="tnum w-24 py-1.5 pr-4 text-right">
-              <span className="font-semibold text-ink">{pct(SCORING.prior)}</span>
-              <div className="text-[10.5px] text-ink-3">{oddsText(SCORING.prior)}</div>
-            </td>
-          </tr>
-          {steps.map((x) => {
-            const os = OUTCOME_STYLE[x.o]
-            const moved = x.o === 'supports' || x.o === 'contradicts'
-            return (
-              <tr key={x.ch.id} className={`border-b border-line ${moved ? '' : 'text-ink-3'}`}>
-                <td className="py-1.5 pl-4 text-ink-3">{x.i + 1}</td>
-                <td className="py-1.5 pr-3">
-                  <span className={moved ? 'text-ink' : ''}>{x.ch.label}</span>
-                  <span className="ml-1.5 inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: os.color }}>
-                    {os.glyph} {os.label.toLowerCase()}
-                  </span>
-                </td>
-                <td className="py-1.5 pr-3 text-[11.5px]">
-                  <span className={moved ? 'text-ink' : ''}>{x.ch.strength} check</span>
-                  <div className={moved ? 'font-medium' : ''} style={{ color: moved ? os.color : undefined }}>
-                    {x.effect}
-                  </div>
-                </td>
-                <td className="py-1.5 pr-3">
-                  <Track p={x.p} prev={x.before} color={moved ? os.color : 'var(--ink-3)'} />
-                </td>
-                <td className="tnum py-1.5 pr-4 text-right">
-                  <span className={`font-semibold ${moved ? 'text-ink' : ''}`}>{pct(x.p)}</span>
-                  <div className="text-[10.5px] text-ink-3">{oddsText(x.p)}</div>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-      <div className="px-4 pb-1 pt-1.5 text-[11px] text-ink-3">
-        A strong check makes the odds {SCORING.factor.strong} times more (or less) in the claim’s favour; a weak check {SCORING.factor.weak} times. Odds of 1 : 10 against mean 1 chance in 11, which is 9%.
-        {capped && ` Scores are capped at ${pct(SCORING.cap)} either way.`}
-      </div>
-      <div className="mt-2 px-4 py-3" style={{ background: s.bg }}>
-        <div className="flex flex-wrap items-center gap-3">
-          <VerdictBadge v={r.verdict} />
-          <span className="text-[13px] text-ink">{rule}</span>
-          {r.verdict !== 'unverified' && (
-            <span className="tnum ml-auto text-[12.5px] text-ink-2">
+    <div className="border-t border-line px-4 py-3" style={{ background: s.bg }}>
+      <div className="flex flex-wrap items-center gap-3">
+        <VerdictBadge v={r.verdict} />
+        {pending > 0 && <span className="text-[12px] text-ink-2">{pending} check{pending > 1 ? 's' : ''} couldn’t run yet; adding phones may change this.</span>}
+        <span className="tnum ml-auto text-[12.5px] text-ink-2">
+          {r.verdict !== 'unverified' ? (
+            <>
               Confidence <span className="text-[17px] font-semibold text-ink">{pct(r.confidence)}</span>
-            </span>
+            </>
+          ) : (
+            confText(r)
           )}
-        </div>
-        <div className="mt-1 text-[12px] text-ink-2">
-          {conf}.{r.checks.length - r.ran > 0 && ` ${r.checks.length - r.ran} check${r.checks.length - r.ran > 1 ? 's' : ''} couldn’t run yet; adding phones may change this.`}
-        </div>
+        </span>
       </div>
     </div>
   )
@@ -501,7 +383,6 @@ function ConfidenceScorecard({ t, v, selected, onSelect }: { t: Transcript; v: R
           <div className="rounded-md border border-line px-3 py-2">
             <div className="text-[10.5px] font-semibold tracking-[0.06em] text-ink-3">MEAN CONFIDENCE</div>
             <div className="tnum text-[22px] font-semibold leading-tight text-ink">{v.mean_confidence === null ? '—' : pct(v.mean_confidence)}</div>
-            <div className="text-[10.5px] text-ink-3">over verified and disproven claims</div>
           </div>
           <div className="col-span-2 rounded-md border border-line px-3 py-2">
             <div className="flex items-baseline justify-between">
@@ -522,21 +403,7 @@ function ConfidenceScorecard({ t, v, selected, onSelect }: { t: Transcript; v: R
 
         <div className="col-span-12 md:col-span-8">
           <ProbabilityStrip results={v.results} selected={selected} onSelect={onSelect} />
-          <div className="mt-3 grid grid-cols-3 gap-2 text-[11.5px] leading-snug text-ink-2">
-            <div className="rounded-md bg-sunken px-3 py-2">
-              <div className="font-medium text-ink">1 · Start undecided</div>
-              Every claim starts at {pct(SCORING.prior)}: even odds, 1 : 1.
-            </div>
-            <div className="rounded-md bg-sunken px-3 py-2">
-              <div className="font-medium text-ink">2 · Each check shifts the odds</div>
-              Strong check ×{SCORING.factor.strong}, weak ×{SCORING.factor.weak}; divided instead if it contradicts. Inconclusive: no change.
-            </div>
-            <div className="rounded-md bg-sunken px-3 py-2">
-              <div className="font-medium text-ink">3 · Apply the verdict rule</div>
-              ≥ {pct(SCORING.verified_at)} + a strong supporting check: VERIFIED. ≤ {pct(SCORING.disproven_at)} + a strong contradicting check: DISPROVEN. Otherwise UNVERIFIED.
-            </div>
-          </div>
-          <div className="mt-1.5 text-[11px] text-ink-3">Click a claim to see its step-by-step score. Check strengths are fixed before the check runs; nothing scores above {pct(SCORING.cap)}.</div>
+          <div className="mt-1.5 text-[11px] text-ink-3">Click a claim to see its checks.</div>
         </div>
       </div>
     </Panel>
