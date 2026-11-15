@@ -6,6 +6,7 @@ import { fmtDate, fmtKm, fmtTime } from '../../../lib/format'
 import Portrait from '../../../components/Portrait'
 import { useCase, type EvidenceItem } from '../../../state/caseStore'
 import { InquiryHeader } from './meta'
+import MapTimeline from './MapTimeline'
 
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const HATCH = 'repeating-linear-gradient(45deg, var(--line-strong) 0 1.5px, transparent 1.5px 6px)'
@@ -37,6 +38,15 @@ export default function WindowView() {
   return (
     <div className="space-y-3 p-4">
       <InquiryHeader id="window" />
+      <MapTimeline />
+      <details className="group rounded-lg border border-line bg-surface">
+        <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-[13px] font-medium text-ink hover:bg-sunken">
+          <span className="w-3 text-ink-3 group-open:hidden">▸</span>
+          <span className="hidden w-3 text-ink-3 group-open:inline">▾</span>
+          The week as a table
+          <span className="text-[12px] font-normal text-ink-2">every stay, deletion and exchange, in blocks of a few hours</span>
+        </summary>
+        <div className="space-y-3 border-t border-line p-3">
       <HowToRead />
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="mr-1 text-[12px] text-ink-2">Show:</span>
@@ -76,6 +86,8 @@ export default function WindowView() {
           })}
         </div>
       </section>
+        </div>
+      </details>
     </div>
   )
 }
