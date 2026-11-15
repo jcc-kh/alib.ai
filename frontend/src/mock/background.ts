@@ -10,7 +10,7 @@
 //   - background social posts score well below the hostility threshold and name no one in the case
 
 import type { EvidenceTable, PersonId } from '../api/types'
-import { ALL_GAPS, NUMBERS, PEOPLE, PLACES, RAVI_END, ROWS, VICTIM, addRow, social, ts } from './data'
+import { ALL_GAPS, NUMBERS, PEOPLE, RAVI_END, ROWS, VICTIM, addRow, findPlace, isNamedPlace, social, ts } from './data'
 import { SEGMENTS } from './segments'
 
 // ---------- seeded helpers ----------
@@ -97,7 +97,7 @@ const BODIES_IN = [
 const POSTS = [
   'Long run done 🏃', 'Best noodles in Port Calder, fight me', 'Coffee first. Then everything else.', 'Throwback to last summer at the coast',
   'New playlist, who wants it?', 'Finally fixed the bike', 'Rain again… classic April', 'Game night with the crew', 'Trying a new recipe tonight',
-  'Midweek mood', 'Shoutout to the Dock Cafe team ☕', 'Plans tonight: absolutely nothing', 'Anyone watching the match?', 'Spring cleaning finally done',
+  'Midweek mood', 'Shoutout to the Bean There team ☕', 'Plans tonight: absolutely nothing', 'Anyone watching the match?', 'Spring cleaning finally done',
 ]
 const MERCHANTS: { name: string; median: number; sigma: number; hours: number[] }[] = [
   { name: 'Bean There Coffee', median: 4.6, sigma: 0.25, hours: [7, 8, 9, 10] },
@@ -235,8 +235,8 @@ const pairMsgs: [PersonId, PersonId, number, number, number, string][] = [
   ['ravi', 'cara', 13, 11, 45, 'Delivery Thursday as usual?'],
   ['cara', 'ravi', 13, 11, 52, 'Yes, before noon.'],
 ]
-// Paul's phone deleted its SMS thread with Ravi on 17 Apr, so Paul's copies of these are gone; Ravi's remain.
-const deletedOn = (owner: PersonId, other: PersonId) => owner === 'paul' && other === 'ravi'
+// Paul's and Cara's phones deleted their SMS threads with Ravi on 17 Apr, so their copies of these are gone; Ravi's remain.
+const deletedOn = (owner: PersonId, other: PersonId) => (owner === 'paul' || owner === 'cara') && other === 'ravi'
 for (const [from, to, d, h, m, body] of pairMsgs) {
   const t = ts(d, h, m)
   if (!deletedOn(from, to)) addRow(from, 'messages', t, `To ${name(to)}: "${body}"`, { thread_id: `sms:${NUMBERS[to]}`, app: 'SMS', direction: 'out', from: NUMBERS[from], to: NUMBERS[to], body })
@@ -246,7 +246,7 @@ for (const [from, to, d, h, m, body] of pairMsgs) {
 // ---------- locations from the stays table ----------
 const taken = new Set<string>()
 for (const r of ROWS.values()) if (r.table === 'locations') taken.add(`${r.device_owner}|${r.timestamp}`)
-const coords = (n?: string) => PLACES.find((x) => x.name === n)
+const coords = (n?: string) => findPlace(n)
 for (const seg of SEGMENTS) {
   if (seg.kind === 'gap') continue
   const a = absOf(seg.start)
@@ -267,7 +267,8 @@ for (const seg of SEGMENTS) {
       const j = acc * 0.8
       lat = c.lat + (normal() * j) / 111320
       lon = c.lon + (normal() * j) / (111320 * Math.cos((c.lat * Math.PI) / 180))
-      placeName = seg.place!
+      // Unnamed spots (where Paul's and Cara's phones meet) carry coordinates only.
+      placeName = isNamedPlace(seg.place) ? seg.place! : ''
     } else {
       const f = coords(seg.from)!
       const t = coords(seg.to)!
@@ -278,7 +279,7 @@ for (const seg of SEGMENTS) {
       lon = f.lon + (t.lon - f.lon) * k + (normal() * 40) / 84000
     }
     taken.add(`${seg.person}|${iso}`)
-    addRow(seg.person, 'locations', iso, placeName ? `${placeName} (±${acc} m)` : `In transit (±${acc} m)`, {
+    addRow(seg.person, 'locations', iso, placeName ? `${placeName} (±${acc} m)` : seg.kind === 'stay' ? `Unnamed location (±${acc} m)` : `In transit (±${acc} m)`, {
       lat: +lat.toFixed(6),
       lon: +lon.toFixed(6),
       accuracy_m: acc,

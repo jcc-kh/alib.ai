@@ -12,15 +12,16 @@
 //     Paul's phone came within 0.9 km of Pier 9 at 21:10 and was then powered off until 23:38.
 //   - Amy (Ravi's estranged partner) argued with Ravi by text that evening; those texts survive only on
 //     Ravi's phone. Her phone reported no location 21:40–22:50 while it called Ravi twice.
-//   - Paul paid Cara $4,800 as an "invoice" and Cara sent $4,320 back the same afternoon; their phones met
-//     four times at Dock Cafe with no call or text on record.
+//   - The hidden link: Paul and Cara have no call, text, saved contact, payment or social tie on any phone,
+//     yet their phones spent 20 minutes within 100 m of each other on five days, at five different unnamed
+//     roadside spots. No record names the link; it only appears when the two location tracks are compared.
 //   - Ken, dismissed by Ravi on 14 Apr, posted hostile comments about him, but his phone was far from Pier 9
 //     the whole window. Motive and a shared area are leads, not presence.
-//   - After a news alert at 09:05 on 17 Apr, three phones deleted threads within 35 minutes.
+//   - After a news alert at 09:05 on 17 Apr, three phones deleted their threads with Ravi within 26 minutes.
 //   Decoys: Ken's phone off overnight 14→15 Apr, Cara's 50-min gap on 19 Apr, Amy and Ken at FreshMart once,
 //   Paul → Amy $50 "lunch", and Amy's "Done being lied to." post (below the hostility threshold).
 
-import type { ChainOutput, GapOutput, GapType, CoverageOutput, EvidenceRow, EvidenceTable, HostilityOutput, MeetingsOutput, MissingOutput, Person, PersonId, Place, SyncOutput, TrackPoint } from '../api/types'
+import type { GapOutput, GapType, CoverageOutput, EvidenceRow, EvidenceTable, HostilityOutput, MeetingsOutput, MissingOutput, Person, PersonId, Place, SyncOutput, TrackPoint } from '../api/types'
 import { fmtDate } from '../lib/format'
 
 // ---------- helpers ----------
@@ -73,7 +74,22 @@ export const PLACES: Place[] = [
   { name: 'Walsh residence', kind: 'home', lat: 41.021, lon: -71.951 },
   { name: 'Novak residence', kind: 'home', lat: 40.961, lon: -71.94 },
 ]
-export const place = (name: string) => PLACES.find((p) => p.name === name)!
+/**
+ * Points that no map or saved place names: the five spots where Paul's and Cara's phones met. Location rows
+ * there carry coordinates only (place_name null), so there is nothing to search for. The stays table labels
+ * them by their coordinates. Not part of PLACES, so maps don't mark them.
+ */
+const spot = (lat: number, lon: number): Place => ({ name: `Unnamed (${lat.toFixed(3)}, ${lon.toFixed(3)})`, kind: 'unnamed', lat, lon })
+export const SPOTS: Place[] = [
+  spot(40.9835, -71.9605), // fuel station forecourt off Route 25, 2 km from Dock Cafe
+  spot(41.097, -71.975), // lay-by on Northgate Rd, 1.9 km from the mall
+  spot(40.918, -72.022), // Sunset Park south lot, 2.1 km from the park entrance
+  spot(40.952, -71.951), // side street off Harbor Rd, 1.4 km from the lot
+  spot(40.94, -71.99), // Shore Rd lay-by, 2.1 km from the lot
+]
+export const findPlace = (name?: string) => PLACES.find((p) => p.name === name) ?? SPOTS.find((p) => p.name === name)
+export const isNamedPlace = (name?: string) => PLACES.some((p) => p.name === name)
+export const place = (name: string) => findPlace(name)!
 export const SCENE = place('Pier 9 Warehouse')
 
 export const NUMBERS: Record<PersonId, string> = {
@@ -172,7 +188,8 @@ export function locRow(owner: PersonId, t: string, placeName: string, jitterM = 
   const lat = +(pl.lat + dLat).toFixed(6)
   const lon = +(pl.lon + dLon).toFixed(6)
   const acc = 5 + Math.floor(rng() * 20)
-  const id = addRow(owner, 'locations', t, `${placeName} (±${acc} m)`, { lat, lon, accuracy_m: acc, place_name: placeName, source: 'gps' })
+  const named = isNamedPlace(placeName)
+  const id = addRow(owner, 'locations', t, `${named ? placeName : 'Unnamed location'} (±${acc} m)`, { lat, lon, accuracy_m: acc, place_name: named ? placeName : null, source: 'gps' })
   return { id, t, lat, lon }
 }
 
@@ -257,10 +274,9 @@ for (const p of ['paul', 'amy', 'ken', 'cara'] as PersonId[]) newsIds[p] = msg(p
 export const NEWS_IDS = newsIds
 const syncDef: [PersonId, 'thread_deleted' | 'power_off' | 'power_on', string, string][] = [
   ['paul', 'thread_deleted', ts(17, 9, 20), `SMS thread with ${NUMBERS.ravi} (Ravi)`],
-  ['paul', 'thread_deleted', ts(17, 9, 21), `WhatsApp thread with ${NUMBERS.cara} (Cara)`],
   ['amy', 'thread_deleted', ts(17, 9, 25), `SMS thread with ${NUMBERS.ravi} (Ravi)`],
   ['paul', 'power_off', ts(17, 9, 30), 'Device powered off'],
-  ['cara', 'thread_deleted', ts(17, 9, 46), `WhatsApp thread with ${NUMBERS.paul} (Paul)`],
+  ['cara', 'thread_deleted', ts(17, 9, 46), `SMS thread with ${NUMBERS.ravi} (Ravi)`],
   ['cara', 'power_off', ts(17, 9, 55), 'Device powered off'],
   ['paul', 'power_on', ts(17, 12, 40), 'Device powered on'],
   ['cara', 'power_on', ts(17, 13, 10), 'Device powered on'],
@@ -296,10 +312,9 @@ export const MISSING: MissingOutput = {
 export const PAUL_DELETE_RAVI = syncEvents[0]
 
 // =====================================================================
-// CHAIN  Paul → Cara $4,800 "invoice HSC-2291", Cara → Paul $4,320 4 h 35 min later (15 Apr)
+// Swiftpay helper. There is no money plant between Paul and Cara: a direct transfer would name the link
+// in one row. The only Swiftpay transfer between case phones is the Paul → Amy $50 decoy below.
 // =====================================================================
-const l1t = ts(15, 11, 5)
-const l2t = ts(15, 15, 40)
 const tx = (owner: PersonId, t: string, from: PersonId, to: PersonId, amount: number, memo: string) =>
   addRow(owner, 'transactions', t, `${owner === from ? `Sent $${amount.toLocaleString()} to ${personOf(to).name}` : `Received $${amount.toLocaleString()} from ${personOf(from).name}`} (Swiftpay)${memo ? `, memo "${memo}"` : ', no memo'}`, {
     app: 'Swiftpay',
@@ -309,50 +324,50 @@ const tx = (owner: PersonId, t: string, from: PersonId, to: PersonId, amount: nu
     currency: 'USD',
     memo,
   })
-const l1 = { from: 'paul', to: 'cara', amount: 4800, currency: 'USD', t: l1t, memo: 'invoice HSC-2291', row_ids: [tx('paul', l1t, 'paul', 'cara', 4800, 'invoice HSC-2291'), tx('cara', l1t, 'paul', 'cara', 4800, 'invoice HSC-2291')] }
-const l2 = { from: 'cara', to: 'paul', amount: 4320, currency: 'USD', t: l2t, memo: 'thx', row_ids: [tx('cara', l2t, 'cara', 'paul', 4320, 'thx'), tx('paul', l2t, 'cara', 'paul', 4320, 'thx')] }
-export const CHAIN: ChainOutput = {
-  kind: 'chain',
-  links: [l1, l2],
-  gap_minutes: minsBetween(l1t, l2t),
-  gap_label: '4 h 35 min',
-  ratio: 0.9,
-  thresholds: { window_h: 24, ratio_min: 0.8, ratio_max: 1.0, min_amount: 500 },
-}
 
 // =====================================================================
-// MEET  Paul's and Cara's phones at Dock Cafe on 13, 15, 16, 18 Apr; no call or text between them anywhere
+// MEET  The hidden link. Paul's and Cara's phones within 100 m for 20 min on five days, at five different
+// unnamed spots (SPOTS), arriving separately. No call, text, saved contact, payment or social tie between
+// them exists on any phone, so nothing in either phone names the other.
 // =====================================================================
 const occasionsDef = [
-  { day: 13, h: 8, m: 10, slots: 5 },
-  { day: 15, h: 7, m: 50, slots: 4 },
-  { day: 16, h: 12, m: 30, slots: 5 },
-  { day: 18, h: 9, m: 0, slots: 6 },
+  { day: 13, h: 7, m: 30, slots: 2, spot: 0 },
+  { day: 14, h: 18, m: 0, slots: 2, spot: 1 },
+  { day: 15, h: 12, m: 40, slots: 2, spot: 2 },
+  { day: 16, h: 12, m: 30, slots: 2, spot: 3 },
+  { day: 18, h: 9, m: 0, slots: 2, spot: 4 },
 ]
+/** "unnamed spot 1.9 km from Northgate Mall": the nearest named place that isn't a home, computed from coordinates. */
+export function nearestLabel(lat: number, lon: number) {
+  const [d, n] = PLACES.filter((p) => p.kind !== 'home')
+    .map((p) => [haversine(lat, lon, p.lat, p.lon), p.name] as const)
+    .sort((x, y) => x[0] - y[0])[0]
+  return `unnamed spot ${(d / 1000).toFixed(1)} km from ${n}`
+}
 export const MEET: MeetingsOutput = {
   kind: 'meetings',
   person_a: 'paul',
   person_b: 'cara',
-  occasions: occasionsDef.map(({ day, h, m, slots }) => {
+  occasions: occasionsDef.map(({ day, h, m, slots, spot }) => {
     const row_ids: string[] = []
     let minD = Infinity
     let first = ''
     let last = ''
+    const pl = SPOTS[spot]
     for (let i = 0; i < slots; i++) {
       const mins = h * 60 + m + i * 10
       const t = ts(day, Math.floor(mins / 60), mins % 60)
-      const a = locRow('paul', t, 'Dock Cafe', 15)
-      const b = locRow('cara', t, 'Dock Cafe', 15)
+      const a = locRow('paul', t, pl.name, 20)
+      const b = locRow('cara', t, pl.name, 20)
       minD = Math.min(minD, haversine(a.lat, a.lon, b.lat, b.lon))
       row_ids.push(a.id, b.id)
       if (i === 0) first = t
       last = t
     }
-    const pl = place('Dock Cafe')
-    return { date: fmtDate(first), place: 'Dock Cafe', start: first, end: last, duration_min: slots * 10, min_distance_m: Math.round(minD), lat: pl.lat, lon: pl.lon, row_ids }
+    return { date: fmtDate(first), place: nearestLabel(pl.lat, pl.lon), start: first, end: last, duration_min: slots * 10, min_distance_m: Math.round(minD), lat: pl.lat, lon: pl.lon, row_ids }
   }),
   contact_rows_found: 0,
-  channels_checked: ['messages', 'calls', 'social direct messages'],
+  channels_checked: ['messages', 'calls', 'contacts', 'transactions', 'social interactions'],
   thresholds: { within_m: 100, min_minutes: 20, min_occasions: 2 },
 }
 
@@ -400,8 +415,6 @@ export const RAVI_POST = social('ravi', ts(15, 18, 0), 'post', "Cleaning house a
 export const AMY_POST = social('amy', ts(16, 20, 33), 'post', 'Done being lied to.', 0.55, null, 'own profile')
 // Ordinary ties the relationship mapper picks up.
 export const SOCIAL_TIES = [
-  social('cara', ts(13, 7, 2), 'follow', '', null, 'paul', 'follow list (date followed not recorded)'),
-  social('paul', ts(16, 23, 48), 'like', '', null, 'cara', "liked @cara.novak's post"),
   social('amy', ts(13, 9, 12), 'follow', '', null, 'ravi', 'follow list'),
   social('ken', ts(13, 9, 40), 'follow', '', null, 'ravi', 'follow list'),
   social('paul', ts(15, 18, 22), 'like', '', null, 'ravi', "liked @ravi.mehta's post"),
@@ -489,7 +502,7 @@ export const COVERAGE_IDS = coverageDevices.flatMap((d) => [d.first.id, d.last.i
 export const NEXT_STEPS = [
   "Ask Paul where he was between 21:16 and 23:38 on 16 April, when his phone was off, and about the 18:05 text from Ravi's phone.",
   'Ask Amy where she was between 21:40 and 22:50 on 16 April, and why the thread with Ravi was deleted at 09:25 on 17 April.',
-  'Request Swiftpay records for Paul and Cara, and the Harbor Supply Co. invoice HSC-2291.',
+  'Request bank records for Paul and Cara, and every Harbor Supply Co. invoice from Novak since January (the invoices Ravi asked Paul for on 15 April).',
   'Request CCTV and parking records for Harbor Rd lot and Pier 9, 16 April 20:30 to 00:00.',
   "Request carrier cell-site records for Paul's and Amy's numbers for the same window; a phone that is off leaves none.",
   "Preserve Ken's Snapline account; the posts are context for interview, not evidence of presence.",

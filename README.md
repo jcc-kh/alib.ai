@@ -70,12 +70,12 @@ At any time, **review**: dispute a data row, and every check that cited it rerun
 What the data holds (the answer key is in `frontend/src/mock/answerKey.ts`):
 - At 18:05 Ravi's phone texted Paul: *"I've seen the Novak invoices. Pier 9, 9:30 tonight. Come alone."* Paul's phone came within 950 m of Pier 9 at 21:10 and was then off until 23:38.
 - Amy's texts with Ravi that evening survive only on Ravi's phone; her phone had no location data from 21:40 to 22:50 while it called him twice.
-- Paul paid Cara $4,800 as an "invoice" and $4,320 came back the same afternoon; their phones met four times with no call or text on record.
+- **The hidden link.** Paul and Cara have no call, text, saved contact, payment or social tie on any phone: read phone by phone, they are strangers who each work with Ravi. Yet their phones spent 20 minutes within 100 m of each other on five days, each time at a different unnamed roadside spot, arriving separately. No record names the link and there is no shared name or place to search for; it appears only when the two location tracks are compared, which is what the network does. Every other pair of phones only overlaps at a named workplace, plus one supermarket decoy.
 - Ken posted hostile comments about Ravi after losing his job, but his phone was at least 9 km from Pier 9 all evening. Motive is a lead, not presence.
-- After a news alert at 09:05 on 17 April, three phones deleted threads within 35 minutes.
+- After a news alert at 09:05 on 17 April, three phones deleted their threads with Ravi within 26 minutes.
 - Five decoys look suspicious but have ordinary explanations; the sweep sets all of them aside.
 
-**Adding a source, live.** The demo opens with four phones loaded; **Cara's phone is added mid-demo** as a new source, and the board highlights what it changes: her side of the round-trip payment and of the four meetings with Paul's phone, and any of the post-news deletions made on her phone.
+**Adding a source, live.** The demo opens with four phones loaded; **Cara's phone is added mid-demo** as a new source, and the board highlights what it changes. The hidden link appears: a new string between Paul and Cara that no record on either phone accounts for, with the question "Why do Paul's and Cara's phones keep meeting when they never contact each other?" Her post-news deletion joins the synchronised-deletion insight. The money behind the link (the "Novak invoices" Ravi asked Paul for) is not on the phones; requesting bank records is the suggested next step.
 
 **Claims to verify** are pre-filled, for example:
 - Ken: "I was nowhere near the pier that night." (Supported: his phone was at least 9 km away all evening)
